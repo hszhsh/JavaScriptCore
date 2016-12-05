@@ -25,7 +25,7 @@ mark_as_advanced(ICU_INCLUDE_DIR)
 # Look for the library.
 find_library(
     ICU_LIBRARY
-    NAMES icuuc libicuuc cygicuuc cygicuuc32
+    NAMES icuuc_53 icuuc libicuuc cygicuuc cygicuuc32
     HINTS ${PC_ICU_LIBRARY_DIRS}
           ${PC_ICU_LIBDIR}
           ${WEBKIT_LIBRARIES_LINK_DIR}
@@ -51,7 +51,7 @@ if (ICU_INCLUDE_DIR AND ICU_LIBRARY)
     pkg_check_modules(PC_ICU_I18N icu-i18n)
     find_library(
         ICU_I18N_LIBRARY
-        NAMES icui18n icuin libicui18n libicuin cygicuin cygicuin32
+        NAMES icui18n_53 icui18n icuin libicui18n libicuin cygicuin cygicuin32
         HINTS ${PC_ICU_I18N_LIBRARY_DIRS}
               ${PC_ICU_I18N_LIBDIR}
               ${WEBKIT_LIBRARIES_LINK_DIR}
@@ -68,7 +68,7 @@ if (ICU_INCLUDE_DIR AND ICU_LIBRARY)
     # Look for the ICU data libraries
     find_library(
         ICU_DATA_LIBRARY
-        NAMES icudata libicudata cygicudata cygicudata32
+        NAMES icudata_53 icudata libicudata cygicudata cygicudata32
         HINTS ${PC_ICU_I18N_LIBRARY_DIRS}
               ${PC_ICU_I18N_LIBDIR}
               ${WEBKIT_LIBRARIES_LINK_DIR}

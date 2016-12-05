@@ -41,6 +41,12 @@
 #define PTHREAD_KEYS_MAX 1024
 #else
 #include <limits.h>
+#if OS(ANDROID)
+#ifndef PTHREAD_KEYS_MAX
+#define PTHREAD_KEYS_MAX 128
+#endif
+#endif
+
 #endif
 
 namespace WTF {

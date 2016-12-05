@@ -30,6 +30,15 @@
 #include <wtf/Vector.h>
 
 namespace JSC {
+    
+#if PLATFORM(ANDROID) && (ANDROID_NATIVE_API_LEVEL < 18)
+    float log2f(float x) {
+        return logf(x) / logf(2);
+    }
+    double log2(double x) {
+        return log(x) / log(2);
+    }
+#endif
 
 STATIC_ASSERT_IS_TRIVIALLY_DESTRUCTIBLE(MathObject);
 

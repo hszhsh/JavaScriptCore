@@ -73,18 +73,23 @@ void* Allocator::tryAllocate(size_t alignment, size_t size)
     bool crashOnFailure = false;
     return allocateImpl(alignment, size, crashOnFailure);
 }
-
+    
 void* Allocator::allocateImpl(size_t alignment, size_t size, bool crashOnFailure)
 {
     BASSERT(isPowerOfTwo(alignment));
 
     if (!m_isBmallocEnabled) {
         void* result = nullptr;
+        
+#if !defined(ANDROID) || (ANDROID_NATIVE_API_LEVEL > 15)
         if (posix_memalign(&result, alignment, size)) {
             if (crashOnFailure)
                 BCRASH();
             return nullptr;
         }
+#else
+            return memalign(alignment, size);
+#endif
         return result;
     }
 

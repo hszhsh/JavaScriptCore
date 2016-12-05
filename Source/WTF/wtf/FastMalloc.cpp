@@ -142,10 +142,35 @@ void fastAlignedFree(void* p)
 {
     _aligned_free(p);
 }
+    
+#elif (PLATFORM(ANDROID) && (ANDROID_NATIVE_API_LEVEL < 16))
+
+void* fastAlignedMalloc(size_t alignment, size_t size)
+{
+    ASSERT_IS_WITHIN_LIMIT(size);
+    void* p = nullptr;
+    memalign(&p, alignment, size);
+    if (UNLIKELY(!p))
+        CRASH();
+    return p;
+}
+
+void* tryFastAlignedMalloc(size_t alignment, size_t size)
+{
+    FAIL_IF_EXCEEDS_LIMIT(size);
+    void* p = nullptr;
+    memalign(&p, alignment, size);
+    return p;
+}
+
+void fastAlignedFree(void* p) 
+{
+    free(p);
+}
 
 #else
 
-void* fastAlignedMalloc(size_t alignment, size_t size) 
+void* fastAlignedMalloc(size_t alignment, size_t size)
 {
     ASSERT_IS_WITHIN_LIMIT(size);
     void* p = nullptr;
@@ -155,7 +180,7 @@ void* fastAlignedMalloc(size_t alignment, size_t size)
     return p;
 }
 
-void* tryFastAlignedMalloc(size_t alignment, size_t size) 
+void* tryFastAlignedMalloc(size_t alignment, size_t size)
 {
     FAIL_IF_EXCEEDS_LIMIT(size);
     void* p = nullptr;

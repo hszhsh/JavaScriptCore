@@ -42,7 +42,7 @@
 #include <wtf/StringExtras.h>
 #include <wtf/text/StringBuilder.h>
 
-#if PLATFORM(COCOA)
+#if PLATFORM(MAC)
 #include <crt_externs.h>
 #endif
 
@@ -428,7 +428,7 @@ void Options::initialize()
             // Allow environment vars to override options if applicable.
             // The evn var should be the name of the option prefixed with
             // "JSC_".
-#if PLATFORM(COCOA)
+#if PLATFORM(MAC)
             bool hasBadOptions = false;
             for (char** envp = *_NSGetEnviron(); *envp; envp++) {
                 const char* env = *envp;

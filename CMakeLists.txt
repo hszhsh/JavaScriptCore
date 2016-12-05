@@ -8,7 +8,9 @@ endif ()
 
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/Source/cmake")
 
-set(ENABLE_WEBCORE ON)
+if (NOT DEFINED ENABLE_WEBCORE)
+    set(ENABLE_WEBCORE ON)
+endif()
 
 if (NOT DEFINED ENABLE_WEBKIT)
     set(ENABLE_WEBKIT ON)
@@ -28,6 +30,7 @@ set(ALL_PORTS
     JSCOnly
     Mac
     WinCairo
+    Android
 )
 set(PORT "NOPORT" CACHE STRING "choose which WebKit port to build (one of ${ALL_PORTS})")
 
@@ -94,6 +97,10 @@ if (UNIX)
     if (APPLE)
         set(WTF_OS_MAC_OS_X 1)
     else ()
+        if(ANDROID)
+            ADD_DEFINITIONS(-DANDROID_NATIVE_API_LEVEL=${ANDROID_NATIVE_API_LEVEL})
+            MESSAGE("ANDROID_NATIVE_API_LEVEL=${ANDROID_NATIVE_API_LEVEL}")
+        endif()
         set(WTF_OS_UNIX 1)
     endif ()
 elseif (CMAKE_SYSTEM_NAME MATCHES "Windows")
@@ -111,7 +118,7 @@ if (SHARED_CORE)
     set(JavaScriptCore_LIBRARY_TYPE SHARED)
     set(WebCore_LIBRARY_TYPE SHARED)
 else ()
-    set(JavaScriptCore_LIBRARY_TYPE SHARED)
+    set(JavaScriptCore_LIBRARY_TYPE STATIC)
     set(WebCore_LIBRARY_TYPE STATIC)
 endif ()
 

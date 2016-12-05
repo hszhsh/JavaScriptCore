@@ -49,7 +49,7 @@
 #include "ScriptCallStackFactory.h"
 #include <wtf/Stopwatch.h>
 
-#if OS(DARWIN) || (OS(LINUX) && !PLATFORM(GTK))
+#if OS(DARWIN) || (OS(LINUX) && !PLATFORM(GTK) && !PLATFORM(ANDROID))
 #include <cxxabi.h>
 #include <dlfcn.h>
 #include <execinfo.h>
@@ -189,7 +189,7 @@ void JSGlobalObjectInspectorController::pause()
 
 void JSGlobalObjectInspectorController::appendAPIBacktrace(ScriptCallStack* callStack)
 {
-#if OS(DARWIN) || (OS(LINUX) && !PLATFORM(GTK))
+#if OS(DARWIN) || (OS(LINUX) && !PLATFORM(GTK) && !PLATFORM(ANDROID))
     static const int framesToShow = 31;
     static const int framesToSkip = 3; // WTFGetBacktrace, appendAPIBacktrace, reportAPIException.
 

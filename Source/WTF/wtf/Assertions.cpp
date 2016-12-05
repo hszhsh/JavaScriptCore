@@ -75,7 +75,9 @@
 #if OS(DARWIN) || (OS(LINUX) && defined(__GLIBC__) && !defined(__UCLIBC__))
 #include <cxxabi.h>
 #include <dlfcn.h>
+#if !OS(ANDROID)
 #include <execinfo.h>
+#endif
 #endif
 
 extern "C" {
@@ -261,7 +263,7 @@ void WTFReportBacktrace()
 }
 
 #if OS(DARWIN) || OS(LINUX)
-#  if PLATFORM(GTK)
+#  if PLATFORM(GTK) || PLATFORM(ANDROID)
 #    if defined(__GLIBC__) && !defined(__UCLIBC__)
 #      define USE_BACKTRACE_SYMBOLS 1
 #    endif

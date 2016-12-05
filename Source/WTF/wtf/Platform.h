@@ -403,6 +403,10 @@
 #define WTF_OS_SOLARIS 1
 #endif
 
+#if defined(ANDROID)
+#define WTF_OS_ANDROID 1
+#endif
+
 /* OS(WINDOWS) - Any version of Windows */
 #if defined(WIN32) || defined(_WIN32)
 #define WTF_OS_WINDOWS 1
@@ -456,6 +460,8 @@
 #endif
 #elif OS(WINDOWS)
 #define WTF_PLATFORM_WIN 1
+#elif OS(ANDROID)
+#define WTF_PLATFORM_ANDROID 1
 #endif
 
 /* PLATFORM(COCOA) */
