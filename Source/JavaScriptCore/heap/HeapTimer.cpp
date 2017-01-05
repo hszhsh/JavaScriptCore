@@ -233,24 +233,48 @@ void HeapTimer::cancelTimer()
 }
 #else
 HeapTimer::HeapTimer(VM* vm)
-    : m_vm(vm)
+    : m_vm(vm), m_apiLock(&vm->apiLock())
 {
+    m_timer = new RunLoop::Timer<HeapTimer>(RunLoop::current(), this, &HeapTimer::timerDidFire);
 }
 
 HeapTimer::~HeapTimer()
 {
+    delete m_timer;
+}
+    
+void HeapTimer::timerDidFire()
+{
+    m_apiLock->lock();
+    
+    if (!m_apiLock->vm()) {
+        // The VM has been destroyed, so we should just give up.
+        m_apiLock->unlock();
+        return;
+    }
+    
+    {
+        JSLockHolder locker(m_vm);
+        doWork();
+    }
+    
+    m_apiLock->unlock();
 }
 
 void HeapTimer::invalidate()
 {
 }
 
-void HeapTimer::scheduleTimer(double)
+void HeapTimer::scheduleTimer(double intervalSeconds)
 {
+    m_timer->startOneShot(intervalSeconds);
+    m_isScheduled = true;
 }
 
 void HeapTimer::cancelTimer()
 {
+    m_timer->stop();
+    m_isScheduled = false;
 }
 #endif
     

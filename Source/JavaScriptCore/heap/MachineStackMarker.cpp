@@ -555,6 +555,15 @@ void* MachineThreads::Thread::Registers::stackPointer() const
 #error Unknown Architecture
 #endif
 
+#elif OS(ANDROID)
+    
+    // TODO x86 x86_64 and mips
+#if CPU(ARM)
+    return reinterpret_cast<void*>((uintptr_t) regs.machineContext.arm_sp);
+#elif CPU(ARM64)
+    return reinterpret_cast<void*>((uintptr_t) regs.machineContext.sp);
+#endif
+    
 #else
     void* stackBase = 0;
     size_t stackSize = 0;

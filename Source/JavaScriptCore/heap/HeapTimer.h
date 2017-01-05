@@ -39,6 +39,8 @@
 #include <wtf/glib/GRefPtr.h>
 #endif
 
+#include <wtf/RunLoop.h>
+
 namespace JSC {
 
 class JSLock;
@@ -84,6 +86,9 @@ protected:
 #elif USE(GLIB)
     void timerDidFire();
     GRefPtr<GSource> m_timer;
+#else
+    void timerDidFire();
+    RunLoop::Timer<HeapTimer>* m_timer;
 #endif
     
 private:

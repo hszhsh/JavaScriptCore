@@ -72,18 +72,28 @@
 #include <unistd.h>
 #endif
 
-#if OS(DARWIN) || (OS(LINUX) && defined(__GLIBC__) && !defined(__UCLIBC__))
+#if OS(DARWIN) || OS(ANDROID) || (OS(LINUX) && defined(__GLIBC__) && !defined(__UCLIBC__))
 #include <cxxabi.h>
 #include <dlfcn.h>
-#if !OS(ANDROID)
+#if OS(ANDROID)
+#include <iomanip>
+#include <unwind.h>
+#else
 #include <execinfo.h>
 #endif
+#endif
+
+#if OS(ANDROID)
+#include <android/log.h>
 #endif
 
 extern "C" {
 
 static void logToStderr(const char* buffer)
 {
+#if OS(ANDROID)
+    __android_log_write(ANDROID_LOG_ERROR, "WTF", buffer);
+#else
 #if USE(APPLE_SYSTEM_LOG)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
@@ -91,11 +101,15 @@ static void logToStderr(const char* buffer)
 #pragma clang diagnostic pop
 #endif
     fputs(buffer, stderr);
+#endif
 }
 
 WTF_ATTRIBUTE_PRINTF(1, 0)
 static void vprintf_stderr_common(const char* format, va_list args)
 {
+#if OS(ANDROID)
+    __android_log_vprint(ANDROID_LOG_ERROR, "WTF", format, args);
+#else
 #if USE(CF) && !OS(WINDOWS)
     if (strstr(format, "%@")) {
         CFStringRef cfFormat = CFStringCreateWithCString(NULL, format, kCFStringEncodingUTF8);
@@ -155,6 +169,7 @@ static void vprintf_stderr_common(const char* format, va_list args)
     }
 #endif
     vfprintf(stderr, format, args);
+#endif
 }
 
 #if COMPILER(GCC_OR_CLANG)
@@ -239,7 +254,45 @@ void WTFReportArgumentAssertionFailure(const char* file, int line, const char* f
     printf_stderr_common("ARGUMENT BAD: %s, %s\n", argName, assertion);
     printCallSite(file, line, function);
 }
-
+    
+#if OS(ANDROID)
+    
+namespace {
+struct BacktraceState
+{
+    void** current;
+    void** end;
+};
+    
+static _Unwind_Reason_Code unwindCallback(struct _Unwind_Context* context, void* arg)
+{
+    BacktraceState* state = static_cast<BacktraceState*>(arg);
+    uintptr_t pc = _Unwind_GetIP(context);
+    if (pc) {
+        if (state->current == state->end) {
+            return _URC_END_OF_STACK;
+        } else {
+            *state->current++ = reinterpret_cast<void*>(pc);
+        }
+    }
+    return _URC_NO_REASON;
+}
+}
+    
+size_t captureBacktrace(void** buffer, size_t max)
+{
+    BacktraceState state = {buffer, buffer + max};
+    _Unwind_Backtrace(unwindCallback, &state);
+    
+    return state.current - buffer;
+}
+    
+void WTFGetBacktrace(void** stack, int* size)
+{
+    *size = captureBacktrace(stack, *size);
+}
+    
+#else
 void WTFGetBacktrace(void** stack, int* size)
 {
 #if OS(DARWIN) || (OS(LINUX) && defined(__GLIBC__) && !defined(__UCLIBC__))
@@ -250,6 +303,7 @@ void WTFGetBacktrace(void** stack, int* size)
     *size = 0;
 #endif
 }
+#endif
 
 void WTFReportBacktrace()
 {
@@ -263,7 +317,7 @@ void WTFReportBacktrace()
 }
 
 #if OS(DARWIN) || OS(LINUX)
-#  if PLATFORM(GTK) || PLATFORM(ANDROID)
+#  if PLATFORM(GTK)
 #    if defined(__GLIBC__) && !defined(__UCLIBC__)
 #      define USE_BACKTRACE_SYMBOLS 1
 #    endif

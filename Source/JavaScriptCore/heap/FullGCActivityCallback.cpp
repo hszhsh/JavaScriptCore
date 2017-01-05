@@ -93,21 +93,35 @@ FullGCActivityCallback::FullGCActivityCallback(Heap* heap)
 
 void FullGCActivityCallback::doCollection()
 {
+    Heap& heap = m_vm->heap;
+    m_didSyncGCRecently = false;
+    heap.collectAsync(CollectionScope::Full);
 }
 
 double FullGCActivityCallback::lastGCLength()
 {
-    return 0;
+    return m_vm->heap.lastFullGCLength();
 }
 
 double FullGCActivityCallback::deathRate()
 {
-    return 0;
+    Heap* heap = &m_vm->heap;
+    size_t sizeBefore = heap->sizeBeforeLastFullCollection();
+    size_t sizeAfter = heap->sizeAfterLastFullCollection();
+    if (!sizeBefore)
+        return 1.0;
+    if (sizeAfter > sizeBefore) {
+        // GC caused the heap to grow(!)
+        // This could happen if the we visited more extra memory than was reported allocated.
+        // We don't return a negative death rate, since that would schedule the next GC in the past.
+        return 0;
+    }
+    return static_cast<double>(sizeBefore - sizeAfter) / static_cast<double>(sizeBefore);
 }
 
-double FullGCActivityCallback::gcTimeSlice(size_t)
+double FullGCActivityCallback::gcTimeSlice(size_t bytes)
 {
-    return 0;
+    return std::min((static_cast<double>(bytes) / MB) * Options::percentCPUPerMBForFullTimer(), Options::collectionTimerMaxPercentCPU());
 }
 
 #endif // USE(CF) || USE(GLIB)

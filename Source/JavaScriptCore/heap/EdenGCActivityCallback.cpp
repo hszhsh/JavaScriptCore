@@ -77,21 +77,33 @@ EdenGCActivityCallback::EdenGCActivityCallback(Heap* heap)
 
 void EdenGCActivityCallback::doCollection()
 {
+    m_vm->heap.collectAsync(CollectionScope::Eden);
 }
 
 double EdenGCActivityCallback::lastGCLength()
 {
-    return 0;
+    return m_vm->heap.lastEdenGCLength();
 }
 
 double EdenGCActivityCallback::deathRate()
 {
-    return 0;
+    Heap* heap = &m_vm->heap;
+    size_t sizeBefore = heap->sizeBeforeLastEdenCollection();
+    size_t sizeAfter = heap->sizeAfterLastEdenCollection();
+    if (!sizeBefore)
+        return 1.0;
+    if (sizeAfter > sizeBefore) {
+        // GC caused the heap to grow(!)
+        // This could happen if the we visited more extra memory than was reported allocated.
+        // We don't return a negative death rate, since that would schedule the next GC in the past.
+        return 0;
+    }
+    return static_cast<double>(sizeBefore - sizeAfter) / static_cast<double>(sizeBefore);
 }
 
-double EdenGCActivityCallback::gcTimeSlice(size_t)
+double EdenGCActivityCallback::gcTimeSlice(size_t bytes)
 {
-    return 0;
+    return std::min((static_cast<double>(bytes) / MB) * Options::percentCPUPerMBForEdenTimer(), Options::collectionTimerMaxPercentCPU());
 }
 
 #endif // USE(CF) || USE(GLIB)

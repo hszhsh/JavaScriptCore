@@ -44,9 +44,9 @@ namespace JSC {
 
 bool GCActivityCallback::s_shouldCreateGCTimer = true;
 
-#if USE(CF) || USE(GLIB)
-
 const double timerSlop = 2.0; // Fudge factor to avoid performance cost of resetting timer.
+    
+#if USE(CF) || USE(GLIB)
 
 #if USE(CF)
 GCActivityCallback::GCActivityCallback(Heap* heap)
@@ -182,18 +182,53 @@ GCActivityCallback::GCActivityCallback(Heap* heap)
 
 void GCActivityCallback::doWork()
 {
+    Heap* heap = &m_vm->heap;
+    if (!isEnabled())
+        return;
+    
+    JSLockHolder locker(m_vm);
+    if (heap->isDeferred()) {
+        scheduleTimer(0);
+        return;
+    }
+    
+    doCollection();
 }
 
-void GCActivityCallback::didAllocate(size_t)
+void GCActivityCallback::didAllocate(size_t bytes)
 {
+    // The first byte allocated in an allocation cycle will report 0 bytes to didAllocate.
+    // We pretend it's one byte so that we don't ignore this allocation entirely.
+    if (!bytes)
+        bytes = 1;
+    double bytesExpectedToReclaim = static_cast<double>(bytes) * deathRate();
+    double newDelay = lastGCLength() / gcTimeSlice(bytesExpectedToReclaim);
+    scheduleTimer(newDelay);
 }
 
 void GCActivityCallback::willCollect()
 {
+    cancelTimer();
 }
 
 void GCActivityCallback::cancel()
 {
+    cancelTimer();
+}
+    
+void GCActivityCallback::scheduleTimer(double newDelay)
+{
+    if (m_delay != -1 && newDelay * timerSlop > m_delay)
+        return;
+    
+    m_delay = newDelay;
+    HeapTimer::scheduleTimer(newDelay);
+}
+    
+void GCActivityCallback::cancelTimer()
+{
+    m_delay = -1;
+    HeapTimer::cancelTimer();
 }
 
 #endif

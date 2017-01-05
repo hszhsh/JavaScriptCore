@@ -94,21 +94,24 @@ protected:
     GCActivityCallback(VM* vm)
         : HeapTimer(vm)
         , m_enabled(true)
+        , m_delay(-1)
     {
     }
 #endif
 
     bool m_enabled;
 
-#if USE(CF) || USE(GLIB)
+//#if USE(CF) || USE(GLIB)
 protected:
     void cancelTimer();
     void scheduleTimer(double);
 
 private:
     double m_delay;
+#if USE(CF)
     double m_nextFireTime { 0 };
 #endif
+//#endif
 };
 
 } // namespace JSC
