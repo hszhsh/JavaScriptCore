@@ -297,6 +297,8 @@ void CachedResource::loadFrom(const CachedResource& resource)
 void CachedResource::setBodyDataFrom(const CachedResource& resource)
 {
     m_data = resource.m_data;
+    m_response = resource.m_response;
+    setDecodedSize(resource.decodedSize());
 }
 
 void CachedResource::checkNotify()
@@ -366,8 +368,12 @@ bool CachedResource::isCORSSameOrigin() const
 {
     // Following resource types do not use CORS
     ASSERT(type() != CachedResource::Type::FontResource);
+#if ENABLE(SVG_FONTS)
     ASSERT(type() != CachedResource::Type::SVGFontResource);
+#endif
+#if ENABLE(XSLT)
     ASSERT(type() != CachedResource::XSLStyleSheet);
+#endif
 
     // https://html.spec.whatwg.org/multipage/infrastructure.html#cors-same-origin
     return !loadFailedOrCanceled() && m_responseTainting != ResourceResponse::Tainting::Opaque;

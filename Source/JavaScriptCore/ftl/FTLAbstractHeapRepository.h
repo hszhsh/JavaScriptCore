@@ -51,7 +51,8 @@ namespace JSC { namespace FTL {
     macro(DirectArguments_callee, DirectArguments::offsetOfCallee()) \
     macro(DirectArguments_length, DirectArguments::offsetOfLength()) \
     macro(DirectArguments_minCapacity, DirectArguments::offsetOfMinCapacity()) \
-    macro(DirectArguments_overrides, DirectArguments::offsetOfOverrides()) \
+    macro(DirectArguments_mappedArguments, DirectArguments::offsetOfMappedArguments()) \
+    macro(DirectArguments_modifiedArgumentsDescriptor, DirectArguments::offsetOfModifiedArgumentsDescriptor()) \
     macro(GetterSetter_getter, GetterSetter::offsetOfGetter()) \
     macro(GetterSetter_setter, GetterSetter::offsetOfSetter()) \
     macro(JSArrayBufferView_length, JSArrayBufferView::offsetOfLength()) \
@@ -67,8 +68,6 @@ namespace JSC { namespace FTL {
     macro(JSFunction_executable, JSFunction::offsetOfExecutable()) \
     macro(JSFunction_scope, JSFunction::offsetOfScopeChain()) \
     macro(JSFunction_rareData, JSFunction::offsetOfRareData()) \
-    macro(FunctionRareData_allocator, FunctionRareData::offsetOfObjectAllocationProfile() + ObjectAllocationProfile::offsetOfAllocator()) \
-    macro(FunctionRareData_structure, FunctionRareData::offsetOfObjectAllocationProfile() + ObjectAllocationProfile::offsetOfStructure()) \
     macro(JSObject_butterfly, JSObject::butterflyOffset()) \
     macro(JSPropertyNameEnumerator_cachedInlineCapacity, JSPropertyNameEnumerator::cachedInlineCapacityOffset()) \
     macro(JSPropertyNameEnumerator_cachedPropertyNamesVector, JSPropertyNameEnumerator::cachedPropertyNamesVectorOffset()) \
@@ -109,8 +108,6 @@ namespace JSC { namespace FTL {
     macro(Structure_globalObject, Structure::globalObjectOffset()) \
     macro(Structure_prototype, Structure::prototypeOffset()) \
     macro(Structure_structureID, Structure::structureIDOffset()) \
-    macro(Structure_inlineCapacity, Structure::inlineCapacityOffset()) \
-    macro(Structure_initializationBlob, Structure::indexingTypeIncludingHistoryOffset()) \
     macro(JSMap_hashMapImpl, JSMap::offsetOfHashMapImpl()) \
     macro(JSSet_hashMapImpl, JSSet::offsetOfHashMapImpl()) \
     macro(HashMapImpl_capacity, HashMapImpl<HashMapBucket<HashMapBucketDataKey>>::offsetOfCapacity()) \

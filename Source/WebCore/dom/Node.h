@@ -61,7 +61,6 @@ class RenderStyle;
 class SVGQualifiedName;
 class ShadowRoot;
 class TouchEvent;
-class UIRequestEvent;
 
 using NodeOrString = Variant<RefPtr<Node>, String>;
 
@@ -241,7 +240,7 @@ public:
     WEBCORE_EXPORT Node* deprecatedShadowAncestorNode() const;
     ShadowRoot* containingShadowRoot() const;
     ShadowRoot* shadowRoot() const;
-    bool isUnclosedNode(const Node&) const;
+    bool isClosedShadowHidden(const Node&) const;
 
     HTMLSlotElement* assignedSlot() const;
     HTMLSlotElement* assignedSlotForBindings() const;
@@ -266,6 +265,8 @@ public:
         bool composed;
     };
     Node& getRootNode(const GetRootNodeOptions&) const;
+    
+    void* opaqueRoot() const;
 
     // Use when it's guaranteed to that shadowHost is null.
     ContainerNode* parentNodeGuaranteedHostFree() const;
@@ -507,10 +508,6 @@ public:
 #if ENABLE(TOUCH_EVENTS) && !PLATFORM(IOS)
     bool dispatchTouchEvent(TouchEvent&);
 #endif
-#if ENABLE(INDIE_UI)
-    bool dispatchUIRequestEvent(UIRequestEvent&);
-#endif
-
     bool dispatchBeforeLoadEvent(const String& sourceURL);
 
     void dispatchInputEvent();
@@ -530,13 +527,14 @@ public:
 #endif
 
     EventTargetData* eventTargetData() final;
+    EventTargetData* eventTargetDataConcurrently() final;
     EventTargetData& ensureEventTargetData() final;
 
-    void getRegisteredMutationObserversOfType(HashMap<MutationObserver*, MutationRecordDeliveryOptions>&, MutationObserver::MutationType, const QualifiedName* attributeName);
-    void registerMutationObserver(MutationObserver*, MutationObserverOptions, const HashSet<AtomicString>& attributeFilter);
-    void unregisterMutationObserver(MutationObserverRegistration*);
-    void registerTransientMutationObserver(MutationObserverRegistration*);
-    void unregisterTransientMutationObserver(MutationObserverRegistration*);
+    HashMap<MutationObserver*, MutationRecordDeliveryOptions> registeredMutationObservers(MutationObserver::MutationType, const QualifiedName* attributeName);
+    void registerMutationObserver(MutationObserver&, MutationObserverOptions, const HashSet<AtomicString>& attributeFilter);
+    void unregisterMutationObserver(MutationObserverRegistration&);
+    void registerTransientMutationObserver(MutationObserverRegistration&);
+    void unregisterTransientMutationObserver(MutationObserverRegistration&);
     void notifyMutationObserversNodeWillDetach();
 
     WEBCORE_EXPORT void textRects(Vector<IntRect>&) const;
@@ -670,6 +668,8 @@ private:
     HashSet<MutationObserverRegistration*>* transientMutationObserverRegistry();
 
     void adjustStyleValidity(Style::Validity, Style::InvalidationMode);
+    
+    void* opaqueRootSlow() const;
 
     int m_refCount;
     mutable uint32_t m_nodeFlags;
@@ -756,6 +756,15 @@ inline ContainerNode* Node::parentNode() const
     return m_parentNode;
 }
 
+inline void* Node::opaqueRoot() const
+{
+    // FIXME: Possible race?
+    // https://bugs.webkit.org/show_bug.cgi?id=165713
+    if (inDocument())
+        return &document();
+    return opaqueRootSlow();
+}
+
 inline ContainerNode* Node::parentNodeGuaranteedHostFree() const
 {
     ASSERT(!isShadowRoot());
@@ -781,7 +790,7 @@ inline void Node::setHasValidStyle()
 } // namespace WebCore
 
 #if ENABLE(TREE_DEBUGGING)
-// Outside the WebCore namespace for ease of invocation from gdb.
+// Outside the WebCore namespace for ease of invocation from the debugger.
 void showTree(const WebCore::Node*);
 void showNodePath(const WebCore::Node*);
 #endif

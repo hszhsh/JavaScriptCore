@@ -427,6 +427,20 @@ public:
         m_assembler.clz<64>(dest, src);
     }
 
+    void countTrailingZeros32(RegisterID src, RegisterID dest)
+    {
+        // Arm does not have a count trailing zeros only a count leading zeros.
+        m_assembler.rbit<32>(dest, src);
+        m_assembler.clz<32>(dest, dest);
+    }
+
+    void countTrailingZeros64(RegisterID src, RegisterID dest)
+    {
+        // Arm does not have a count trailing zeros only a count leading zeros.
+        m_assembler.rbit<64>(dest, src);
+        m_assembler.clz<64>(dest, dest);
+    }
+
     void lshift32(RegisterID src, RegisterID shiftAmount, RegisterID dest)
     {
         m_assembler.lsl<32>(dest, src, shiftAmount);
@@ -1560,6 +1574,16 @@ public:
         m_assembler.frintm<32>(dest, src);
     }
 
+    void roundTowardNearestIntDouble(FPRegisterID src, FPRegisterID dest)
+    {
+        m_assembler.frintn<64>(dest, src);
+    }
+
+    void roundTowardNearestIntFloat(FPRegisterID src, FPRegisterID dest)
+    {
+        m_assembler.frintn<32>(dest, src);
+    }
+
     void roundTowardZeroDouble(FPRegisterID src, FPRegisterID dest)
     {
         m_assembler.frintz<64>(dest, src);
@@ -1569,6 +1593,7 @@ public:
     {
         m_assembler.frintz<32>(dest, src);
     }
+
 
     // Convert 'src' to an integer, and places the resulting 'dest'.
     // If the result is not representable as a 32 bit value, branch.
@@ -1630,7 +1655,7 @@ public:
         // Truncate to a 64-bit integer in dataTempRegister, copy the low 32-bit to dest.
         m_assembler.fcvtzs<64, 64>(getCachedDataTempRegisterIDAndInvalidate(), src);
         zeroExtend32ToPtr(dataTempRegister, dest);
-        // Check thlow 32-bits sign extend to be equal to the full value.
+        // Check the low 32-bits sign extend to be equal to the full value.
         m_assembler.cmp<64>(dataTempRegister, dataTempRegister, ARM64Assembler::SXTW, 0);
         return Jump(makeBranch(branchType == BranchIfTruncateSuccessful ? Equal : NotEqual));
     }
@@ -1682,7 +1707,17 @@ public:
     {
         m_assembler.scvtf<32, 64>(dest, src);
     }
-    
+
+    void convertUInt64ToDouble(RegisterID src, FPRegisterID dest)
+    {
+        m_assembler.ucvtf<64, 64>(dest, src);
+    }
+
+    void convertUInt64ToFloat(RegisterID src, FPRegisterID dest)
+    {
+        m_assembler.ucvtf<32, 64>(dest, src);
+    }
+
     void divDouble(FPRegisterID src, FPRegisterID dest)
     {
         divDouble(dest, src, dest);
@@ -1906,6 +1941,16 @@ public:
         andDouble(op1, op2, dest);
     }
 
+    void orDouble(FPRegisterID op1, FPRegisterID op2, FPRegisterID dest)
+    {
+        m_assembler.vorr<64>(dest, op1, op2);
+    }
+
+    void orFloat(FPRegisterID op1, FPRegisterID op2, FPRegisterID dest)
+    {
+        orDouble(op1, op2, dest);
+    }
+
     void negateDouble(FPRegisterID src, FPRegisterID dest)
     {
         m_assembler.fneg<64>(dest, src);
@@ -2006,6 +2051,45 @@ public:
         m_assembler.fcvtzu<32, 64>(dest, src);
     }
 
+    void truncateDoubleToInt64(FPRegisterID src, RegisterID dest)
+    {
+        m_assembler.fcvtzs<64, 64>(dest, src);
+    }
+
+    void truncateDoubleToUint64(FPRegisterID src, RegisterID dest, FPRegisterID, FPRegisterID)
+    {
+        truncateDoubleToUint64(src, dest);
+    }
+
+    void truncateDoubleToUint64(FPRegisterID src, RegisterID dest)
+    {
+        m_assembler.fcvtzu<64, 64>(dest, src);
+    }
+
+    void truncateFloatToInt32(FPRegisterID src, RegisterID dest)
+    {
+        m_assembler.fcvtzs<32, 32>(dest, src);
+    }
+
+    void truncateFloatToUint32(FPRegisterID src, RegisterID dest)
+    {
+        m_assembler.fcvtzu<32, 32>(dest, src);
+    }
+
+    void truncateFloatToInt64(FPRegisterID src, RegisterID dest)
+    {
+        m_assembler.fcvtzs<64, 32>(dest, src);
+    }
+
+    void truncateFloatToUint64(FPRegisterID src, RegisterID dest, FPRegisterID, FPRegisterID)
+    {
+        truncateFloatToUint64(src, dest);
+    }
+
+    void truncateFloatToUint64(FPRegisterID src, RegisterID dest)
+    {
+        m_assembler.fcvtzu<64, 32>(dest, src);
+    }
 
     // Stack manipulation operations:
     //

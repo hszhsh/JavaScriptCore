@@ -91,8 +91,8 @@ void Parser<LexerType>::logError(bool)
     setErrorMessage(stream.toStringWithLatin1Fallback());
 }
 
-template <typename LexerType> template <typename A>
-void Parser<LexerType>::logError(bool shouldPrintToken, const A& value1)
+template <typename LexerType> template <typename... Args>
+void Parser<LexerType>::logError(bool shouldPrintToken, Args&&... args)
 {
     if (hasError())
         return;
@@ -101,91 +101,7 @@ void Parser<LexerType>::logError(bool shouldPrintToken, const A& value1)
         printUnexpectedTokenText(stream);
         stream.print(". ");
     }
-    stream.print(value1, ".");
-    setErrorMessage(stream.toStringWithLatin1Fallback());
-}
-
-template <typename LexerType> template <typename A, typename B>
-void Parser<LexerType>::logError(bool shouldPrintToken, const A& value1, const B& value2)
-{
-    if (hasError())
-        return;
-    StringPrintStream stream;
-    if (shouldPrintToken) {
-        printUnexpectedTokenText(stream);
-        stream.print(". ");
-    }
-    stream.print(value1, value2, ".");
-    setErrorMessage(stream.toStringWithLatin1Fallback());
-}
-
-template <typename LexerType> template <typename A, typename B, typename C>
-void Parser<LexerType>::logError(bool shouldPrintToken, const A& value1, const B& value2, const C& value3)
-{
-    if (hasError())
-        return;
-    StringPrintStream stream;
-    if (shouldPrintToken) {
-        printUnexpectedTokenText(stream);
-        stream.print(". ");
-    }
-    stream.print(value1, value2, value3, ".");
-    setErrorMessage(stream.toStringWithLatin1Fallback());
-}
-
-template <typename LexerType> template <typename A, typename B, typename C, typename D>
-void Parser<LexerType>::logError(bool shouldPrintToken, const A& value1, const B& value2, const C& value3, const D& value4)
-{
-    if (hasError())
-        return;
-    StringPrintStream stream;
-    if (shouldPrintToken) {
-        printUnexpectedTokenText(stream);
-        stream.print(". ");
-    }
-    stream.print(value1, value2, value3, value4, ".");
-    setErrorMessage(stream.toStringWithLatin1Fallback());
-}
-
-template <typename LexerType> template <typename A, typename B, typename C, typename D, typename E>
-void Parser<LexerType>::logError(bool shouldPrintToken, const A& value1, const B& value2, const C& value3, const D& value4, const E& value5)
-{
-    if (hasError())
-        return;
-    StringPrintStream stream;
-    if (shouldPrintToken) {
-        printUnexpectedTokenText(stream);
-        stream.print(". ");
-    }
-    stream.print(value1, value2, value3, value4, value5, ".");
-    setErrorMessage(stream.toStringWithLatin1Fallback());
-}
-
-template <typename LexerType> template <typename A, typename B, typename C, typename D, typename E, typename F>
-void Parser<LexerType>::logError(bool shouldPrintToken, const A& value1, const B& value2, const C& value3, const D& value4, const E& value5, const F& value6)
-{
-    if (hasError())
-        return;
-    StringPrintStream stream;
-    if (shouldPrintToken) {
-        printUnexpectedTokenText(stream);
-        stream.print(". ");
-    }
-    stream.print(value1, value2, value3, value4, value5, value6, ".");
-    setErrorMessage(stream.toStringWithLatin1Fallback());
-}
-
-template <typename LexerType> template <typename A, typename B, typename C, typename D, typename E, typename F, typename G>
-void Parser<LexerType>::logError(bool shouldPrintToken, const A& value1, const B& value2, const C& value3, const D& value4, const E& value5, const F& value6, const G& value7)
-{
-    if (hasError())
-        return;
-    StringPrintStream stream;
-    if (shouldPrintToken) {
-        printUnexpectedTokenText(stream);
-        stream.print(". ");
-    }
-    stream.print(value1, value2, value3, value4, value5, value6, value7, ".");
+    stream.print(std::forward<Args>(args)..., ".");
     setErrorMessage(stream.toStringWithLatin1Fallback());
 }
 
@@ -207,7 +123,7 @@ Parser<LexerType>::Parser(VM* vm, const SourceCode& source, JSParserBuiltinMode 
 {
     m_lexer = std::make_unique<LexerType>(vm, builtinMode, scriptMode);
     m_lexer->setCode(source, &m_parserArena);
-    m_token.m_location.line = source.firstLine();
+    m_token.m_location.line = source.firstLine().oneBasedInt();
     m_token.m_location.startOffset = source.startOffset();
     m_token.m_location.endOffset = source.startOffset();
     m_token.m_location.lineStartOffset = source.startOffset();
@@ -4427,7 +4343,8 @@ template <class TreeBuilder> TreeExpression Parser<LexerType>::parseMemberExpres
     }
 
     bool baseIsSuper = match(SUPER);
-    semanticFailIfTrue(baseIsSuper && newCount, "Cannot use new with super");
+    bool baseIsImport = match(IMPORT);
+    semanticFailIfTrue((baseIsSuper || baseIsImport) && newCount, "Cannot use new with ", getToken());
 
     bool baseIsNewTarget = false;
     if (newCount && match(DOT)) {
@@ -4467,6 +4384,14 @@ template <class TreeBuilder> TreeExpression Parser<LexerType>::parseMemberExpres
                 semanticFailIfTrue(functionSuperBinding == SuperBinding::NotNeeded, "super is not valid in this context");
             }
         }
+    } else if (baseIsImport) {
+        JSTextPosition expressionEnd = lastTokenEndPosition();
+        next();
+        consumeOrFail(OPENPAREN, "import call expects exactly one argument");
+        TreeExpression expr = parseAssignmentExpression(context);
+        failIfFalse(expr, "Cannot parse expression");
+        consumeOrFail(CLOSEPAREN, "import call expects exactly one argument");
+        return context.createImportExpr(location, expr, expressionStart, expressionEnd, lastTokenEndPosition());
     } else if (!baseIsNewTarget) {
         const bool isAsync = match(ASYNC);
 
@@ -4476,7 +4401,7 @@ template <class TreeBuilder> TreeExpression Parser<LexerType>::parseMemberExpres
             if (matchSpecIdentifier()) {
                 // AsyncArrowFunction
                 forceClassifyExpressionError(ErrorIndicatesAsyncArrowFunction);
-                return 0;
+                failDueToUnexpectedToken();
             }
             baseIsAsyncKeyword = true;
         }

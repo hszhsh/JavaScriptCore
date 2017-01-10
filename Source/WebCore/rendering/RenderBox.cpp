@@ -66,6 +66,7 @@
 #include "RenderView.h"
 #include "ScrollAnimator.h"
 #include "ScrollbarTheme.h"
+#include "StyleScrollSnapPoints.h"
 #include "TransformState.h"
 #include "htmlediting.h"
 #include <algorithm>
@@ -323,11 +324,12 @@ void RenderBox::styleWillChange(StyleDifference diff, const RenderStyle& newStyl
         view().repaintRootContents();
 
 #if ENABLE(CSS_SCROLL_SNAP)
-    if (!newStyle.scrollSnapCoordinates().isEmpty() || (oldStyle && !oldStyle->scrollSnapCoordinates().isEmpty())) {
-        if (newStyle.scrollSnapCoordinates().isEmpty())
-            view().unregisterBoxWithScrollSnapCoordinates(*this);
+    bool boxContributesSnapPositions = newStyle.scrollSnapArea().hasSnapPosition();
+    if (boxContributesSnapPositions || (oldStyle && oldStyle->scrollSnapArea().hasSnapPosition())) {
+        if (boxContributesSnapPositions)
+            view().registerBoxWithScrollSnapPositions(*this);
         else
-            view().registerBoxWithScrollSnapCoordinates(*this);
+            view().unregisterBoxWithScrollSnapPositions(*this);
     }
 #endif
 
@@ -433,7 +435,7 @@ void RenderBox::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle
         if (rootStyleChanged && is<RenderBlockFlow>(rootRenderer) && downcast<RenderBlockFlow>(*rootRenderer).multiColumnFlowThread())
             downcast<RenderBlockFlow>(*rootRenderer).updateStylesForColumnChildren();
         
-        if (isBodyRenderer && pagination.mode != Pagination::Unpaginated && frame().page()->paginationLineGridEnabled()) {
+        if (isBodyRenderer && pagination.mode != Pagination::Unpaginated && page().paginationLineGridEnabled()) {
             // Propagate the body font back up to the RenderView and use it as
             // the basis of the grid.
             if (newStyle.fontDescription() != view().style().fontDescription()) {
@@ -453,8 +455,8 @@ void RenderBox::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle
 void RenderBox::willBeRemovedFromTree()
 {
 #if ENABLE(CSS_SCROLL_SNAP)
-    if (hasInitializedStyle() && !style().scrollSnapCoordinates().isEmpty())
-        view().unregisterBoxWithScrollSnapCoordinates(*this);
+    if (hasInitializedStyle() && style().scrollSnapArea().hasSnapPosition())
+        view().unregisterBoxWithScrollSnapPositions(*this);
 #endif
     
     RenderBoxModelObject::willBeRemovedFromTree();
@@ -597,23 +599,19 @@ int RenderBox::scrollTop() const
     return hasOverflowClip() && layer() ? layer()->scrollPosition().y() : 0;
 }
 
-static void setupWheelEventTestTrigger(RenderLayer& layer, Frame* frame)
+static void setupWheelEventTestTrigger(RenderLayer& layer)
 {
-    if (!frame)
+    Page& page = layer.renderer().page();
+    if (!page.expectsWheelEventTriggers())
         return;
-
-    Page* page = frame->page();
-    if (!page || !page->expectsWheelEventTriggers())
-        return;
-
-    layer.scrollAnimator().setWheelEventTestTrigger(page->testTrigger());
+    layer.scrollAnimator().setWheelEventTestTrigger(page.testTrigger());
 }
 
 void RenderBox::setScrollLeft(int newLeft)
 {
     if (!hasOverflowClip() || !layer())
         return;
-    setupWheelEventTestTrigger(*layer(), document().frame());
+    setupWheelEventTestTrigger(*layer());
     layer()->scrollToXPosition(newLeft, RenderLayer::ScrollOffsetClamped);
 }
 
@@ -621,7 +619,7 @@ void RenderBox::setScrollTop(int newTop)
 {
     if (!hasOverflowClip() || !layer())
         return;
-    setupWheelEventTestTrigger(*layer(), document().frame());
+    setupWheelEventTestTrigger(*layer());
     layer()->scrollToYPosition(newTop, RenderLayer::ScrollOffsetClamped);
 }
 
@@ -1264,15 +1262,18 @@ bool RenderBox::nodeAtPoint(const HitTestRequest& request, HitTestResult& result
 
 void RenderBox::paintRootBoxFillLayers(const PaintInfo& paintInfo)
 {
+    ASSERT(isDocumentElementRenderer());
     if (paintInfo.skipRootBackground())
         return;
 
-    auto& rootBackgroundRenderer = rendererForRootBackground();
-    
-    const FillLayer* bgLayer = rootBackgroundRenderer.style().backgroundLayers();
-    Color bgColor = rootBackgroundRenderer.style().visitedDependentColor(CSSPropertyBackgroundColor);
+    auto* rootBackgroundRenderer = view().rendererForRootBackground();
+    if (!rootBackgroundRenderer)
+        return;
 
-    paintFillLayers(paintInfo, bgColor, bgLayer, view().backgroundRect(), BackgroundBleedNone, CompositeSourceOver, &rootBackgroundRenderer);
+    const FillLayer* bgLayer = rootBackgroundRenderer->style().backgroundLayers();
+    Color bgColor = rootBackgroundRenderer->style().visitedDependentColor(CSSPropertyBackgroundColor);
+
+    paintFillLayers(paintInfo, bgColor, bgLayer, view().backgroundRect(), BackgroundBleedNone, CompositeSourceOver, rootBackgroundRenderer);
 }
 
 BackgroundBleedAvoidance RenderBox::determineBackgroundBleedAvoidance(GraphicsContext& context) const
@@ -2775,23 +2776,22 @@ static bool shouldFlipBeforeAfterMargins(const RenderStyle& containingBlockStyle
 
 void RenderBox::updateLogicalHeight()
 {
-    LogicalExtentComputedValues computedValues;
-    computeLogicalHeight(logicalHeight(), logicalTop(), computedValues);
-
+    auto computedValues = computeLogicalHeight(logicalHeight(), logicalTop());
     setLogicalHeight(computedValues.m_extent);
     setLogicalTop(computedValues.m_position);
     setMarginBefore(computedValues.m_margins.m_before);
     setMarginAfter(computedValues.m_margins.m_after);
 }
 
-void RenderBox::computeLogicalHeight(LayoutUnit logicalHeight, LayoutUnit logicalTop, LogicalExtentComputedValues& computedValues) const
+RenderBox::LogicalExtentComputedValues RenderBox::computeLogicalHeight(LayoutUnit logicalHeight, LayoutUnit logicalTop) const
 {
+    LogicalExtentComputedValues computedValues;
     computedValues.m_extent = logicalHeight;
     computedValues.m_position = logicalTop;
 
     // Cell height is managed by the table and inline non-replaced elements do not support a height property.
     if (isTableCell() || (isInline() && !isReplaced()))
-        return;
+        return computedValues;
 
     Length h;
     if (isOutOfFlowPositioned())
@@ -2815,7 +2815,7 @@ void RenderBox::computeLogicalHeight(LayoutUnit logicalHeight, LayoutUnit logica
                     shouldFlipBeforeAfter ? computedValues.m_margins.m_after : computedValues.m_margins.m_before,
                     shouldFlipBeforeAfter ? computedValues.m_margins.m_before : computedValues.m_margins.m_after);
             }
-            return;
+            return computedValues;
         }
 
         // FIXME: Account for block-flow in flexible boxes.
@@ -2899,6 +2899,7 @@ void RenderBox::computeLogicalHeight(LayoutUnit logicalHeight, LayoutUnit logica
             computedValues.m_extent = std::max(computedValues.m_extent, visibleHeight - marginsBordersPadding);
         }
     }
+    return computedValues;
 }
 
 std::optional<LayoutUnit> RenderBox::computeLogicalHeightUsing(SizeType heightType, const Length& height, std::optional<LayoutUnit> intrinsicContentHeight) const
@@ -3014,7 +3015,7 @@ std::optional<LayoutUnit> RenderBox::computePercentageLogicalHeight(const Length
             // don't care if the cell specified a height or not. We just always make ourselves
             // be a percentage of the cell's current content height.
             if (!cb->hasOverrideLogicalContentHeight())
-                return tableCellShouldHaveZeroInitialSize(*cb, scrollsOverflowY()) ? std::optional<LayoutUnit>() : std::nullopt;
+                return tableCellShouldHaveZeroInitialSize(*cb, scrollsOverflowY()) ? std::optional<LayoutUnit>(0) : std::nullopt;
 
             availableHeight = cb->overrideLogicalContentHeight();
             includeBorderPadding = true;
@@ -3036,8 +3037,7 @@ std::optional<LayoutUnit> RenderBox::computePercentageLogicalHeight(const Length
     } else if (isOutOfFlowPositionedWithSpecifiedHeight) {
         // Don't allow this to affect the block' height() member variable, since this
         // can get called while the block is still laying out its kids.
-        LogicalExtentComputedValues computedValues;
-        cb->computeLogicalHeight(cb->logicalHeight(), 0, computedValues);
+        auto computedValues = cb->computeLogicalHeight(cb->logicalHeight(), 0);
         availableHeight = computedValues.m_extent - cb->borderAndPaddingLogicalHeight() - cb->scrollbarLogicalHeight();
     } else if (cb->isRenderView())
         availableHeight = view().pageOrViewLogicalHeight();
@@ -3141,19 +3141,23 @@ LayoutUnit RenderBox::computeReplacedLogicalHeightUsing(SizeType heightType, Len
         case Percent:
         case Calculated:
         {
-            auto cb = isOutOfFlowPositioned() ? container() : containingBlock();
-            while (cb && cb->isAnonymous() && !is<RenderView>(*cb)) {
-                cb = cb->containingBlock();
-                downcast<RenderBlock>(*cb).addPercentHeightDescendant(const_cast<RenderBox&>(*this));
+            auto* container = isOutOfFlowPositioned() ? this->container() : containingBlock();
+            while (container && container->isAnonymous()) {
+                // Stop at rendering context root.
+                if (is<RenderView>(*container) || is<RenderNamedFlowThread>(*container))
+                    break;
+                container = container->containingBlock();
+                downcast<RenderBlock>(*container).addPercentHeightDescendant(const_cast<RenderBox&>(*this));
             }
 
             // FIXME: This calculation is not patched for block-flow yet.
             // https://bugs.webkit.org/show_bug.cgi?id=46500
-            if (cb->isOutOfFlowPositioned() && cb->style().height().isAuto() && !(cb->style().top().isAuto() || cb->style().bottom().isAuto())) {
-                ASSERT_WITH_SECURITY_IMPLICATION(cb->isRenderBlock());
-                RenderBlock& block = downcast<RenderBlock>(*cb);
-                LogicalExtentComputedValues computedValues;
-                block.computeLogicalHeight(block.logicalHeight(), 0, computedValues);
+            if (container->isOutOfFlowPositioned()
+                && container->style().height().isAuto()
+                && !(container->style().top().isAuto() || container->style().bottom().isAuto())) {
+                ASSERT_WITH_SECURITY_IMPLICATION(container->isRenderBlock());
+                auto& block = downcast<RenderBlock>(*container);
+                auto computedValues = block.computeLogicalHeight(block.logicalHeight(), 0);
                 LayoutUnit newContentHeight = computedValues.m_extent - block.borderAndPaddingLogicalHeight() - block.scrollbarLogicalHeight();
                 LayoutUnit newHeight = block.adjustContentBoxLogicalHeightForBoxSizing(newContentHeight);
                 return adjustContentBoxLogicalHeightForBoxSizing(valueForLength(logicalHeight, newHeight));
@@ -3164,7 +3168,7 @@ LayoutUnit RenderBox::computeReplacedLogicalHeightUsing(SizeType heightType, Len
             // https://bugs.webkit.org/show_bug.cgi?id=46496
             LayoutUnit availableHeight;
             if (isOutOfFlowPositioned())
-                availableHeight = containingBlockLogicalHeightForPositioned(downcast<RenderBoxModelObject>(*cb));
+                availableHeight = containingBlockLogicalHeightForPositioned(downcast<RenderBoxModelObject>(*container));
             else {
                 availableHeight = containingBlockLogicalHeightForContent(IncludeMarginBorderPadding);
                 // It is necessary to use the border-box to match WinIE's broken
@@ -3172,15 +3176,16 @@ LayoutUnit RenderBox::computeReplacedLogicalHeightUsing(SizeType heightType, Len
                 // table cells using percentage heights.
                 // FIXME: This needs to be made block-flow-aware.  If the cell and image are perpendicular block-flows, this isn't right.
                 // https://bugs.webkit.org/show_bug.cgi?id=46997
-                while (cb && !is<RenderView>(*cb) && (cb->style().logicalHeight().isAuto() || cb->style().logicalHeight().isPercentOrCalculated())) {
-                    if (cb->isTableCell()) {
+                while (container && !is<RenderView>(*container)
+                    && (container->style().logicalHeight().isAuto() || container->style().logicalHeight().isPercentOrCalculated())) {
+                    if (container->isTableCell()) {
                         // Don't let table cells squeeze percent-height replaced elements
                         // <http://bugs.webkit.org/show_bug.cgi?id=15359>
                         availableHeight = std::max(availableHeight, intrinsicLogicalHeight());
                         return valueForLength(logicalHeight, availableHeight - borderAndPaddingLogicalHeight());
                     }
-                    downcast<RenderBlock>(*cb).addPercentHeightDescendant(const_cast<RenderBox&>(*this));
-                    cb = cb->containingBlock();
+                    downcast<RenderBlock>(*container).addPercentHeightDescendant(const_cast<RenderBox&>(*this));
+                    container = container->containingBlock();
                 }
             }
             return adjustContentBoxLogicalHeightForBoxSizing(valueForLength(logicalHeight, availableHeight));
@@ -3224,8 +3229,7 @@ LayoutUnit RenderBox::availableLogicalHeightUsing(const Length& h, AvailableLogi
     // https://bugs.webkit.org/show_bug.cgi?id=46500
     if (is<RenderBlock>(*this) && isOutOfFlowPositioned() && style().height().isAuto() && !(style().top().isAuto() || style().bottom().isAuto())) {
         RenderBlock& block = const_cast<RenderBlock&>(downcast<RenderBlock>(*this));
-        LogicalExtentComputedValues computedValues;
-        block.computeLogicalHeight(block.logicalHeight(), 0, computedValues);
+        auto computedValues = block.computeLogicalHeight(block.logicalHeight(), 0);
         LayoutUnit newContentHeight = computedValues.m_extent - block.borderAndPaddingLogicalHeight() - block.scrollbarLogicalHeight();
         return adjustContentBoxLogicalHeightForBoxSizing(newContentHeight);
     }

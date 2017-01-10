@@ -2532,6 +2532,8 @@ static NSString* roleValueToNSString(AccessibilityRole value)
                 return AXTelephoneFieldText();
             if (input.isURLField())
                 return AXURLFieldText();
+            if (input.isNumberField())
+                return AXNumberFieldText();
             
             // These input types are not enabled on mac yet, we check the type attribute for now.
             auto& type = input.attributeWithoutSynchronization(typeAttr);
@@ -2539,6 +2541,12 @@ static NSString* roleValueToNSString(AccessibilityRole value)
                 return AXDateFieldText();
             if (equalLettersIgnoringASCIICase(type, "time"))
                 return AXTimeFieldText();
+            if (equalLettersIgnoringASCIICase(type, "week"))
+                return AXWeekFieldText();
+            if (equalLettersIgnoringASCIICase(type, "month"))
+                return AXMonthFieldText();
+            if (equalLettersIgnoringASCIICase(type, "datetime-local"))
+                return AXDateTimeFieldText();
         }
     }
     
@@ -3176,7 +3184,7 @@ static NSString* roleValueToNSString(AccessibilityRole value)
     }
     
     if ([attributeName isEqualToString:NSAccessibilityBlockQuoteLevelAttribute])
-        return [NSNumber numberWithInt:m_object->blockquoteLevel()];
+        return [NSNumber numberWithUnsignedInt:m_object->blockquoteLevel()];
     if ([attributeName isEqualToString:@"AXTableLevel"])
         return [NSNumber numberWithInt:m_object->tableLevel()];
     

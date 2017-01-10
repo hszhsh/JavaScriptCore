@@ -62,10 +62,10 @@ UnlinkedCodeBlockType* CodeCache::getUnlinkedGlobalCodeBlock(VM& vm, ExecutableT
     if (cache && Options::useCodeCache()) {
         UnlinkedCodeBlockType* unlinkedCodeBlock = jsCast<UnlinkedCodeBlockType*>(cache->cell.get());
         unsigned lineCount = unlinkedCodeBlock->lineCount();
-        unsigned startColumn = unlinkedCodeBlock->startColumn() + source.startColumn();
+        unsigned startColumn = unlinkedCodeBlock->startColumn() + source.startColumn().oneBasedInt();
         bool endColumnIsOnStartLine = !lineCount;
         unsigned endColumn = unlinkedCodeBlock->endColumn() + (endColumnIsOnStartLine ? startColumn : 1);
-        executable->recordParse(unlinkedCodeBlock->codeFeatures(), unlinkedCodeBlock->hasCapturedVariables(), source.firstLine(), source.firstLine() + lineCount, startColumn, endColumn);
+        executable->recordParse(unlinkedCodeBlock->codeFeatures(), unlinkedCodeBlock->hasCapturedVariables(), source.firstLine().oneBasedInt() + lineCount, endColumn);
         source.provider()->setSourceURLDirective(unlinkedCodeBlock->sourceURLDirective());
         source.provider()->setSourceMappingURLDirective(unlinkedCodeBlock->sourceMappingURLDirective());
         return unlinkedCodeBlock;
@@ -85,7 +85,7 @@ UnlinkedProgramCodeBlock* CodeCache::getUnlinkedProgramCodeBlock(VM& vm, Program
     return getUnlinkedGlobalCodeBlock<UnlinkedProgramCodeBlock>(vm, executable, source, strictMode, JSParserScriptMode::Classic, debuggerMode, error, EvalContextType::None);
 }
 
-UnlinkedEvalCodeBlock* CodeCache::getUnlinkedGlobalEvalCodeBlock(VM& vm, IndirectEvalExecutable* executable, const SourceCode& source, JSParserStrictMode strictMode, DebuggerMode debuggerMode, ParserError& error, EvalContextType evalContextType)
+UnlinkedEvalCodeBlock* CodeCache::getUnlinkedEvalCodeBlock(VM& vm, IndirectEvalExecutable* executable, const SourceCode& source, JSParserStrictMode strictMode, DebuggerMode debuggerMode, ParserError& error, EvalContextType evalContextType)
 {
     return getUnlinkedGlobalCodeBlock<UnlinkedEvalCodeBlock>(vm, executable, source, strictMode, JSParserScriptMode::Classic, debuggerMode, error, evalContextType);
 }

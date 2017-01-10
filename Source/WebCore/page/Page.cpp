@@ -83,6 +83,7 @@
 #include "ScrollingCoordinator.h"
 #include "Settings.h"
 #include "SharedBuffer.h"
+#include "SocketProvider.h"
 #include "StorageArea.h"
 #include "StorageNamespace.h"
 #include "StorageNamespaceProvider.h"
@@ -133,6 +134,12 @@ void Page::forEachPage(std::function<void(Page&)> function)
         return;
     for (Page* page : *allPages)
         function(*page);
+}
+
+void Page::updateValidationBubbleStateIfNeeded()
+{
+    if (auto* client = validationMessageClient())
+        client->updateValidationBubbleStateIfNeeded();
 }
 
 static void networkStateChanged(bool isOnLine)
@@ -768,10 +775,8 @@ void Page::setInLowQualityImageInterpolationMode(bool mode)
 
 DiagnosticLoggingClient& Page::diagnosticLoggingClient() const
 {
-    static NeverDestroyed<EmptyDiagnosticLoggingClient> dummyClient;
     if (!settings().diagnosticLoggingEnabled() || !m_diagnosticLoggingClient)
-        return dummyClient;
-
+        return emptyDiagnosticLoggingClient();
     return *m_diagnosticLoggingClient;
 }
 
@@ -1534,10 +1539,10 @@ void Page::setIsPrerender()
 PageVisibilityState Page::visibilityState() const
 {
     if (isVisible())
-        return PageVisibilityStateVisible;
+        return PageVisibilityState::Visible;
     if (m_isPrerender)
-        return PageVisibilityStatePrerender;
-    return PageVisibilityStateHidden;
+        return PageVisibilityState::Prerender;
+    return PageVisibilityState::Hidden;
 }
 
 #if ENABLE(RUBBER_BANDING)

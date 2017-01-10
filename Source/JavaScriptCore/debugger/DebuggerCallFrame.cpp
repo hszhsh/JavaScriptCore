@@ -159,7 +159,7 @@ DebuggerScope* DebuggerCallFrame::scope()
             scope = m_shadowChickenFrame.scope;
         else if (codeBlock && codeBlock->scopeRegister().isValid())
             scope = m_validMachineFrame->scope(codeBlock->scopeRegister().offset());
-        else if (JSCallee* callee = jsDynamicCast<JSCallee*>(m_validMachineFrame->callee()))
+        else if (JSCallee* callee = jsDynamicCast<JSCallee*>(m_validMachineFrame->jsCallee()))
             scope = callee->scope();
         else
             scope = m_validMachineFrame->lexicalGlobalObject()->globalLexicalEnvironment();
@@ -178,7 +178,7 @@ DebuggerCallFrame::Type DebuggerCallFrame::type() const
     if (isTailDeleted())
         return FunctionType;
 
-    if (jsDynamicCast<JSFunction*>(m_validMachineFrame->callee()))
+    if (jsDynamicCast<JSFunction*>(m_validMachineFrame->jsCallee()))
         return FunctionType;
 
     return ProgramType;
@@ -243,7 +243,7 @@ JSValue DebuggerCallFrame::evaluateWithScopeExtension(const String& script, JSOb
     VariableEnvironment variablesUnderTDZ;
     JSScope::collectClosureVariablesUnderTDZ(scope()->jsScope(), variablesUnderTDZ);
 
-    EvalExecutable* eval = DirectEvalExecutable::create(callFrame, makeSource(script), codeBlock->isStrictMode(), codeBlock->unlinkedCodeBlock()->derivedContextType(), codeBlock->unlinkedCodeBlock()->isArrowFunction(), evalContextType, &variablesUnderTDZ);
+    auto* eval = DirectEvalExecutable::create(callFrame, makeSource(script, callFrame->callerSourceOrigin()), codeBlock->isStrictMode(), codeBlock->unlinkedCodeBlock()->derivedContextType(), codeBlock->unlinkedCodeBlock()->isArrowFunction(), evalContextType, &variablesUnderTDZ);
     if (UNLIKELY(catchScope.exception())) {
         exception = catchScope.exception();
         catchScope.clearException();

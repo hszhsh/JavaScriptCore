@@ -153,7 +153,7 @@ void makeCapitalized(String* string, UChar previous)
             stringWithPrevious[i] = stringImpl[i - 1];
     }
 
-    TextBreakIterator* boundary = wordBreakIterator(StringView(stringWithPrevious.characters(), length + 1));
+    UBreakIterator* boundary = wordBreakIterator(StringView(stringWithPrevious.characters(), length + 1));
     if (!boundary)
         return;
 
@@ -161,8 +161,8 @@ void makeCapitalized(String* string, UChar previous)
     result.reserveCapacity(length);
 
     int32_t endOfWord;
-    int32_t startOfWord = textBreakFirst(boundary);
-    for (endOfWord = textBreakNext(boundary); endOfWord != TextBreakDone; startOfWord = endOfWord, endOfWord = textBreakNext(boundary)) {
+    int32_t startOfWord = ubrk_first(boundary);
+    for (endOfWord = ubrk_next(boundary); endOfWord != UBRK_DONE; startOfWord = endOfWord, endOfWord = ubrk_next(boundary)) {
         if (startOfWord) // Ignore first char of previous string
             result.append(stringImpl[startOfWord - 1] == noBreakSpace ? noBreakSpace : u_totitle(stringWithPrevious[startOfWord]));
         for (int i = startOfWord + 1; i < endOfWord; i++)
@@ -742,7 +742,7 @@ static float maxWordFragmentWidth(RenderText& renderer, const RenderStyle& style
     Vector<int, 8> hyphenLocations;
     ASSERT(word.length() >= minimumSuffixLength);
     unsigned hyphenLocation = word.length() - minimumSuffixLength;
-    while ((hyphenLocation = lastHyphenLocation(word, hyphenLocation, style.locale())) >= minimumPrefixLength)
+    while ((hyphenLocation = lastHyphenLocation(word, hyphenLocation, style.locale())) >= std::max(minimumPrefixLength, 1U))
         hyphenLocations.append(hyphenLocation);
 
     if (hyphenLocations.isEmpty())
@@ -750,6 +750,7 @@ static float maxWordFragmentWidth(RenderText& renderer, const RenderStyle& style
 
     hyphenLocations.reverse();
 
+    // FIXME: Breaking the string at these places in the middle of words is completely broken with complex text.
     float minimumFragmentWidthToConsider = font.pixelSize() * 5 / 4 + hyphenWidth(renderer, font);
     float maxFragmentWidth = 0;
     for (size_t k = 0; k < hyphenLocations.size(); ++k) {
@@ -1468,12 +1469,12 @@ int RenderText::previousOffset(int current) const
         return current - 1;
 
     StringImpl* textImpl = m_text.impl();
-    TextBreakIterator* iterator = cursorMovementIterator(StringView(textImpl->characters16(), textImpl->length()));
+    UBreakIterator* iterator = cursorMovementIterator(StringView(textImpl->characters16(), textImpl->length()));
     if (!iterator)
         return current - 1;
 
-    long result = textBreakPreceding(iterator, current);
-    if (result == TextBreakDone)
+    long result = ubrk_preceding(iterator, current);
+    if (result == UBRK_DONE)
         result = current - 1;
 
 
@@ -1522,7 +1523,7 @@ int RenderText::previousOffsetForBackwardDeletion(int current) const
     ASSERT(!m_text.isNull());
     StringImpl& text = *m_text.impl();
 
-    // FIXME: Unclear why this has so much handrolled code rather than using TextBreakIterator.
+    // FIXME: Unclear why this has so much handrolled code rather than using UBreakIterator.
     // Also unclear why this is so different from advanceByCombiningCharacterSequence.
 
     // FIXME: Seems like this fancier case could be used on all platforms now, no
@@ -1648,12 +1649,12 @@ int RenderText::nextOffset(int current) const
         return current + 1;
 
     StringImpl* textImpl = m_text.impl();
-    TextBreakIterator* iterator = cursorMovementIterator(StringView(textImpl->characters16(), textImpl->length()));
+    UBreakIterator* iterator = cursorMovementIterator(StringView(textImpl->characters16(), textImpl->length()));
     if (!iterator)
         return current + 1;
 
-    long result = textBreakFollowing(iterator, current);
-    if (result == TextBreakDone)
+    long result = ubrk_following(iterator, current);
+    if (result == UBRK_DONE)
         result = current + 1;
 
     return result;

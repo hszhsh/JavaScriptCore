@@ -50,7 +50,7 @@ static CSSParserContext parserContextForElement(const Element& element)
     // User agent shadow trees can't contain document-relative URLs. Use blank URL as base allowing cross-document sharing.
     auto& baseURL = shadowRoot && shadowRoot->mode() == ShadowRootMode::UserAgent ? blankURL() : element.document().baseURL();
 
-    CSSParserContext result = CSSParserContext { element.document(), baseURL, element.document().encoding() };
+    CSSParserContext result = CSSParserContext { element.document(), baseURL, element.document().characterSetWithUTF8Fallback() };
     if (shadowRoot && shadowRoot->mode() == ShadowRootMode::UserAgent)
         result.mode = UASheetMode;
     return result;
@@ -202,7 +202,7 @@ void InlineStyleSheetOwner::createSheet(Element& element, const String& text)
     m_sheet->setMediaQueries(mediaQueries.releaseNonNull());
     m_sheet->setTitle(element.title());
 
-    contents->parseStringAtPosition(text, m_startTextPosition, m_isParsingChildren);
+    contents->parseString(text);
 
     m_loading = false;
 

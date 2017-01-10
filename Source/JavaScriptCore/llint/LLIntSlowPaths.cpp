@@ -66,7 +66,6 @@
 #include "ShadowChicken.h"
 #include "StructureRareDataInlines.h"
 #include "VMInlines.h"
-#include "WebAssemblyCodeBlock.h"
 #include <wtf/NeverDestroyed.h>
 #include <wtf/StringPrintStream.h>
 
@@ -229,19 +228,20 @@ extern "C" SlowPathReturnType llint_trace_value(ExecState* exec, Instruction* pc
 
 LLINT_SLOW_PATH_DECL(trace_prologue)
 {
-    dataLogF("%p / %p: in prologue.\n", exec->codeBlock(), exec);
+    dataLogF("%p / %p: in prologue of ", exec->codeBlock(), exec);
+    dataLog(*exec->codeBlock(), "\n");
     LLINT_END_IMPL();
 }
 
 static void traceFunctionPrologue(ExecState* exec, const char* comment, CodeSpecializationKind kind)
 {
-    JSFunction* callee = jsCast<JSFunction*>(exec->callee());
+    JSFunction* callee = jsCast<JSFunction*>(exec->jsCallee());
     FunctionExecutable* executable = callee->jsExecutable();
     CodeBlock* codeBlock = executable->codeBlockFor(kind);
-    dataLogF("%p / %p: in %s of function %p, executable %p; numVars = %u, numParameters = %u, numCalleeLocals = %u, caller = %p.\n",
-            codeBlock, exec, comment, callee, executable,
-            codeBlock->m_numVars, codeBlock->numParameters(), codeBlock->m_numCalleeLocals,
-            exec->callerFrame());
+    dataLogF("%p / %p: in %s of ", codeBlock, exec, comment);
+    dataLog(*codeBlock);
+    dataLogF(" function %p, executable %p; numVars = %u, numParameters = %u, numCalleeLocals = %u, caller = %p.\n",
+        callee, executable, codeBlock->m_numVars, codeBlock->numParameters(), codeBlock->m_numCalleeLocals, exec->callerFrame());
 }
 
 LLINT_SLOW_PATH_DECL(trace_prologue_function_for_call)
@@ -393,22 +393,22 @@ LLINT_SLOW_PATH_DECL(entry_osr)
 
 LLINT_SLOW_PATH_DECL(entry_osr_function_for_call)
 {
-    return entryOSR(exec, pc, jsCast<JSFunction*>(exec->callee())->jsExecutable()->codeBlockForCall(), "entry_osr_function_for_call", Prologue);
+    return entryOSR(exec, pc, jsCast<JSFunction*>(exec->jsCallee())->jsExecutable()->codeBlockForCall(), "entry_osr_function_for_call", Prologue);
 }
 
 LLINT_SLOW_PATH_DECL(entry_osr_function_for_construct)
 {
-    return entryOSR(exec, pc, jsCast<JSFunction*>(exec->callee())->jsExecutable()->codeBlockForConstruct(), "entry_osr_function_for_construct", Prologue);
+    return entryOSR(exec, pc, jsCast<JSFunction*>(exec->jsCallee())->jsExecutable()->codeBlockForConstruct(), "entry_osr_function_for_construct", Prologue);
 }
 
 LLINT_SLOW_PATH_DECL(entry_osr_function_for_call_arityCheck)
 {
-    return entryOSR(exec, pc, jsCast<JSFunction*>(exec->callee())->jsExecutable()->codeBlockForCall(), "entry_osr_function_for_call_arityCheck", ArityCheck);
+    return entryOSR(exec, pc, jsCast<JSFunction*>(exec->jsCallee())->jsExecutable()->codeBlockForCall(), "entry_osr_function_for_call_arityCheck", ArityCheck);
 }
 
 LLINT_SLOW_PATH_DECL(entry_osr_function_for_construct_arityCheck)
 {
-    return entryOSR(exec, pc, jsCast<JSFunction*>(exec->callee())->jsExecutable()->codeBlockForConstruct(), "entry_osr_function_for_construct_arityCheck", ArityCheck);
+    return entryOSR(exec, pc, jsCast<JSFunction*>(exec->jsCallee())->jsExecutable()->codeBlockForConstruct(), "entry_osr_function_for_construct_arityCheck", ArityCheck);
 }
 
 LLINT_SLOW_PATH_DECL(loop_osr)
@@ -490,7 +490,7 @@ LLINT_SLOW_PATH_DECL(stack_check)
 
 #if LLINT_SLOW_PATH_TRACING
     dataLogF("Checking stack height with exec = %p.\n", exec);
-    dataLogF("CodeBlock = %p.\n", exec->codeBlock());
+    dataLog("CodeBlock = ", *exec->codeBlock(), "\n");
     dataLogF("Num callee registers = %u.\n", exec->codeBlock()->m_numCalleeLocals);
     dataLogF("Num vars = %u.\n", exec->codeBlock()->m_numVars);
 
@@ -1292,14 +1292,9 @@ inline SlowPathReturnType setUpCall(ExecState* execCallee, Instruction* pc, Code
 
     MacroAssemblerCodePtr codePtr;
     CodeBlock* codeBlock = 0;
-    bool isWebAssemblyExecutable = false;
-#if ENABLE(WEBASSEMBLY)
-    isWebAssemblyExecutable = executable->isWebAssemblyExecutable();
-#endif
-
     if (executable->isHostFunction()) {
         codePtr = executable->entrypointFor(kind, MustCheckArity);
-    } else if (!isWebAssemblyExecutable) {
+    } else {
         FunctionExecutable* functionExecutable = static_cast<FunctionExecutable*>(executable);
 
         if (!isCall(kind) && functionExecutable->constructAbility() == ConstructAbility::CannotConstruct)
@@ -1318,20 +1313,8 @@ inline SlowPathReturnType setUpCall(ExecState* execCallee, Instruction* pc, Code
         else
             arity = ArityCheckNotRequired;
         codePtr = functionExecutable->entrypointFor(kind, arity);
-    } else {
-#if ENABLE(WEBASSEMBLY)
-        WebAssemblyExecutable* webAssemblyExecutable = static_cast<WebAssemblyExecutable*>(executable);
-        codeBlock = webAssemblyExecutable->codeBlockForCall();
-        ASSERT(codeBlock);
-        ArityCheckMode arity;
-        if (execCallee->argumentCountIncludingThis() < static_cast<size_t>(codeBlock->numParameters()))
-            arity = MustCheckArity;
-        else
-            arity = ArityCheckNotRequired;
-        codePtr = webAssemblyExecutable->entrypointFor(kind, arity);
-#endif
     }
-    
+
     ASSERT(!!codePtr);
     
     if (!LLINT_ALWAYS_ACCESS_SLOW && callLinkInfo) {
@@ -1627,7 +1610,7 @@ LLINT_SLOW_PATH_DECL(slow_path_log_shadow_chicken_prologue)
     LLINT_BEGIN();
     
     JSScope* scope = exec->uncheckedR(pc[1].u.operand).Register::scope();
-    vm.shadowChicken().log(vm, exec, ShadowChicken::Packet::prologue(exec->callee(), exec, exec->callerFrame(), scope));
+    vm.shadowChicken().log(vm, exec, ShadowChicken::Packet::prologue(exec->jsCallee(), exec, exec->callerFrame(), scope));
     
     LLINT_END();
 }

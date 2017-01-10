@@ -38,23 +38,23 @@ namespace WTF {
 
 // Iterator initialization
 
-static TextBreakIterator* initializeIterator(UBreakIteratorType type, const char* locale = currentTextBreakLocaleID())
+static UBreakIterator* initializeIterator(UBreakIteratorType type, const char* locale = currentTextBreakLocaleID())
 {
     UErrorCode openStatus = U_ZERO_ERROR;
-    TextBreakIterator* iterator = reinterpret_cast<TextBreakIterator*>(ubrk_open(type, locale, 0, 0, &openStatus));
+    UBreakIterator* iterator = ubrk_open(type, locale, 0, 0, &openStatus);
     ASSERT_WITH_MESSAGE(U_SUCCESS(openStatus), "ICU could not open a break iterator: %s (%d)", u_errorName(openStatus), openStatus);
     return iterator;
 }
 
 #if !PLATFORM(IOS)
 
-static TextBreakIterator* initializeIteratorWithRules(const char* breakRules)
+static UBreakIterator* initializeIteratorWithRules(const char* breakRules)
 {
     UParseError parseStatus;
     UErrorCode openStatus = U_ZERO_ERROR;
     unsigned length = strlen(breakRules);
     auto upconvertedCharacters = StringView(reinterpret_cast<const LChar*>(breakRules), length).upconvertedCharacters();
-    TextBreakIterator* iterator = reinterpret_cast<TextBreakIterator*>(ubrk_openRules(upconvertedCharacters, length, 0, 0, &parseStatus, &openStatus));
+    UBreakIterator* iterator = ubrk_openRules(upconvertedCharacters, length, 0, 0, &parseStatus, &openStatus);
     ASSERT_WITH_MESSAGE(U_SUCCESS(openStatus), "ICU could not open a break iterator: %s (%d)", u_errorName(openStatus), openStatus);
     return iterator;
 }
@@ -64,7 +64,7 @@ static TextBreakIterator* initializeIteratorWithRules(const char* breakRules)
 
 // Iterator text setting
 
-static TextBreakIterator* setTextForIterator(TextBreakIterator& iterator, StringView string)
+static UBreakIterator* setTextForIterator(UBreakIterator& iterator, StringView string)
 {
     if (string.is8Bit()) {
         UTextWithBuffer textLocal;
@@ -80,7 +80,7 @@ static TextBreakIterator* setTextForIterator(TextBreakIterator& iterator, String
         }
 
         UErrorCode setTextStatus = U_ZERO_ERROR;
-        ubrk_setUText(reinterpret_cast<UBreakIterator*>(&iterator), text, &setTextStatus);
+        ubrk_setUText(&iterator, text, &setTextStatus);
         if (U_FAILURE(setTextStatus)) {
             LOG_ERROR("ubrk_setUText failed with status %d", setTextStatus);
             return nullptr;
@@ -89,7 +89,7 @@ static TextBreakIterator* setTextForIterator(TextBreakIterator& iterator, String
         utext_close(text);
     } else {
         UErrorCode setTextStatus = U_ZERO_ERROR;
-        ubrk_setText(reinterpret_cast<UBreakIterator*>(&iterator), string.characters16(), string.length(), &setTextStatus);
+        ubrk_setText(&iterator, string.characters16(), string.length(), &setTextStatus);
         if (U_FAILURE(setTextStatus))
             return nullptr;
     }
@@ -97,7 +97,7 @@ static TextBreakIterator* setTextForIterator(TextBreakIterator& iterator, String
     return &iterator;
 }
 
-static TextBreakIterator* setContextAwareTextForIterator(TextBreakIterator& iterator, StringView string, const UChar* priorContext, unsigned priorContextLength)
+static UBreakIterator* setContextAwareTextForIterator(UBreakIterator& iterator, StringView string, const UChar* priorContext, unsigned priorContextLength)
 {
     if (string.is8Bit()) {
         UTextWithBuffer textLocal;
@@ -113,7 +113,7 @@ static TextBreakIterator* setContextAwareTextForIterator(TextBreakIterator& iter
         }
 
         UErrorCode setTextStatus = U_ZERO_ERROR;
-        ubrk_setUText(reinterpret_cast<UBreakIterator*>(&iterator), text, &setTextStatus);
+        ubrk_setUText(&iterator, text, &setTextStatus);
         if (U_FAILURE(setTextStatus)) {
             LOG_ERROR("ubrk_setUText failed with status %d", setTextStatus);
             return nullptr;
@@ -131,7 +131,7 @@ static TextBreakIterator* setContextAwareTextForIterator(TextBreakIterator& iter
         }
 
         UErrorCode setTextStatus = U_ZERO_ERROR;
-        ubrk_setUText(reinterpret_cast<UBreakIterator*>(&iterator), text, &setTextStatus);
+        ubrk_setUText(&iterator, text, &setTextStatus);
         if (U_FAILURE(setTextStatus)) {
             LOG_ERROR("ubrk_setUText failed with status %d", setTextStatus);
             return nullptr;
@@ -146,25 +146,25 @@ static TextBreakIterator* setContextAwareTextForIterator(TextBreakIterator& iter
 
 // Static iterators
 
-TextBreakIterator* wordBreakIterator(StringView string)
+UBreakIterator* wordBreakIterator(StringView string)
 {
-    static TextBreakIterator* staticWordBreakIterator = initializeIterator(UBRK_WORD);
+    static UBreakIterator* staticWordBreakIterator = initializeIterator(UBRK_WORD);
     if (!staticWordBreakIterator)
         return nullptr;
 
     return setTextForIterator(*staticWordBreakIterator, string);
 }
 
-TextBreakIterator* sentenceBreakIterator(StringView string)
+UBreakIterator* sentenceBreakIterator(StringView string)
 {
-    static TextBreakIterator* staticSentenceBreakIterator = initializeIterator(UBRK_SENTENCE);
+    static UBreakIterator* staticSentenceBreakIterator = initializeIterator(UBRK_SENTENCE);
     if (!staticSentenceBreakIterator)
         return nullptr;
 
     return setTextForIterator(*staticSentenceBreakIterator, string);
 }
 
-TextBreakIterator* cursorMovementIterator(StringView string)
+UBreakIterator* cursorMovementIterator(StringView string)
 {
 #if !PLATFORM(IOS)
     // This rule set is based on character-break iterator rules of ICU 57
@@ -216,7 +216,7 @@ TextBreakIterator* cursorMovementIterator(StringView string)
         "$EmojiVar = [\\uFE0F];" // Emoji-style variation selector
 #if ADDITIONAL_EMOJI_SUPPORT
         "$EmojiForSeqs = [\\u2640 \\u2642 \\u26F9 \\u2764 \\U0001F308 \\U0001F3C3-\\U0001F3C4 \\U0001F3CA-\\U0001F3CC \\U0001F3F3 \\U0001F441 \\U0001F466-\\U0001F469 \\U0001F46E-\\U0001F46F \\U0001F471 \\U0001F473 \\U0001F477 \\U0001F481-\\U0001F482 \\U0001F486-\\U0001F487 \\U0001F48B \\U0001F575 \\U0001F5E8 \\U0001F645-\\U0001F647 \\U0001F64B \\U0001F64D-\\U0001F64E \\U0001F6A3 \\U0001F6B4-\\U0001F6B6 \\u2695-\\u2696 \\u2708 \\U0001F33E \\U0001F373 \\U0001F393 \\U0001F3A4 \\U0001F3A8 \\U0001F3EB \\U0001F3ED \\U0001F4BB-\\U0001F4BC \\U0001F527 \\U0001F52C \\U0001F680 \\U0001F692 \\U0001F926 \\U0001F937-\\U0001F939 \\U0001F93C-\\U0001F93E];" // Emoji that participate in ZWJ sequences
-        "$EmojiForMods = [\\u261D \\u26F9 \\u270A-\\u270D \\U0001F385 \\U0001F3C3-\\U0001F3C4 \\U0001F3CA \\U0001F3CB \\U0001F442-\\U0001F443 \\U0001F446-\\U0001F450 \\U0001F466-\\U0001F469 \\U0001F46E-\\U0001F478 \\U0001F47C \\U0001F481-\\U0001F483 \\U0001F485-\\U0001F487 \\U0001F4AA \\U0001F575 \\U0001F590 \\U0001F595 \\U0001F596 \\U0001F645-\\U0001F647 \\U0001F64B-\\U0001F64F \\U0001F6A3 \\U0001F6B4-\\U0001F6B6 \\U0001F6C0 \\U0001F918 \\U0001F3C2 \\U0001F3C7 \\U0001F3CC \\U0001F574 \\U0001F57A \\U0001F6CC \\U0001F919-\\U0001F91E \\U0001F926 \\U0001F930 \\U0001F933-\\U0001F939 \\U0001F93C-\\U0001F93E] ;" // Emoji that take Fitzpatrick modifiers
+        "$EmojiForMods = [\\u261D \\u26F9 \\u270A-\\u270D \\U0001F385 \\U0001F3C3-\\U0001F3C4 \\U0001F3CA \\U0001F3CB \\U0001F442-\\U0001F443 \\U0001F446-\\U0001F450 \\U0001F466-\\U0001F478 \\U0001F47C \\U0001F481-\\U0001F483 \\U0001F485-\\U0001F487 \\U0001F4AA \\U0001F575 \\U0001F590 \\U0001F595 \\U0001F596 \\U0001F645-\\U0001F647 \\U0001F64B-\\U0001F64F \\U0001F6A3 \\U0001F6B4-\\U0001F6B6 \\U0001F6C0 \\U0001F918 \\U0001F3C2 \\U0001F3C7 \\U0001F3CC \\U0001F574 \\U0001F57A \\U0001F6CC \\U0001F919-\\U0001F91E \\U0001F926 \\U0001F930 \\U0001F933-\\U0001F939 \\U0001F93C-\\U0001F93E] ;" // Emoji that take Fitzpatrick modifiers
 #else
         "$EmojiForSeqs = [\\u2764 \\U0001F466-\\U0001F469 \\U0001F48B];" // Emoji that participate in ZWJ sequences
         "$EmojiForMods = [\\u261D \\u270A-\\u270C \\U0001F385 \\U0001F3C3-\\U0001F3C4 \\U0001F3C7 \\U0001F3CA \\U0001F442-\\U0001F443 \\U0001F446-\\U0001F450 \\U0001F466-\\U0001F469 \\U0001F46E-\\U0001F478 \\U0001F47C \\U0001F481-\\U0001F483 \\U0001F485-\\U0001F487 \\U0001F4AA \\U0001F596 \\U0001F645-\\U0001F647 \\U0001F64B-\\U0001F64F \\U0001F6A3 \\U0001F6B4-\\U0001F6B6 \\U0001F6C0] ;" // Emoji that take Fitzpatrick modifiers
@@ -291,10 +291,10 @@ TextBreakIterator* cursorMovementIterator(StringView string)
         "!!safe_reverse;"
         "!!safe_forward;";
 #endif
-    static TextBreakIterator* staticCursorMovementIterator = initializeIteratorWithRules(kRules);
+    static UBreakIterator* staticCursorMovementIterator = initializeIteratorWithRules(kRules);
 #else // PLATFORM(IOS)
     // Use the special Thai character break iterator for all locales
-    static TextBreakIterator* staticCursorMovementIterator = initializeIterator(UBRK_CHARACTER, "th");
+    static UBreakIterator* staticCursorMovementIterator = initializeIterator(UBRK_CHARACTER, "th");
 #endif // !PLATFORM(IOS)
 
     if (!staticCursorMovementIterator)
@@ -303,16 +303,16 @@ TextBreakIterator* cursorMovementIterator(StringView string)
     return setTextForIterator(*staticCursorMovementIterator, string);
 }
 
-TextBreakIterator* acquireLineBreakIterator(StringView string, const AtomicString& locale, const UChar* priorContext, unsigned priorContextLength, LineBreakIteratorMode mode, bool isCJK)
+UBreakIterator* acquireLineBreakIterator(StringView string, const AtomicString& locale, const UChar* priorContext, unsigned priorContextLength, LineBreakIteratorMode mode, bool isCJK)
 {
-    TextBreakIterator* iterator = LineBreakIteratorPool::sharedPool().take(locale, mode, isCJK);
+    UBreakIterator* iterator = LineBreakIteratorPool::sharedPool().take(locale, mode, isCJK);
     if (!iterator)
         return nullptr;
 
     return setContextAwareTextForIterator(*iterator, string, priorContext, priorContextLength);
 }
 
-void releaseLineBreakIterator(TextBreakIterator* iterator)
+void releaseLineBreakIterator(UBreakIterator* iterator)
 {
     ASSERT_ARG(iterator, iterator);
 
@@ -449,7 +449,7 @@ static const char* uax14AssignmentsAfter =
     "$EmojiVar = \\uFE0F;"
 #if ADDITIONAL_EMOJI_SUPPORT
     "$EmojiForSeqs = [\\u2640 \\u2642 \\u26F9 \\u2764 \\U0001F308 \\U0001F3C3-\\U0001F3C4 \\U0001F3CA-\\U0001F3CC \\U0001F3F3 \\U0001F441 \\U0001F466-\\U0001F469 \\U0001F46E-\\U0001F46F \\U0001F471 \\U0001F473 \\U0001F477 \\U0001F481-\\U0001F482 \\U0001F486-\\U0001F487 \\U0001F48B \\U0001F575 \\U0001F5E8 \\U0001F645-\\U0001F647 \\U0001F64B \\U0001F64D-\\U0001F64E \\U0001F6A3 \\U0001F6B4-\\U0001F6B6 \\u2695-\\u2696 \\u2708 \\U0001F33E \\U0001F373 \\U0001F393 \\U0001F3A4 \\U0001F3A8 \\U0001F3EB \\U0001F3ED \\U0001F4BB-\\U0001F4BC \\U0001F527 \\U0001F52C \\U0001F680 \\U0001F692 \\U0001F926 \\U0001F937-\\U0001F939 \\U0001F93C-\\U0001F93E];" // Emoji that participate in ZWJ sequences
-    "$EmojiForMods = [\\u261D \\u26F9 \\u270A-\\u270D \\U0001F385 \\U0001F3C3-\\U0001F3C4 \\U0001F3CA \\U0001F3CB \\U0001F442-\\U0001F443 \\U0001F446-\\U0001F450 \\U0001F466-\\U0001F469 \\U0001F46E-\\U0001F478 \\U0001F47C \\U0001F481-\\U0001F483 \\U0001F485-\\U0001F487 \\U0001F4AA \\U0001F575 \\U0001F590 \\U0001F595 \\U0001F596 \\U0001F645-\\U0001F647 \\U0001F64B-\\U0001F64F \\U0001F6A3 \\U0001F6B4-\\U0001F6B6 \\U0001F6C0 \\U0001F918 \\U0001F3C2 \\U0001F3C7 \\U0001F3CC \\U0001F574 \\U0001F57A \\U0001F6CC \\U0001F919-\\U0001F91E \\U0001F926 \\U0001F930 \\U0001F933-\\U0001F939 \\U0001F93C-\\U0001F93E] ;" // Emoji that take Fitzpatrick modifiers
+    "$EmojiForMods = [\\u261D \\u26F9 \\u270A-\\u270D \\U0001F385 \\U0001F3C3-\\U0001F3C4 \\U0001F3CA \\U0001F3CB \\U0001F442-\\U0001F443 \\U0001F446-\\U0001F450 \\U0001F466-\\U0001F478 \\U0001F47C \\U0001F481-\\U0001F483 \\U0001F485-\\U0001F487 \\U0001F4AA \\U0001F575 \\U0001F590 \\U0001F595 \\U0001F596 \\U0001F645-\\U0001F647 \\U0001F64B-\\U0001F64F \\U0001F6A3 \\U0001F6B4-\\U0001F6B6 \\U0001F6C0 \\U0001F918 \\U0001F3C2 \\U0001F3C7 \\U0001F3CC \\U0001F574 \\U0001F57A \\U0001F6CC \\U0001F919-\\U0001F91E \\U0001F926 \\U0001F930 \\U0001F933-\\U0001F939 \\U0001F93C-\\U0001F93E] ;" // Emoji that take Fitzpatrick modifiers
 #else
     "$EmojiForSeqs = [\\u2764 \\U0001F466-\\U0001F469 \\U0001F48B];"
     "$EmojiForMods = [\\u261D \\u270A-\\u270C \\U0001F385 \\U0001F3C3-\\U0001F3C4 \\U0001F3C7 \\U0001F3CA \\U0001F442-\\U0001F443 \\U0001F446-\\U0001F450 \\U0001F466-\\U0001F469 \\U0001F46E-\\U0001F478 \\U0001F47C \\U0001F481-\\U0001F483 \\U0001F485-\\U0001F487 \\U0001F4AA \\U0001F596 \\U0001F645-\\U0001F647 \\U0001F64B-\\U0001F64F \\U0001F6A3 \\U0001F6B4-\\U0001F6B6 \\U0001F6C0] ;" // Emoji that take Fitzpatrick modifiers
@@ -780,7 +780,7 @@ bool isCJKLocale(const AtomicString& locale)
     return false;
 }
 
-TextBreakIterator* openLineBreakIterator(const AtomicString& locale, LineBreakIteratorMode mode, bool isCJK)
+UBreakIterator* openLineBreakIterator(const AtomicString& locale, LineBreakIteratorMode mode, bool isCJK)
 {
     UBreakIterator* ubrkIter;
     UErrorCode openStatus = U_ZERO_ERROR;
@@ -804,30 +804,30 @@ TextBreakIterator* openLineBreakIterator(const AtomicString& locale, LineBreakIt
         return nullptr;
     }
 
-    return reinterpret_cast<TextBreakIterator*>(ubrkIter);
+    return ubrkIter;
 }
 
-void closeLineBreakIterator(TextBreakIterator*& iterator)
+void closeLineBreakIterator(UBreakIterator*& iterator)
 {
-    UBreakIterator* ubrkIter = reinterpret_cast<UBreakIterator*>(iterator);
+    UBreakIterator* ubrkIter = iterator;
     ASSERT(ubrkIter);
     ubrk_close(ubrkIter);
     iterator = nullptr;
 }
 
-static std::atomic<TextBreakIterator*> nonSharedCharacterBreakIterator = ATOMIC_VAR_INIT(nullptr);
+static std::atomic<UBreakIterator*> nonSharedCharacterBreakIterator = ATOMIC_VAR_INIT(nullptr);
 
-static inline TextBreakIterator* getNonSharedCharacterBreakIterator()
+static inline UBreakIterator* getNonSharedCharacterBreakIterator()
 {
     if (auto *res = nonSharedCharacterBreakIterator.exchange(nullptr, std::memory_order_acquire))
         return res;
     return initializeIterator(UBRK_CHARACTER);
 }
 
-static inline void cacheNonSharedCharacterBreakIterator(TextBreakIterator* cacheMe)
+static inline void cacheNonSharedCharacterBreakIterator(UBreakIterator* cacheMe)
 {
     if (auto *old = nonSharedCharacterBreakIterator.exchange(cacheMe, std::memory_order_release))
-        ubrk_close(reinterpret_cast<UBreakIterator*>(old));
+        ubrk_close(old);
 }
 
 NonSharedCharacterBreakIterator::NonSharedCharacterBreakIterator(StringView string)
@@ -848,52 +848,11 @@ NonSharedCharacterBreakIterator::NonSharedCharacterBreakIterator(NonSharedCharac
     std::swap(m_iterator, other.m_iterator);
 }
 
-
 // Iterator implemenation.
 
-int textBreakFirst(TextBreakIterator* iterator)
+bool isWordTextBreak(UBreakIterator* iterator)
 {
-    return ubrk_first(reinterpret_cast<UBreakIterator*>(iterator));
-}
-
-int textBreakLast(TextBreakIterator* iterator)
-{
-    return ubrk_last(reinterpret_cast<UBreakIterator*>(iterator));
-}
-
-int textBreakNext(TextBreakIterator* iterator)
-{
-    return ubrk_next(reinterpret_cast<UBreakIterator*>(iterator));
-}
-
-int textBreakPrevious(TextBreakIterator* iterator)
-{
-    return ubrk_previous(reinterpret_cast<UBreakIterator*>(iterator));
-}
-
-int textBreakPreceding(TextBreakIterator* iterator, int pos)
-{
-    return ubrk_preceding(reinterpret_cast<UBreakIterator*>(iterator), pos);
-}
-
-int textBreakFollowing(TextBreakIterator* iterator, int pos)
-{
-    return ubrk_following(reinterpret_cast<UBreakIterator*>(iterator), pos);
-}
-
-int textBreakCurrent(TextBreakIterator* iterator)
-{
-    return ubrk_current(reinterpret_cast<UBreakIterator*>(iterator));
-}
-
-bool isTextBreak(TextBreakIterator* iterator, int position)
-{
-    return ubrk_isBoundary(reinterpret_cast<UBreakIterator*>(iterator), position);
-}
-
-bool isWordTextBreak(TextBreakIterator* iterator)
-{
-    int ruleStatus = ubrk_getRuleStatus(reinterpret_cast<UBreakIterator*>(iterator));
+    int ruleStatus = ubrk_getRuleStatus(iterator);
     return ruleStatus != UBRK_WORD_NONE;
 }
 
@@ -920,7 +879,7 @@ unsigned numGraphemeClusters(StringView string)
     }
 
     unsigned numGraphemeClusters = 0;
-    while (textBreakNext(iterator) != TextBreakDone)
+    while (ubrk_next(iterator) != UBRK_DONE)
         ++numGraphemeClusters;
     return numGraphemeClusters;
 }
@@ -948,10 +907,10 @@ unsigned numCharactersInGraphemeClusters(StringView string, unsigned numGrapheme
     }
 
     for (unsigned i = 0; i < numGraphemeClusters; ++i) {
-        if (textBreakNext(iterator) == TextBreakDone)
+        if (ubrk_next(iterator) == UBRK_DONE)
             return stringLength;
     }
-    return textBreakCurrent(iterator);
+    return ubrk_current(iterator);
 }
 
 } // namespace WTF

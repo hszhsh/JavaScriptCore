@@ -239,6 +239,13 @@ public:
         store32(ARMRegisters::S1, ARMRegisters::S0);
     }
 
+    void or32(TrustedImm32 imm, Address address)
+    {
+        load32(address, ARMRegisters::S0);
+        or32(imm, ARMRegisters::S0, ARMRegisters::S0);
+        store32(ARMRegisters::S0, address);
+    }
+
     void or32(TrustedImm32 imm, RegisterID dest)
     {
         ASSERT(dest != ARMRegisters::S0);
@@ -1465,9 +1472,7 @@ public:
 
     void storeFence()
     {
-        // FIXME: We should actually implement this. The only current caller is related to
-        // concurrent GC, which is disabled on 32-bit systems.
-        // https://bugs.webkit.org/show_bug.cgi?id=164733
+        m_assembler.dmbISHST();
     }
 
     static FunctionPtr readCallTarget(CodeLocationCall call)

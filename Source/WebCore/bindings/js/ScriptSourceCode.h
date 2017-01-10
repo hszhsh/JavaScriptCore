@@ -42,8 +42,8 @@ namespace WebCore {
 
 class ScriptSourceCode {
 public:
-    ScriptSourceCode(const String& source, const URL& url = URL(), const TextPosition& startPosition = TextPosition::minimumPosition(), JSC::SourceProviderSourceType sourceType = JSC::SourceProviderSourceType::Program)
-        : m_provider(JSC::StringSourceProvider::create(source, url.isNull() ? String() : url.string(), startPosition, sourceType))
+    ScriptSourceCode(const String& source, const URL& url = URL(), const TextPosition& startPosition = TextPosition(), JSC::SourceProviderSourceType sourceType = JSC::SourceProviderSourceType::Program)
+        : m_provider(JSC::StringSourceProvider::create(source, JSC::SourceOrigin { url.string() }, url.string(), startPosition, sourceType))
         , m_code(m_provider, startPosition.m_line.oneBasedInt(), startPosition.m_column.oneBasedInt())
         , m_url(url)
     {
@@ -62,7 +62,7 @@ public:
 
     StringView source() const { return m_provider->source(); }
 
-    int startLine() const { return m_code.firstLine(); }
+    int startLine() const { return m_code.firstLine().oneBasedInt(); }
 
     CachedScript* cachedScript() const { return m_cachedScript.get(); }
 

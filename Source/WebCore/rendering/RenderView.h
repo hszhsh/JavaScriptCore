@@ -57,7 +57,7 @@ public:
 
     void layout() override;
     void updateLogicalWidth() override;
-    void computeLogicalHeight(LayoutUnit logicalHeight, LayoutUnit logicalTop, LogicalExtentComputedValues&) const override;
+    LogicalExtentComputedValues computeLogicalHeight(LayoutUnit logicalHeight, LayoutUnit logicalTop) const override;
 
     LayoutUnit availableLogicalHeight(AvailableLogicalHeightType) const override;
 
@@ -82,6 +82,8 @@ public:
 
     void paint(PaintInfo&, const LayoutPoint&) override;
     void paintBoxDecorations(PaintInfo&, const LayoutPoint&) override;
+    // Return the renderer whose background style is used to paint the root background.
+    RenderElement* rendererForRootBackground() const;
 
     enum SelectionRepaintMode { RepaintNewXOROld, RepaintNewMinusOld, RepaintNothing };
     void setSelection(RenderObject* start, std::optional<unsigned> startPos, RenderObject* endObject, std::optional<unsigned> endPos, SelectionRepaintMode = RepaintNewXOROld);
@@ -247,9 +249,9 @@ public:
     void releaseProtectedRenderWidgets() { m_protectedRenderWidgets.clear(); }
 
 #if ENABLE(CSS_SCROLL_SNAP)
-    void registerBoxWithScrollSnapCoordinates(const RenderBox&);
-    void unregisterBoxWithScrollSnapCoordinates(const RenderBox&);
-    const HashSet<const RenderBox*>& boxesWithScrollSnapCoordinates() { return m_boxesWithScrollSnapCoordinates; }
+    void registerBoxWithScrollSnapPositions(const RenderBox&);
+    void unregisterBoxWithScrollSnapPositions(const RenderBox&);
+    const HashSet<const RenderBox*>& boxesWithScrollSnapPositions() { return m_boxesWithScrollSnapPositions; }
 #endif
 
 #if !ASSERT_DISABLED
@@ -391,7 +393,7 @@ private:
     SelectionRectGatherer m_selectionRectGatherer;
 #endif
 #if ENABLE(CSS_SCROLL_SNAP)
-    HashSet<const RenderBox*> m_boxesWithScrollSnapCoordinates;
+    HashSet<const RenderBox*> m_boxesWithScrollSnapPositions;
 #endif
 };
 

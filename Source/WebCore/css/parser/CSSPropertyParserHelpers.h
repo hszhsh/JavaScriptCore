@@ -35,6 +35,7 @@
 #include "CSSParserTokenRange.h"
 #include "CSSPrimitiveValue.h"
 #include "CSSShadowValue.h"
+#include "CSSValuePool.h"
 #include "Length.h" // For ValueRange
 
 namespace WebCore {
@@ -57,6 +58,7 @@ enum class UnitlessQuirk {
 };
 
 RefPtr<CSSPrimitiveValue> consumeInteger(CSSParserTokenRange&, double minimumValue = -std::numeric_limits<double>::max());
+bool consumePositiveIntegerRaw(CSSParserTokenRange&, int& result);
 RefPtr<CSSPrimitiveValue> consumePositiveInteger(CSSParserTokenRange&);
 bool consumeNumberRaw(CSSParserTokenRange&, double& result);
 RefPtr<CSSPrimitiveValue> consumeNumber(CSSParserTokenRange&, ValueRange);
@@ -107,7 +109,7 @@ template<CSSValueID... names> RefPtr<CSSPrimitiveValue> consumeIdent(CSSParserTo
 {
     if (range.peek().type() != IdentToken || !identMatches<names...>(range.peek().id()))
         return nullptr;
-    return CSSPrimitiveValue::createIdentifier(range.consumeIncludingWhitespace().id());
+    return CSSValuePool::singleton().createIdentifierValue(range.consumeIncludingWhitespace().id());
 }
 
 static inline bool isCSSWideKeyword(const CSSValueID& id)

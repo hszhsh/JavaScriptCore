@@ -32,7 +32,6 @@
 #if ENABLE(FETCH_API)
 
 #include "FetchLoader.h"
-#include "FetchResponseSource.h"
 #include "HTTPParsers.h"
 #include "JSBlob.h"
 #include "ResourceResponse.h"
@@ -91,7 +90,7 @@ void FetchBodyOwner::arrayBuffer(Ref<DeferredPromise>&& promise)
 void FetchBodyOwner::blob(Ref<DeferredPromise>&& promise)
 {
     if (isBodyNull()) {
-        promise->resolve(Blob::create(Vector<uint8_t>(), Blob::normalizedContentType(extractMIMETypeFromMediaType(m_contentType))));
+        promise->resolve<IDLInterface<Blob>>(Blob::create({ }, Blob::normalizedContentType(extractMIMETypeFromMediaType(m_contentType))).get());
         return;
     }
     if (isDisturbedOrLocked()) {
@@ -139,7 +138,7 @@ void FetchBodyOwner::consumeOnceLoadingFinished(FetchBodyConsumer::Type type, Re
 void FetchBodyOwner::formData(Ref<DeferredPromise>&& promise)
 {
     if (isBodyNull()) {
-        promise->reject(0);
+        promise->reject();
         return;
     }
     if (isDisturbedOrLocked()) {
@@ -167,7 +166,7 @@ void FetchBodyOwner::json(Ref<DeferredPromise>&& promise)
 void FetchBodyOwner::text(Ref<DeferredPromise>&& promise)
 {
     if (isBodyNull()) {
-        promise->resolve(String());
+        promise->resolve<IDLDOMString>({ });
         return;
     }
     if (isDisturbedOrLocked()) {

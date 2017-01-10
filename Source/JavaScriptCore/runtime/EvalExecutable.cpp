@@ -27,9 +27,7 @@
 #include "EvalExecutable.h"
 
 #include "EvalCodeBlock.h"
-#include "HeapCellInlines.h"
-#include "JSCJSValueInlines.h"
-#include "SlotVisitorInlines.h"
+#include "JSCInlines.h"
 
 namespace JSC {
 
@@ -51,9 +49,9 @@ void EvalExecutable::visitChildren(JSCell* cell, SlotVisitor& visitor)
     EvalExecutable* thisObject = jsCast<EvalExecutable*>(cell);
     ASSERT_GC_OBJECT_INHERITS(thisObject, info());
     ScriptExecutable::visitChildren(thisObject, visitor);
-    visitor.append(&thisObject->m_unlinkedEvalCodeBlock);
-    if (thisObject->m_evalCodeBlock)
-        thisObject->m_evalCodeBlock->visitWeakly(visitor);
+    visitor.append(thisObject->m_unlinkedEvalCodeBlock);
+    if (EvalCodeBlock* evalCodeBlock = thisObject->m_evalCodeBlock.get())
+        evalCodeBlock->visitWeakly(visitor);
 }
 
 } // namespace JSC

@@ -110,7 +110,7 @@ void ObjectConstructor::finishCreation(VM& vm, JSGlobalObject* globalObject, Obj
 // ES 19.1.1.1 Object([value])
 static ALWAYS_INLINE JSObject* constructObject(ExecState* exec, JSValue newTarget)
 {
-    ObjectConstructor* objectConstructor = jsCast<ObjectConstructor*>(exec->callee());
+    ObjectConstructor* objectConstructor = jsCast<ObjectConstructor*>(exec->jsCallee());
     JSGlobalObject* globalObject = objectConstructor->globalObject();
     VM& vm = globalObject->vm();
     auto scope = DECLARE_THROW_SCOPE(vm);
@@ -176,11 +176,11 @@ EncodedJSValue JSC_HOST_CALL objectConstructorSetPrototypeOf(ExecState* exec)
 
     JSValue objectValue = exec->argument(0);
     if (objectValue.isUndefinedOrNull())
-        return throwVMTypeError(exec, scope);
+        return throwVMTypeError(exec, scope, ASCIILiteral("Cannot set prototype of undefined or null"));
 
     JSValue protoValue = exec->argument(1);
     if (!protoValue.isObject() && !protoValue.isNull())
-        return throwVMTypeError(exec, scope);
+        return throwVMTypeError(exec, scope, ASCIILiteral("Prototype value can only be an object or null"));
 
     JSObject* object = objectValue.toObject(exec);
     RETURN_IF_EXCEPTION(scope, encodedJSValue());

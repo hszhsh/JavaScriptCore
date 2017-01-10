@@ -30,7 +30,9 @@
 #include "FrameSelection.h"
 #include "FrameView.h"
 #include "GraphicsContext.h"
+#include "HTMLBodyElement.h"
 #include "HTMLFrameOwnerElement.h"
+#include "HTMLHtmlElement.h"
 #include "HTMLIFrameElement.h"
 #include "HitTestResult.h"
 #include "ImageQualityController.h"
@@ -166,11 +168,8 @@ void RenderView::unscheduleLazyRepaint(RenderBox& renderer)
 
 void RenderView::lazyRepaintTimerFired()
 {
-    bool shouldRepaint = document().pageCacheState() == Document::NotInPageCache;
-
     for (auto& renderer : m_renderersNeedingLazyRepaint) {
-        if (shouldRepaint)
-            renderer->repaint();
+        renderer->repaint();
         renderer->setRenderBoxNeedsLazyRepaint(false);
     }
     m_renderersNeedingLazyRepaint.clear();
@@ -210,9 +209,9 @@ bool RenderView::hitTest(const HitTestRequest& request, const HitTestLocation& l
     return resultLayer;
 }
 
-void RenderView::computeLogicalHeight(LayoutUnit logicalHeight, LayoutUnit, LogicalExtentComputedValues& computedValues) const
+RenderBox::LogicalExtentComputedValues RenderView::computeLogicalHeight(LayoutUnit logicalHeight, LayoutUnit) const
 {
-    computedValues.m_extent = !shouldUsePrintingLayout() ? LayoutUnit(viewLogicalHeight()) : logicalHeight;
+    return { !shouldUsePrintingLayout() ? LayoutUnit(viewLogicalHeight()) : logicalHeight, LayoutUnit(), ComputedMarginValues() };
 }
 
 void RenderView::updateLogicalWidth()
@@ -437,14 +436,14 @@ void RenderView::mapLocalToContainer(const RenderLayerModelObject* repaintContai
     ASSERT_ARG(repaintContainer, !repaintContainer || repaintContainer == this);
     ASSERT_UNUSED(wasFixed, !wasFixed || *wasFixed == (mode & IsFixed));
 
+    if (mode & IsFixed)
+        transformState.move(toLayoutSize(frameView().scrollPositionRespectingCustomFixedPosition()));
+
     if (!repaintContainer && mode & UseTransforms && shouldUseTransformFromContainer(nullptr)) {
         TransformationMatrix t;
         getTransformFromContainer(nullptr, LayoutSize(), t);
         transformState.applyTransform(t);
     }
-    
-    if (mode & IsFixed)
-        transformState.move(toLayoutSize(frameView().scrollPositionRespectingCustomFixedPosition()));
 }
 
 const RenderObject* RenderView::pushMappingToContainer(const RenderLayerModelObject* ancestorToStopAt, RenderGeometryMap& geometryMap) const
@@ -467,14 +466,14 @@ const RenderObject* RenderView::pushMappingToContainer(const RenderLayerModelObj
 
 void RenderView::mapAbsoluteToLocalPoint(MapCoordinatesFlags mode, TransformState& transformState) const
 {
-    if (mode & IsFixed)
-        transformState.move(toLayoutSize(frameView().scrollPositionRespectingCustomFixedPosition()));
-
     if (mode & UseTransforms && shouldUseTransformFromContainer(nullptr)) {
         TransformationMatrix t;
         getTransformFromContainer(nullptr, LayoutSize(), t);
         transformState.applyTransform(t);
     }
+
+    if (mode & IsFixed)
+        transformState.move(toLayoutSize(frameView().scrollPositionRespectingCustomFixedPosition()));
 }
 
 bool RenderView::requiresColumns(int) const
@@ -506,24 +505,45 @@ void RenderView::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
     paintObject(paintInfo, paintOffset);
 }
 
-static inline bool rendererObscuresBackground(RenderElement* rootObject)
+RenderElement* RenderView::rendererForRootBackground() const
 {
-    if (!rootObject)
-        return false;
-    
-    const RenderStyle& style = rootObject->style();
-    if (style.visibility() != VISIBLE
-        || style.opacity() != 1
-        || style.hasTransform())
-        return false;
-    
-    if (rootObject->isComposited())
-        return false;
+    auto* firstChild = this->firstChild();
+    if (!firstChild)
+        return nullptr;
+    ASSERT(is<RenderElement>(*firstChild));
+    auto& documentRenderer = downcast<RenderElement>(*firstChild);
 
-    if (rootObject->rendererForRootBackground().style().backgroundClip() == TextFillBox)
+    if (documentRenderer.hasBackground())
+        return &documentRenderer;
+
+    // We propagate the background only for HTML content.
+    if (!is<HTMLHtmlElement>(documentRenderer.element()))
+        return &documentRenderer;
+
+    if (auto* body = document().body()) {
+        if (auto* renderer = body->renderer())
+            return renderer;
+    }
+    return &documentRenderer;
+}
+
+static inline bool rendererObscuresBackground(const RenderElement& rootElement)
+{
+    auto& style = rootElement.style();
+    if (style.visibility() != VISIBLE || style.opacity() != 1 || style.hasTransform())
         return false;
 
     if (style.hasBorderRadius())
+        return false;
+
+    if (rootElement.isComposited())
+        return false;
+
+    auto* rendererForBackground = rootElement.view().rendererForRootBackground();
+    if (!rendererForBackground)
+        return false;
+
+    if (rendererForBackground->style().backgroundClip() == TextFillBox)
         return false;
 
     return true;
@@ -567,7 +587,7 @@ void RenderView::paintBoxDecorations(PaintInfo& paintInfo, const LayoutPoint&)
         // The document element's renderer is currently forced to be a block, but may not always be.
         RenderBox* rootBox = is<RenderBox>(*rootRenderer) ? downcast<RenderBox>(rootRenderer) : nullptr;
         rootFillsViewport = rootBox && !rootBox->x() && !rootBox->y() && rootBox->width() >= width() && rootBox->height() >= height();
-        rootObscuresBackground = rendererObscuresBackground(rootRenderer);
+        rootObscuresBackground = rendererObscuresBackground(*rootRenderer);
     }
 
     bool backgroundShouldExtendBeyondPage = frameView().frame().settings().backgroundShouldExtendBeyondPage();
@@ -1144,11 +1164,9 @@ IntRect RenderView::unscaledDocumentRect() const
 
 bool RenderView::rootBackgroundIsEntirelyFixed() const
 {
-    RenderElement* rootObject = document().documentElement() ? document().documentElement()->renderer() : nullptr;
-    if (!rootObject)
-        return false;
-
-    return rootObject->rendererForRootBackground().style().hasEntirelyFixedBackground();
+    if (auto* rootBackgroundRenderer = rendererForRootBackground())
+        return rootBackgroundRenderer->style().hasEntirelyFixedBackground();
+    return false;
 }
     
 LayoutRect RenderView::unextendedBackgroundRect() const
@@ -1416,7 +1434,7 @@ RenderView::RepaintRegionAccumulator::~RepaintRegionAccumulator()
 unsigned RenderView::pageNumberForBlockProgressionOffset(int offset) const
 {
     int columnNumber = 0;
-    const Pagination& pagination = frameView().frame().page()->pagination();
+    const Pagination& pagination = page().pagination();
     if (pagination.mode == Pagination::Unpaginated)
         return columnNumber;
     
@@ -1441,7 +1459,7 @@ unsigned RenderView::pageNumberForBlockProgressionOffset(int offset) const
 
 unsigned RenderView::pageCount() const
 {
-    const Pagination& pagination = frameView().frame().page()->pagination();
+    const Pagination& pagination = page().pagination();
     if (pagination.mode == Pagination::Unpaginated)
         return 0;
     
@@ -1452,14 +1470,14 @@ unsigned RenderView::pageCount() const
 }
 
 #if ENABLE(CSS_SCROLL_SNAP)
-void RenderView::registerBoxWithScrollSnapCoordinates(const RenderBox& box)
+void RenderView::registerBoxWithScrollSnapPositions(const RenderBox& box)
 {
-    m_boxesWithScrollSnapCoordinates.add(&box);
+    m_boxesWithScrollSnapPositions.add(&box);
 }
 
-void RenderView::unregisterBoxWithScrollSnapCoordinates(const RenderBox& box)
+void RenderView::unregisterBoxWithScrollSnapPositions(const RenderBox& box)
 {
-    m_boxesWithScrollSnapCoordinates.remove(&box);
+    m_boxesWithScrollSnapPositions.remove(&box);
 }
 #endif
 

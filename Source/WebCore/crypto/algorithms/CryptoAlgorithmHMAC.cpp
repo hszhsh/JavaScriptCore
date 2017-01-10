@@ -34,6 +34,7 @@
 #include "CryptoKeyDataOctetSequence.h"
 #include "CryptoKeyHMAC.h"
 #include "ExceptionCode.h"
+#include <wtf/Variant.h>
 
 namespace WebCore {
 
@@ -74,6 +75,11 @@ void CryptoAlgorithmHMAC::sign(Ref<CryptoKey>&& key, Vector<uint8_t>&& data, Vec
     platformSign(WTFMove(key), WTFMove(data), WTFMove(callback), WTFMove(exceptionCallback), context, workQueue);
 }
 
+void CryptoAlgorithmHMAC::verify(Ref<CryptoKey>&& key, Vector<uint8_t>&& signature, Vector<uint8_t>&& data, BoolCallback&& callback, ExceptionCallback&& exceptionCallback, ScriptExecutionContext& context, WorkQueue& workQueue)
+{
+    platformVerify(WTFMove(key), WTFMove(signature), WTFMove(data), WTFMove(callback), WTFMove(exceptionCallback), context, workQueue);
+}
+
 void CryptoAlgorithmHMAC::generateKey(const CryptoAlgorithmParameters& parameters, bool extractable, CryptoKeyUsageBitmap usages, KeyOrKeyPairCallback&& callback, ExceptionCallback&& exceptionCallback, ScriptExecutionContext&)
 {
     const auto& hmacParameters = downcast<CryptoAlgorithmHmacKeyParams>(parameters);
@@ -94,7 +100,7 @@ void CryptoAlgorithmHMAC::generateKey(const CryptoAlgorithmParameters& parameter
         return;
     }
 
-    callback(result.get(), nullptr);
+    callback(WTFMove(result));
 }
 
 void CryptoAlgorithmHMAC::importKey(SubtleCrypto::KeyFormat format, KeyData&& data, const std::unique_ptr<CryptoAlgorithmParameters>&& parameters, bool extractable, CryptoKeyUsageBitmap usages, KeyCallback&& callback, ExceptionCallback&& exceptionCallback)
@@ -215,7 +221,7 @@ ExceptionOr<void> CryptoAlgorithmHMAC::generateKey(const CryptoAlgorithmParamete
         failureCallback();
         return { };
     }
-    callback(result.get(), nullptr);
+    callback(WTFMove(result));
     return { };
 }
 

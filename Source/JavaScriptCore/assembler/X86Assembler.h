@@ -267,6 +267,7 @@ private:
         OP2_MOVAPS_VpdWpd   = 0x28,
         OP2_CVTSI2SD_VsdEd  = 0x2A,
         OP2_CVTTSD2SI_GdWsd = 0x2C,
+        OP2_CVTTSS2SI_GdWsd = 0x2C,
         OP2_UCOMISD_VsdWsd  = 0x2E,
         OP2_3BYTE_ESCAPE_3A = 0x3A,
         OP2_CMOVCC          = 0x40,
@@ -280,6 +281,7 @@ private:
         OP2_SQRTSD_VsdWsd   = 0x51,
         OP2_ANDPS_VpdWpd    = 0x54,
         OP2_ANDNPD_VpdWpd   = 0x55,
+        OP2_ORPS_VpdWpd     = 0x56,
         OP2_XORPD_VpdWpd    = 0x57,
         OP2_MOVD_VdEd       = 0x6E,
         OP2_MOVD_EdVd       = 0x7E,
@@ -288,6 +290,8 @@ private:
         OP2_3BYTE_ESCAPE_AE = 0xAE,
         OP2_IMUL_GvEv       = 0xAF,
         OP2_MOVZX_GvEb      = 0xB6,
+        OP2_BSF             = 0xBC,
+        OP2_TZCNT           = 0xBC,
         OP2_BSR             = 0xBD,
         OP2_LZCNT           = 0xBD,
         OP2_MOVSX_GvEb      = 0xBE,
@@ -1015,6 +1019,32 @@ public:
     void bsrq_mr(int offset, RegisterID base, RegisterID dst)
     {
         m_formatter.twoByteOp64(OP2_BSR, dst, base, offset);
+    }
+#endif
+
+    void tzcnt_rr(RegisterID src, RegisterID dst)
+    {
+        m_formatter.prefix(PRE_SSE_F3);
+        m_formatter.twoByteOp(OP2_TZCNT, dst, src);
+    }
+
+#if CPU(X86_64)
+    void tzcntq_rr(RegisterID src, RegisterID dst)
+    {
+        m_formatter.prefix(PRE_SSE_F3);
+        m_formatter.twoByteOp64(OP2_TZCNT, dst, src);
+    }
+#endif
+
+    void bsf_rr(RegisterID src, RegisterID dst)
+    {
+        m_formatter.twoByteOp(OP2_BSF, dst, src);
+    }
+
+#if CPU(X86_64)
+    void bsfq_rr(RegisterID src, RegisterID dst)
+    {
+        m_formatter.twoByteOp64(OP2_BSF, dst, src);
     }
 #endif
 
@@ -2265,6 +2295,20 @@ public:
         m_formatter.twoByteOp(OP2_CVTTSD2SI_GdWsd, dst, (RegisterID)src);
     }
 
+    void cvttss2si_rr(XMMRegisterID src, RegisterID dst)
+    {
+        m_formatter.prefix(PRE_SSE_F3);
+        m_formatter.twoByteOp(OP2_CVTTSS2SI_GdWsd, dst, (RegisterID)src);
+    }
+
+#if CPU(X86_64)
+    void cvttss2siq_rr(XMMRegisterID src, RegisterID dst)
+    {
+        m_formatter.prefix(PRE_SSE_F3);
+        m_formatter.twoByteOp64(OP2_CVTTSS2SI_GdWsd, dst, (RegisterID)src);
+    }
+#endif
+
     void cvtsd2ss_rr(XMMRegisterID src, XMMRegisterID dst)
     {
         m_formatter.prefix(PRE_SSE_F2);
@@ -2615,6 +2659,11 @@ public:
     void andps_rr(XMMRegisterID src, XMMRegisterID dst)
     {
         m_formatter.twoByteOp(OP2_ANDPS_VpdWpd, (RegisterID)dst, (RegisterID)src);
+    }
+
+    void orps_rr(XMMRegisterID src, XMMRegisterID dst)
+    {
+        m_formatter.twoByteOp(OP2_ORPS_VpdWpd, (RegisterID)dst, (RegisterID)src);
     }
 
     void xorps_rr(XMMRegisterID src, XMMRegisterID dst)

@@ -248,6 +248,9 @@ RefPtr<Inspector::Protocol::Console::StackTrace> InspectorDebuggerAgent::buildAs
 
 void InspectorDebuggerAgent::handleConsoleAssert(const String& message)
 {
+    if (!m_scriptDebugServer.breakpointsActive())
+        return;
+
     if (m_pauseOnAssertionFailures)
         breakProgram(DebuggerFrontendDispatcher::Reason::Assert, buildAssertPauseReason(message));
 }
@@ -784,8 +787,11 @@ void InspectorDebuggerAgent::didBecomeIdle()
 {
     m_registeredIdleCallback = false;
 
-    if (m_conditionToDispatchResumed == ShouldDispatchResumed::WhenIdle)
+    if (m_conditionToDispatchResumed == ShouldDispatchResumed::WhenIdle) {
+        cancelPauseOnNextStatement();
+        m_scriptDebugServer.continueProgram();
         m_frontendDispatcher->resumed();
+    }
 
     m_conditionToDispatchResumed = ShouldDispatchResumed::No;
 
@@ -884,11 +890,12 @@ void InspectorDebuggerAgent::didParseSource(JSC::SourceID sourceID, const Script
     String sourceURL = script.sourceURL;
     String sourceMappingURL = sourceMapURLForScript(script);
 
+    const bool isModule = script.sourceProvider->sourceType() == JSC::SourceProviderSourceType::Module;
     const bool* isContentScript = script.isContentScript ? &script.isContentScript : nullptr;
     String* sourceURLParam = hasSourceURL ? &sourceURL : nullptr;
     String* sourceMapURLParam = sourceMappingURL.isEmpty() ? nullptr : &sourceMappingURL;
 
-    m_frontendDispatcher->scriptParsed(scriptIDStr, script.url, script.startLine, script.startColumn, script.endLine, script.endColumn, isContentScript, sourceURLParam, sourceMapURLParam);
+    m_frontendDispatcher->scriptParsed(scriptIDStr, script.url, script.startLine, script.startColumn, script.endLine, script.endColumn, isContentScript, sourceURLParam, sourceMapURLParam, isModule ? &isModule : nullptr);
 
     m_scripts.set(sourceID, script);
 
@@ -1138,7 +1145,6 @@ void InspectorDebuggerAgent::clearAsyncStackTraceData()
 void InspectorDebuggerAgent::refAsyncCallData(const AsyncCallIdentifier& identifier)
 {
     auto iterator = m_asyncCallIdentifierToData.find(identifier);
-    ASSERT(iterator != m_asyncCallIdentifierToData.end());
     if (iterator == m_asyncCallIdentifierToData.end())
         return;
 
@@ -1148,7 +1154,6 @@ void InspectorDebuggerAgent::refAsyncCallData(const AsyncCallIdentifier& identif
 void InspectorDebuggerAgent::derefAsyncCallData(const AsyncCallIdentifier& identifier)
 {
     auto iterator = m_asyncCallIdentifierToData.find(identifier);
-    ASSERT(iterator != m_asyncCallIdentifierToData.end());
     if (iterator == m_asyncCallIdentifierToData.end())
         return;
 

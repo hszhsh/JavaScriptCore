@@ -26,7 +26,8 @@
 #include "config.h"
 #include "SVGElement.h"
 
-#include "CSSParser.h"
+#include "CSSPropertyParser.h"
+#include "DeprecatedCSSOMValue.h"
 #include "Document.h"
 #include "ElementIterator.h"
 #include "Event.h"
@@ -536,7 +537,7 @@ bool SVGElement::removeEventListener(const AtomicString& eventType, EventListene
     if (containingShadowRoot())
         return Node::removeEventListener(eventType, listener, options);
 
-    // EventTarget::removeEventListener creates a PassRefPtr around the given EventListener
+    // EventTarget::removeEventListener creates a Ref around the given EventListener
     // object when creating a temporary RegisteredEventListener object used to look up the
     // event listener in a cache. If we want to be able to call removeEventListener() multiple
     // times on different nodes, we have to delay its immediate destruction, which would happen
@@ -1023,7 +1024,7 @@ void SVGElement::childrenChanged(const ChildChange& change)
     invalidateInstances();
 }
 
-RefPtr<CSSValue> SVGElement::getPresentationAttribute(const String& name)
+RefPtr<DeprecatedCSSOMValue> SVGElement::getPresentationAttribute(const String& name)
 {
     if (!hasAttributesWithoutUpdate())
         return 0;
@@ -1036,8 +1037,10 @@ RefPtr<CSSValue> SVGElement::getPresentationAttribute(const String& name)
     RefPtr<MutableStyleProperties> style = MutableStyleProperties::create(SVGAttributeMode);
     CSSPropertyID propertyID = cssPropertyIdForSVGAttributeName(attribute->name());
     style->setProperty(propertyID, attribute->value());
-    RefPtr<CSSValue> cssValue = style->getPropertyCSSValue(propertyID);
-    return cssValue ? cssValue->cloneForCSSOM() : nullptr;
+    auto cssValue = style->getPropertyCSSValue(propertyID);
+    if (!cssValue)
+        return nullptr;
+    return cssValue->createDeprecatedCSSOMWrapper();
 }
 
 bool SVGElement::instanceUpdatesBlocked() const

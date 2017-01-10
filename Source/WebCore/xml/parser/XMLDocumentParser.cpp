@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2000 Peter Kelly (pmk@post.com)
- * Copyright (C) 2005, 2006, 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2005-2017 Apple Inc. All rights reserved.
  * Copyright (C) 2006 Alexey Proskuryakov (ap@webkit.org)
  * Copyright (C) 2007 Samuel Weinig (sam@webkit.org)
  * Copyright (C) 2008 Nokia Corporation and/or its subsidiary(-ies)
@@ -100,14 +100,15 @@ void XMLDocumentParser::clearCurrentNodeStack()
     }
 }
 
-void XMLDocumentParser::insert(const SegmentedString&)
+void XMLDocumentParser::insert(SegmentedString&&)
 {
     ASSERT_NOT_REACHED();
 }
 
 void XMLDocumentParser::append(RefPtr<StringImpl>&& inputSource)
 {
-    SegmentedString source(WTFMove(inputSource));
+    String source { WTFMove(inputSource) };
+
     if (m_sawXSLTransform || !m_sawFirstElement)
         m_originalSourceForTransform.append(source);
 
@@ -119,7 +120,7 @@ void XMLDocumentParser::append(RefPtr<StringImpl>&& inputSource)
         return;
     }
 
-    doWrite(source.toString());
+    doWrite(source);
 
     // After parsing, dispatch image beforeload events.
     ImageLoader::dispatchPendingBeforeLoadEvents();
@@ -151,7 +152,6 @@ static inline String toString(const xmlChar* string, size_t size)
 { 
     return String::fromUTF8(reinterpret_cast<const char*>(string), size); 
 }
-
 
 bool XMLDocumentParser::updateLeafTextNode()
 {
@@ -237,8 +237,7 @@ void XMLDocumentParser::notifyFinished(PendingScript& pendingScript)
     m_pendingScript = nullptr;
     pendingScript.clearClient();
 
-    auto& scriptElement = *toScriptElementIfPossible(&pendingScript.element());
-    scriptElement.executePendingScript(pendingScript);
+    pendingScript.element().executePendingScript(pendingScript);
 
     if (!isDetached() && !m_requestingScript)
         resumeParsing();

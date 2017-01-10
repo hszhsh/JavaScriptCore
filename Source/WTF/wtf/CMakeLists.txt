@@ -57,6 +57,7 @@ set(WTF_HEADERS
     ListHashSet.h
     Lock.h
     LockAlgorithm.h
+    LockedPrintStream.h
     Locker.h
     MD5.h
     MainThread.h
@@ -92,6 +93,7 @@ set(WTF_HEADERS
     RandomNumberSeed.h
     RangeSet.h
     RawPointer.h
+    RecursiveLockAdapter.h
     RedBlackTree.h
     Ref.h
     RefCounted.h
@@ -198,6 +200,7 @@ set(WTF_SOURCES
     GregorianDateTime.cpp
     HashTable.cpp
     Lock.cpp
+    LockedPrintStream.cpp
     MD5.cpp
     MainThread.cpp
     MediaTime.cpp
@@ -237,6 +240,10 @@ set(WTF_SOURCES
     dtoa/fixed-dtoa.cc
     dtoa/strtod.cc
 
+    persistence/Coders.cpp
+    persistence/Decoder.cpp
+    persistence/Encoder.cpp
+
     text/AtomicString.cpp
     text/AtomicStringImpl.cpp
     text/AtomicStringTable.cpp
@@ -246,6 +253,7 @@ set(WTF_SOURCES
     text/StringImpl.cpp
     text/StringStatics.cpp
     text/StringView.cpp
+    text/SymbolImpl.cpp
     text/SymbolRegistry.cpp
     text/TextBreakIterator.cpp
     text/WTFString.cpp
@@ -264,6 +272,7 @@ set(WTF_INCLUDE_DIRECTORIES
     "${WTF_DIR}"
     "${WTF_DIR}/wtf"
     "${WTF_DIR}/wtf/dtoa"
+    "${WTF_DIR}/wtf/persistence"
     "${WTF_DIR}/wtf/text"
     "${WTF_DIR}/wtf/text/icu"
     "${WTF_DIR}/wtf/threads"

@@ -31,6 +31,8 @@
 #include "NetworkCacheCoders.h"
 #include <wtf/ASCIICType.h>
 #include <wtf/NeverDestroyed.h>
+#include <wtf/persistence/Decoder.h>
+#include <wtf/persistence/Encoder.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/StringBuilder.h>
 
@@ -69,6 +71,7 @@ Key& Key::operator=(const Key& other)
     m_identifier = other.m_identifier.isolatedCopy();
     m_range = other.m_range.isolatedCopy();
     m_hash = other.m_hash;
+    m_partitionHash = other.m_partitionHash;
     return *this;
 }
 
@@ -154,18 +157,19 @@ bool Key::operator==(const Key& other) const
     return m_hash == other.m_hash && m_partition == other.m_partition && m_type == other.m_type && m_identifier == other.m_identifier && m_range == other.m_range;
 }
 
-void Key::encode(Encoder& encoder) const
+void Key::encode(WTF::Persistence::Encoder& encoder) const
 {
     encoder << m_partition;
     encoder << m_type;
     encoder << m_identifier;
     encoder << m_range;
     encoder << m_hash;
+    encoder << m_partitionHash;
 }
 
-bool Key::decode(Decoder& decoder, Key& key)
+bool Key::decode(WTF::Persistence::Decoder& decoder, Key& key)
 {
-    return decoder.decode(key.m_partition) && decoder.decode(key.m_type) && decoder.decode(key.m_identifier) && decoder.decode(key.m_range) && decoder.decode(key.m_hash);
+    return decoder.decode(key.m_partition) && decoder.decode(key.m_type) && decoder.decode(key.m_identifier) && decoder.decode(key.m_range) && decoder.decode(key.m_hash) && decoder.decode(key.m_partitionHash);
 }
 
 }

@@ -1,10 +1,8 @@
 import Builder from '../Builder.js'
 
 const b = new Builder();
-b.setChecked(false);
 b.Type().End()
     .Function().End()
-    .Memory().InitialMaxPages(1, 1).End()
     .Code()
     .Function({ params: ["f32", "f32"], ret: "f32" }, [])
     .GetLocal(0)

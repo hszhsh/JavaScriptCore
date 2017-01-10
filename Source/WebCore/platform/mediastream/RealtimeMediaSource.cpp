@@ -296,7 +296,7 @@ double RealtimeMediaSource::fitnessDistance(const MediaConstraint& constraint)
         Vector<String> supportedModes;
         supportedModes.reserveInitialCapacity(modes.size());
         for (auto& mode : modes)
-            supportedModes.append(RealtimeMediaSourceSettings::facingMode(mode));
+            supportedModes.uncheckedAppend(RealtimeMediaSourceSettings::facingMode(mode));
         return downcast<StringConstraint>(constraint).fitnessDistance(supportedModes);
         break;
     }
@@ -554,7 +554,7 @@ bool RealtimeMediaSource::selectSettings(const MediaConstraints& constraints, Fl
     // 6. Select one settings dictionary from candidates, and return it as the result of the SelectSettings() algorithm.
     //    The UA should use the one with the smallest fitness distance, as calculated in step 3.
     if (!std::isinf(minimumDistance)) {
-        supportedConstraints.removeAllMatching([&](std::pair<double, MediaTrackConstraintSetMap> pair) -> bool {
+        supportedConstraints.removeAllMatching([&](const std::pair<double, MediaTrackConstraintSetMap>& pair) -> bool {
             return pair.first > minimumDistance;
         });
 

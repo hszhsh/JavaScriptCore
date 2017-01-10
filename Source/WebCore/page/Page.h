@@ -108,7 +108,9 @@ class PlugInClient;
 class PluginData;
 class PluginInfoProvider;
 class PluginViewBase;
+#if ENABLE(POINTER_LOCK)
 class PointerLockController;
+#endif
 class ProgressTracker;
 class ProgressTrackerClient;
 class Range;
@@ -213,7 +215,9 @@ public:
 #if ENABLE(POINTER_LOCK)
     PointerLockController& pointerLockController() const { return *m_pointerLockController; }
 #endif
+
     ValidationMessageClient* validationMessageClient() const { return m_validationMessageClient.get(); }
+    void updateValidationBubbleStateIfNeeded();
 
     WEBCORE_EXPORT ScrollingCoordinator* scrollingCoordinator();
 

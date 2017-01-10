@@ -47,6 +47,7 @@ namespace WebCore {
 class CachedResource;
 class Document;
 class DocumentLoader;
+class DocumentThreadableLoader;
 class InspectorPageAgent;
 class NetworkLoadTiming;
 class NetworkResourcesData;
@@ -54,7 +55,6 @@ class ResourceError;
 class ResourceLoader;
 class ResourceRequest;
 class ResourceResponse;
-class ThreadableLoaderClient;
 class URL;
 
 #if ENABLE(WEB_SOCKETS)
@@ -82,8 +82,8 @@ public:
     void didFinishLoading(unsigned long identifier, DocumentLoader&, double finishTime);
     void didFailLoading(unsigned long identifier, DocumentLoader&, const ResourceError&);
     void didLoadResourceFromMemoryCache(DocumentLoader&, CachedResource&);
-    void didFinishXHRLoading(ThreadableLoaderClient*, unsigned long identifier, const String& decodedText);
-    void didReceiveXHRResponse(unsigned long identifier);
+    void didReceiveThreadableLoaderResponse(unsigned long identifier, DocumentThreadableLoader&);
+    void didFinishXHRLoading(unsigned long identifier, const String& decodedText);
     void willLoadXHRSynchronously();
     void didLoadXHRSynchronously();
     void didReceiveScriptResponse(unsigned long identifier);

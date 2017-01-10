@@ -154,7 +154,6 @@ public:
     void updateCompositingLayersAfterLayout();
 
     void clearBackingStores();
-    void restoreBackingStores();
 
     // Called when changes to the GraphicsLayer hierarchy have to be synchronized with
     // content rendered via the normal painting path.
@@ -268,6 +267,8 @@ public:
     // These are in document coordinates, unaffected by zooming.
     WEBCORE_EXPORT LayoutRect layoutViewportRect() const;
     WEBCORE_EXPORT LayoutRect visualViewportRect() const;
+    
+    static LayoutRect visibleDocumentRect(const FloatRect& visibleContentRect, float headerHeight, float footerHeight, const FloatSize& totalContentsSize, float pageScaleFactor);
 
     // This is different than visibleContentRect() in that it ignores negative (or overly positive)
     // offsets from rubber-banding, and it takes zooming into account. 
@@ -585,6 +586,8 @@ public:
     void show() override;
 
     bool shouldPlaceBlockDirectionScrollbarOnLeft() const final;
+
+    void didRestoreFromPageCache();
 
 protected:
     bool scrollContentsFastPath(const IntSize& scrollDelta, const IntRect& rectToScroll, const IntRect& clipRect) override;

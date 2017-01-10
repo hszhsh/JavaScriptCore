@@ -56,6 +56,9 @@
 #include "RenderLayerCompositor.h"
 #include "RenderLineBreak.h"
 #include "RenderListItem.h"
+#if !ASSERT_DISABLED
+#include "RenderListMarker.h"
+#endif
 #include "RenderNamedFlowThread.h"
 #include "RenderRegion.h"
 #include "RenderTableCaption.h"
@@ -86,6 +89,9 @@ struct SameSizeAsRenderElement : public RenderObject {
     void* firstChild;
     void* lastChild;
     RenderStyle style;
+#if !ASSERT_DISABLED
+    bool reparentingChild;
+#endif
 };
 
 static_assert(sizeof(RenderElement) == sizeof(SameSizeAsRenderElement), "RenderElement should stay small");
@@ -641,6 +647,11 @@ void RenderElement::removeChildInternal(RenderObject& oldChild, NotifyChildrenTy
 
     if (AXObjectCache* cache = document().existingAXObjectCache())
         cache->childrenChanged(this);
+#if !ASSERT_DISABLED
+    // Check if the marker gets detached while laying out the list item.
+    if (is<RenderListMarker>(oldChild))
+        ASSERT(m_reparentingChild || !downcast<RenderListMarker>(oldChild).listItem().inLayout());
+#endif
 }
 
 RenderBlock* RenderElement::containingBlockForFixedPosition() const
@@ -1167,22 +1178,6 @@ void RenderElement::setNeedsSimplifiedNormalFlowLayout()
         setLayerNeedsFullRepaint();
 }
 
-RenderElement& RenderElement::rendererForRootBackground()
-{
-    ASSERT(isDocumentElementRenderer());
-    if (!hasBackground() && is<HTMLHtmlElement>(element())) {
-        // Locate the <body> element using the DOM. This is easier than trying
-        // to crawl around a render tree with potential :before/:after content and
-        // anonymous blocks created by inline <body> tags etc. We can locate the <body>
-        // render object very easily via the DOM.
-        if (auto* body = document().body()) {
-            if (auto* renderer = body->renderer())
-                return *renderer;
-        }
-    }
-    return *this;
-}
-
 RenderElement* RenderElement::hoverAncestor() const
 {
     // When searching for the hover ancestor and encountering a named flow thread,
@@ -1437,8 +1432,6 @@ bool RenderElement::mayCauseRepaintInsideViewport(const IntRect* optionalViewpor
 static bool shouldRepaintForImageAnimation(const RenderElement& renderer, const IntRect& visibleRect)
 {
     const Document& document = renderer.document();
-    if (document.pageCacheState() != Document::NotInPageCache)
-        return false;
     if (document.activeDOMObjectsAreSuspended())
         return false;
     if (renderer.style().visibility() != VISIBLE)
@@ -1496,8 +1489,6 @@ void RenderElement::visibleInViewportStateChanged(VisibleInViewportState state)
 
 void RenderElement::newImageAnimationFrameAvailable(CachedImage& image)
 {
-    if (document().pageCacheState() != Document::NotInPageCache)
-        return;
     auto& frameView = view().frameView();
     auto visibleRect = frameView.windowToContents(frameView.windowClipRect());
     if (!shouldRepaintForImageAnimation(*this, visibleRect)) {
@@ -1625,10 +1616,10 @@ Color RenderElement::selectionBackgroundColor() const
     return theme().inactiveSelectionBackgroundColor();
 }
 
-bool RenderElement::getLeadingCorner(FloatPoint& point) const
+bool RenderElement::getLeadingCorner(FloatPoint& point, bool& insideFixed) const
 {
     if (!isInline() || isReplaced()) {
-        point = localToAbsolute(FloatPoint(), UseTransforms);
+        point = localToAbsolute(FloatPoint(), UseTransforms, &insideFixed);
         return true;
     }
 
@@ -1654,7 +1645,7 @@ bool RenderElement::getLeadingCorner(FloatPoint& point) const
         ASSERT(o);
 
         if (!o->isInline() || o->isReplaced()) {
-            point = o->localToAbsolute(FloatPoint(), UseTransforms);
+            point = o->localToAbsolute(FloatPoint(), UseTransforms, &insideFixed);
             return true;
         }
 
@@ -1666,7 +1657,7 @@ bool RenderElement::getLeadingCorner(FloatPoint& point) const
                 point.move(downcast<RenderText>(*o).linesBoundingBox().x(), downcast<RenderText>(*o).topOfFirstText());
             else if (is<RenderBox>(*o))
                 point.moveBy(downcast<RenderBox>(*o).location());
-            point = o->container()->localToAbsolute(point, UseTransforms);
+            point = o->container()->localToAbsolute(point, UseTransforms, &insideFixed);
             return true;
         }
     }
@@ -1680,10 +1671,10 @@ bool RenderElement::getLeadingCorner(FloatPoint& point) const
     return false;
 }
 
-bool RenderElement::getTrailingCorner(FloatPoint& point) const
+bool RenderElement::getTrailingCorner(FloatPoint& point, bool& insideFixed) const
 {
     if (!isInline() || isReplaced()) {
-        point = localToAbsolute(LayoutPoint(downcast<RenderBox>(*this).size()), UseTransforms);
+        point = localToAbsolute(LayoutPoint(downcast<RenderBox>(*this).size()), UseTransforms, &insideFixed);
         return true;
     }
 
@@ -1714,18 +1705,20 @@ bool RenderElement::getTrailingCorner(FloatPoint& point) const
                 point.moveBy(linesBox.maxXMaxYCorner());
             } else
                 point.moveBy(downcast<RenderBox>(*o).frameRect().maxXMaxYCorner());
-            point = o->container()->localToAbsolute(point, UseTransforms);
+            point = o->container()->localToAbsolute(point, UseTransforms, &insideFixed);
             return true;
         }
     }
     return true;
 }
 
-LayoutRect RenderElement::anchorRect() const
+LayoutRect RenderElement::absoluteAnchorRect(bool* insideFixed) const
 {
     FloatPoint leading, trailing;
-    getLeadingCorner(leading);
-    getTrailingCorner(trailing);
+    bool leadingInFixed = false;
+    bool trailingInFixed = false;
+    getLeadingCorner(leading, leadingInFixed);
+    getTrailingCorner(trailing, trailingInFixed);
 
     FloatPoint upperLeft = leading;
     FloatPoint lowerRight = trailing;
@@ -1735,6 +1728,11 @@ LayoutRect RenderElement::anchorRect() const
         upperLeft = FloatPoint(std::min(leading.x(), trailing.x()), std::min(leading.y(), trailing.y()));
         lowerRight = FloatPoint(std::max(leading.x(), trailing.x()), std::max(leading.y(), trailing.y()));
     } // Otherwise, it's not obvious what to do.
+
+    if (insideFixed) {
+        // For now, just look at the leading corner. Handling one inside fixed and one not would be tricky.
+        *insideFixed = leadingInFixed;
+    }
 
     return enclosingLayoutRect(FloatRect(upperLeft, lowerRight.expandedTo(upperLeft) - upperLeft));
 }
@@ -2036,11 +2034,11 @@ void RenderElement::paintFocusRing(PaintInfo& paintInfo, const RenderStyle& styl
             for (auto rect : pixelSnappedFocusRingRects)
                 path.addRect(rect);
         }
-        paintInfo.context().drawFocusRing(path, document().page()->focusController().timeSinceFocusWasSet(), needsRepaint);
+        paintInfo.context().drawFocusRing(path, page().focusController().timeSinceFocusWasSet(), needsRepaint);
     } else
-        paintInfo.context().drawFocusRing(pixelSnappedFocusRingRects, document().page()->focusController().timeSinceFocusWasSet(), needsRepaint);
+        paintInfo.context().drawFocusRing(pixelSnappedFocusRingRects, page().focusController().timeSinceFocusWasSet(), needsRepaint);
     if (needsRepaint)
-        document().page()->focusController().setFocusedElementNeedsRepaint();
+        page().focusController().setFocusedElementNeedsRepaint();
 #else
     paintInfo.context().drawFocusRing(pixelSnappedFocusRingRects, style.outlineWidth(), style.outlineOffset(), style.visitedDependentColor(CSSPropertyOutlineColor));
 #endif

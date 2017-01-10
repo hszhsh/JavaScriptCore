@@ -28,7 +28,6 @@ set(WebKit2_USE_PREFIX_HEADER ON)
 list(APPEND WebKit2_SOURCES
     DatabaseProcess/gtk/DatabaseProcessMainGtk.cpp
 
-    NetworkProcess/CustomProtocols/soup/CustomProtocolManagerImpl.cpp
     NetworkProcess/CustomProtocols/soup/CustomProtocolManagerSoup.cpp
 
     NetworkProcess/Downloads/gtk/DownloadSoupErrorsGtk.cpp
@@ -220,6 +219,9 @@ list(APPEND WebKit2_SOURCES
     UIProcess/API/gtk/WebKitSecurityManager.cpp
     UIProcess/API/gtk/WebKitSecurityManager.h
     UIProcess/API/gtk/WebKitSecurityManagerPrivate.h
+    UIProcess/API/gtk/WebKitSecurityOrigin.cpp
+    UIProcess/API/gtk/WebKitSecurityOrigin.h
+    UIProcess/API/gtk/WebKitSecurityOriginPrivate.h
     UIProcess/API/gtk/WebKitSettings.cpp
     UIProcess/API/gtk/WebKitSettings.h
     UIProcess/API/gtk/WebKitSettingsPrivate.h
@@ -534,6 +536,7 @@ set(WebKit2GTK_INSTALLED_HEADERS
     ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitResponsePolicyDecision.h
     ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitScriptDialog.h
     ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitSecurityManager.h
+    ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitSecurityOrigin.h
     ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitSettings.h
     ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitURIRequest.h
     ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitURIResponse.h
@@ -828,14 +831,6 @@ list(INSERT WebKit2_INCLUDE_DIRECTORIES 0
 
 list(APPEND WebKit2_INCLUDE_DIRECTORIES
     "${WEBKIT2_DIR}/PluginProcess/unix"
-    "${WEBCORE_DIR}/platform/cairo"
-    "${WEBCORE_DIR}/platform/gtk"
-    "${WEBCORE_DIR}/platform/graphics/cairo"
-    "${WEBCORE_DIR}/platform/graphics/freetype"
-    "${WEBCORE_DIR}/platform/graphics/opentype"
-    "${WEBCORE_DIR}/platform/graphics/x11"
-    "${WEBCORE_DIR}/platform/network/soup"
-    "${WEBCORE_DIR}/platform/text/enchant"
     "${WEBKIT2_DIR}/DatabaseProcess/unix"
     "${WEBKIT2_DIR}/NetworkProcess/CustomProtocols/soup"
     "${WEBKIT2_DIR}/NetworkProcess/Downloads/soup"
@@ -872,9 +867,6 @@ list(APPEND WebKit2_INCLUDE_DIRECTORIES
     "${WEBKIT2_DIR}/WebProcess/WebCoreSupport/soup"
     "${WEBKIT2_DIR}/WebProcess/WebPage/atk"
     "${WEBKIT2_DIR}/WebProcess/WebPage/gtk"
-    "${WTF_DIR}/wtf/gtk"
-    "${WTF_DIR}/wtf/glib"
-    "${WTF_DIR}"
 )
 
 list(APPEND WebKit2_SYSTEM_INCLUDE_DIRECTORIES
@@ -1192,7 +1184,6 @@ if (ENABLE_THREADED_COMPOSITOR)
         WebProcess/WebPage/CoordinatedGraphics/UpdateAtlas.cpp
     )
     list(APPEND WebKit2_INCLUDE_DIRECTORIES
-        "${WEBCORE_DIR}/platform/graphics/texmap/coordinated"
         "${WEBKIT2_DIR}/Shared/CoordinatedGraphics"
         "${WEBKIT2_DIR}/Shared/CoordinatedGraphics/threadedcompositor"
         "${WEBKIT2_DIR}/WebProcess/WebPage/CoordinatedGraphics"
@@ -1211,7 +1202,6 @@ include_directories(
     "${WEBKIT2_DIR}/UIProcess/API/C"
     "${WEBKIT2_DIR}/WebProcess/InjectedBundle"
     "${WEBKIT2_DIR}/WebProcess/InjectedBundle/API/c"
-    "${DERIVED_SOURCES_DIR}"
     "${DERIVED_SOURCES_DIR}/InjectedBundle"
     "${FORWARDING_HEADERS_DIR}"
     "${FORWARDING_HEADERS_WEBKIT2GTK_DIR}"

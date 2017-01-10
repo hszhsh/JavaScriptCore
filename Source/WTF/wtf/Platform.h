@@ -162,12 +162,18 @@
     || defined(_X86_)    \
     || defined(__THW_INTEL)
 #define WTF_CPU_X86 1
+
+#if defined(__SSE2__) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
+#define WTF_CPU_X86_SSE2 1
+#endif
+
 #endif
 
 /* CPU(X86_64) - AMD64 / Intel64 / x86_64 64-bit */
 #if   defined(__x86_64__) \
     || defined(_M_X64)
 #define WTF_CPU_X86_64 1
+#define WTF_CPU_X86_SSE2 1
 #endif
 
 /* CPU(ARM64) - Apple */
@@ -639,12 +645,6 @@
 #define USE_PTHREADS 1
 #endif /* OS(UNIX) */
 
-#if !defined(HAVE_VASPRINTF)
-#if !COMPILER(MSVC) && !COMPILER(MINGW)
-#define HAVE_VASPRINTF 1
-#endif
-#endif
-
 #if OS(DARWIN)
 #define HAVE_DISPATCH_H 1
 #define HAVE_MADV_FREE 1
@@ -750,8 +750,8 @@
 #if (CPU(ARM_THUMB2) || CPU(ARM64)) && (PLATFORM(IOS) || PLATFORM(GTK) || PLATFORM(EFL))
 #define ENABLE_DFG_JIT 1
 #endif
-/* Enable the DFG JIT on ARM, MIPS and SH4. */
-#if CPU(ARM_TRADITIONAL) || CPU(MIPS) || CPU(SH4)
+/* Enable the DFG JIT on ARM and MIPS. */
+#if CPU(ARM_TRADITIONAL) || CPU(MIPS)
 #define ENABLE_DFG_JIT 1
 #endif
 #endif

@@ -33,6 +33,7 @@
 #include "CryptoKeyAES.h"
 #include "CryptoKeyDataOctetSequence.h"
 #include "ExceptionCode.h"
+#include <wtf/Variant.h>
 
 namespace WebCore {
 
@@ -76,7 +77,7 @@ void CryptoAlgorithmAES_KW::generateKey(const CryptoAlgorithmParameters& paramet
         return;
     }
 
-    callback(result.get(), nullptr);
+    callback(WTFMove(result));
 }
 
 void CryptoAlgorithmAES_KW::importKey(SubtleCrypto::KeyFormat format, KeyData&& data, const std::unique_ptr<CryptoAlgorithmParameters>&& parameters, bool extractable, CryptoKeyUsageBitmap usages, KeyCallback&& callback, ExceptionCallback&& exceptionCallback)
@@ -158,6 +159,20 @@ void CryptoAlgorithmAES_KW::exportKey(SubtleCrypto::KeyFormat format, Ref<Crypto
     callback(format, WTFMove(result));
 }
 
+void CryptoAlgorithmAES_KW::wrapKey(Ref<CryptoKey>&& key, Vector<uint8_t>&& data, VectorCallback&& callback, ExceptionCallback&& exceptionCallback)
+{
+    if (data.size() % 8) {
+        exceptionCallback(OperationError);
+        return;
+    }
+    platformWrapKey(WTFMove(key), WTFMove(data), WTFMove(callback), WTFMove(exceptionCallback));
+}
+
+void CryptoAlgorithmAES_KW::unwrapKey(Ref<CryptoKey>&& key, Vector<uint8_t>&& data, VectorCallback&& callback, ExceptionCallback&& exceptionCallback)
+{
+    platformUnwrapKey(WTFMove(key), WTFMove(data), WTFMove(callback), WTFMove(exceptionCallback));
+}
+
 ExceptionOr<void> CryptoAlgorithmAES_KW::encryptForWrapKey(const CryptoAlgorithmParametersDeprecated&, const CryptoKey& key, const CryptoOperationData& data, VectorCallback&& callback, VoidCallback&& failureCallback)
 {
     if (!keyAlgorithmMatches(key))
@@ -179,7 +194,8 @@ ExceptionOr<void> CryptoAlgorithmAES_KW::generateKey(const CryptoAlgorithmParame
         failureCallback();
         return { };
     }
-    callback(result.get(), nullptr);
+
+    callback(WTFMove(result));
     return { };
 }
 

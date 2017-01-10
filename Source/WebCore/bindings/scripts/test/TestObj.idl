@@ -82,6 +82,8 @@ enum TestConfidence { "high", "kinda-low" };
     attribute record<ByteString, long> usvstringLongRecordAttr;
     attribute record<DOMString, TestObj> stringObjRecordAttr;
     attribute record<DOMString, TestObj?> stringNullableObjRecordAttr;
+    attribute TestDictionary dictionaryAttr;
+    attribute TestDictionary? nullableDictionaryAttr;
 
     attribute TestEnumTypeWithAlternateImplementationName implementationEnumAttr;
 
@@ -149,7 +151,6 @@ enum TestConfidence { "high", "kinda-low" };
     void methodWithByteStringArgTreatingNullAsEmptyString([TreatNullAs=EmptyString] ByteString str);
 
     void serializedValue(SerializedScriptValue serializedArg);
-    void optionsObject(Dictionary oo, optional Dictionary ooo);
 
     void methodWithRecord(record<DOMString, long> recordParameter);
 
@@ -233,6 +234,7 @@ enum TestConfidence { "high", "kinda-low" };
     void    methodWithOptionalBoolean(optional boolean b);
     void    methodWithOptionalBooleanIsFalse(optional boolean b = false);
     void    methodWithOptionalAny(optional any a);
+    void    methodWithOptionalObject(optional object a);
     void    methodWithOptionalNullableWrapper(optional TestObj? obj);
     void    methodWithOptionalNullableWrapperIsNull(optional TestObj? obj = null);
     void    methodWithOptionalXPathNSResolver(optional XPathNSResolver? resolver);
@@ -272,6 +274,7 @@ enum TestConfidence { "high", "kinda-low" };
     [CachedAttribute] readonly attribute any cachedAttribute2;
     
     attribute any anyAttribute;
+    attribute object objectAttribute;
 
     // Overloads
     void    overloadedMethod(TestObj? objArg, DOMString strArg);
@@ -391,8 +394,9 @@ enum TestConfidence { "high", "kinda-low" };
     attribute _optional                attributeWithReservedEnumType;
     void _any(unrestricted float a, long b);
 
-
-    readonly attribute Promise<void> testReadOnlyPromiseAttribute;
+    // FIXME: Add support for Promise attributes.
+    // readonly attribute Promise<void> testReadOnlyPromiseAttribute;
+    
     // Promise function
     Promise<void> testPromiseFunction();
     Promise<void> testPromiseFunctionWithFloatArgument(float a);
@@ -430,7 +434,9 @@ enum TestConfidence { "high", "kinda-low" };
 
 typedef any AnyTypedef;
 
-dictionary TestDictionary {
+[
+    JSGenerateToJSObject
+]dictionary TestDictionary {
     TestEnumType enumerationValueWithoutDefault;
     TestEnumType enumerationValueWithDefault = "enumValue1";
     TestEnumType enumerationValueWithEmptyStringDefault = "";

@@ -94,7 +94,7 @@ ClonedArguments* ClonedArguments::createWithInlineFrame(ExecState* myFrame, Exec
     if (inlineCallFrame)
         callee = jsCast<JSFunction*>(inlineCallFrame->calleeRecovery.recover(targetFrame));
     else
-        callee = jsCast<JSFunction*>(targetFrame->callee());
+        callee = jsCast<JSFunction*>(targetFrame->jsCallee());
 
     ClonedArguments* result = nullptr;
     
@@ -273,7 +273,7 @@ void ClonedArguments::visitChildren(JSCell* cell, SlotVisitor& visitor)
     ClonedArguments* thisObject = jsCast<ClonedArguments*>(cell);
     ASSERT_GC_OBJECT_INHERITS(thisObject, info());
     Base::visitChildren(thisObject, visitor);
-    visitor.append(&thisObject->m_callee);
+    visitor.append(thisObject->m_callee);
 }
 
 } // namespace JSC

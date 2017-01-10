@@ -30,18 +30,71 @@
 
 #import "SoftLinking.h"
 #import "UIKitSPI.h"
+#import <wtf/RetainPtr.h>
 #import <wtf/text/WTFString.h>
 
 SOFT_LINK_FRAMEWORK(UIKit);
+SOFT_LINK_CLASS(UIKit, UIFont);
 SOFT_LINK_CLASS(UIKit, UILabel);
 SOFT_LINK_CLASS(UIKit, UIPopoverPresentationController);
+SOFT_LINK_CLASS(UIKit, UITapGestureRecognizer);
 SOFT_LINK_CLASS(UIKit, UIView);
 SOFT_LINK_CLASS(UIKit, UIViewController);
 
+@interface WebValidationBubbleTapRecognizer : NSObject
+@end
+
+@implementation WebValidationBubbleTapRecognizer {
+    RetainPtr<UIViewController> _popoverController;
+    RetainPtr<UITapGestureRecognizer> _tapGestureRecognizer;
+}
+
+- (WebValidationBubbleTapRecognizer *)initWithPopoverController:(UIViewController *)popoverController
+{
+    self = [super init];
+    if (!self)
+        return nil;
+
+    _popoverController = popoverController;
+    _tapGestureRecognizer = adoptNS([[getUITapGestureRecognizerClass() alloc] initWithTarget:self action:@selector(dismissPopover)]);
+    [[_popoverController view] addGestureRecognizer:_tapGestureRecognizer.get()];
+
+    return self;
+}
+
+- (void)dealloc
+{
+    [[_popoverController view] removeGestureRecognizer:_tapGestureRecognizer.get()];
+    [super dealloc];
+}
+
+- (void)dismissPopover
+{
+    [_popoverController dismissViewControllerAnimated:NO completion:nil];
+}
+
+@end
+
+@interface WebValidationBubbleDelegate : NSObject <UIPopoverPresentationControllerDelegate> {
+}
+@end
+
+@implementation WebValidationBubbleDelegate
+
+- (UIModalPresentationStyle)adaptivePresentationStyleForPresentationController:(UIPresentationController *)controller traitCollection:(UITraitCollection *)traitCollection
+{
+    UNUSED_PARAM(controller);
+    UNUSED_PARAM(traitCollection);
+    // This is needed to force UIKit to use a popover on iPhone as well.
+    return UIModalPresentationNone;
+}
+
+@end
+
 namespace WebCore {
 
-static const CGFloat horizontalPadding = 8;
-static const CGFloat verticalPadding = 8;
+static const CGFloat horizontalPadding = 17;
+static const CGFloat verticalPadding = 9;
 static const CGFloat maxLabelWidth = 300;
 
 ValidationBubble::ValidationBubble(UIView* view, const String& message)
@@ -53,10 +106,12 @@ ValidationBubble::ValidationBubble(UIView* view, const String& message)
 
     RetainPtr<UIView> popoverView = adoptNS([[getUIViewClass() alloc] initWithFrame:CGRectZero]);
     [m_popoverController setView:popoverView.get()];
+    m_tapRecognizer = adoptNS([[WebValidationBubbleTapRecognizer alloc] initWithPopoverController:m_popoverController.get()]);
 
     RetainPtr<UILabel> label = adoptNS([[getUILabelClass() alloc] initWithFrame:CGRectZero]);
     [label setText:message];
-    [label setLineBreakMode:NSLineBreakByWordWrapping];
+    [label setFont:[getUIFontClass() systemFontOfSize:14.0]];
+    [label setLineBreakMode:NSLineBreakByTruncatingTail];
     [label setNumberOfLines:4];
     [popoverView addSubview:label.get()];
 
@@ -77,11 +132,24 @@ void ValidationBubble::show()
     [m_presentingViewController presentViewController:m_popoverController.get() animated:NO completion:nil];
 }
 
+static UIViewController *fallbackViewController(UIView *view)
+{
+    for (UIView *currentView = view; currentView; currentView = currentView.superview) {
+        if (UIViewController *viewController = [getUIViewControllerClass() viewControllerForView:currentView])
+            return viewController;
+    }
+    NSLog(@"Failed to find a view controller to show form validation popover");
+    return nil;
+}
+
 void ValidationBubble::setAnchorRect(const IntRect& anchorRect, UIViewController* presentingViewController)
 {
+    if (!presentingViewController)
+        presentingViewController = fallbackViewController(m_view);
+
     UIPopoverPresentationController *presentationController = [m_popoverController popoverPresentationController];
-    // This is needed to force UIKit to use a popover on iPhone as well.
-    [getUIPopoverPresentationControllerClass() _setAlwaysAllowPopoverPresentations:YES];
+    m_popoverDelegate = adoptNS([[WebValidationBubbleDelegate alloc] init]);
+    presentationController.delegate = m_popoverDelegate.get();
     presentationController.passthroughViews = [NSArray arrayWithObjects:presentingViewController.view, m_view, nil];
 
     presentationController.permittedArrowDirections = UIPopoverArrowDirectionUp;

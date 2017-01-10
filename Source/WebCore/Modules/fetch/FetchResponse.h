@@ -41,7 +41,6 @@ class JSValue;
 
 namespace WebCore {
 
-class Dictionary;
 class FetchRequest;
 class ReadableStreamSource;
 
@@ -53,7 +52,7 @@ public:
     static Ref<FetchResponse> error(ScriptExecutionContext&);
     static ExceptionOr<Ref<FetchResponse>> redirect(ScriptExecutionContext&, const String& url, int status);
 
-    using FetchPromise = DOMPromise<FetchResponse>;
+    using FetchPromise = DOMPromise<IDLInterface<FetchResponse>>;
     static void fetch(ScriptExecutionContext&, FetchRequest&, FetchPromise&&);
 
     void consume(unsigned, Ref<DeferredPromise>&&);

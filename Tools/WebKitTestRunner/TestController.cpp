@@ -197,6 +197,11 @@ static void checkUserMediaPermissionForOrigin(WKPageRef, WKFrameRef frame, WKSec
     TestController::singleton().handleCheckOfUserMediaPermissionForOrigin(frame, userMediaDocumentOrigin, topLevelDocumentOrigin, checkRequest);
 }
 
+static void requestPointerLock(WKPageRef page, const void*)
+{
+    WKPageDidAllowPointerLock(page);
+}
+
 WKPageRef TestController::createOtherPage(WKPageRef oldPage, WKPageConfigurationRef configuration, WKNavigationActionRef navigationAction, WKWindowFeaturesRef windowFeatures, const void *clientInfo)
 {
     PlatformWebView* parentView = static_cast<PlatformWebView*>(const_cast<void*>(clientInfo));
@@ -206,8 +211,8 @@ WKPageRef TestController::createOtherPage(WKPageRef oldPage, WKPageConfiguration
 
     view->resizeTo(800, 600);
 
-    WKPageUIClientV6 otherPageUIClient = {
-        { 6, view },
+    WKPageUIClientV8 otherPageUIClient = {
+        { 8, view },
         0, // createNewPage_deprecatedForUseWithV0
         0, // showPage
         closeOtherPage,
@@ -270,6 +275,10 @@ WKPageRef TestController::createOtherPage(WKPageRef oldPage, WKPageConfiguration
         0, // runJavaScriptConfirm
         0, // runJavaScriptPrompt
         checkUserMediaPermissionForOrigin,
+        0, // runBeforeUnloadConfirmPanel
+        0, // fullscreenMayReturnToInline
+        requestPointerLock,
+        0,
     };
     WKPageSetPageUIClient(newPage, &otherPageUIClient.base);
     
@@ -474,8 +483,8 @@ void TestController::createWebViewWithOptions(const TestOptions& options)
     resetPreferencesToConsistentValues(options);
 
     platformCreateWebView(configuration.get(), options);
-    WKPageUIClientV6 pageUIClient = {
-        { 6, m_mainWebView.get() },
+    WKPageUIClientV8 pageUIClient = {
+        { 8, m_mainWebView.get() },
         0, // createNewPage_deprecatedForUseWithV0
         0, // showPage
         0, // close
@@ -538,6 +547,10 @@ void TestController::createWebViewWithOptions(const TestOptions& options)
         0, // runJavaScriptConfirm
         0, // runJavaScriptPrompt
         checkUserMediaPermissionForOrigin,
+        0, // runBeforeUnloadConfirmPanel
+        0, // fullscreenMayReturnToInline
+        requestPointerLock,
+        0,
     };
     WKPageSetPageUIClient(m_mainWebView->page(), &pageUIClient.base);
 
@@ -651,6 +664,7 @@ void TestController::resetPreferencesToConsistentValues(const TestOptions& optio
     WKPreferencesSetMockScrollbarsEnabled(preferences, options.useMockScrollbars);
     WKPreferencesSetNeedsSiteSpecificQuirks(preferences, options.needsSiteSpecificQuirks);
     WKPreferencesSetIntersectionObserverEnabled(preferences, options.enableIntersectionObserver);
+    WKPreferencesSetModernMediaControlsEnabled(preferences, options.enableModernMediaControls);
 
     static WKStringRef defaultTextEncoding = WKStringCreateWithUTF8CString("ISO-8859-1");
     WKPreferencesSetDefaultTextEncodingName(preferences, defaultTextEncoding);
@@ -748,7 +762,7 @@ bool TestController::resetStateToConsistentValues(const TestOptions& options)
     WKPageClearWheelEventTestTrigger(m_mainWebView->page());
 
 #if PLATFORM(EFL)
-    // EFL use a real window while other ports such as Qt don't.
+    // EFL uses a real window while other ports such as Qt don't.
     // In EFL, we need to resize the window to the original size after calls to window.resizeTo.
     WKRect rect = m_mainWebView->windowFrame();
     m_mainWebView->setWindowFrame(WKRectMake(rect.origin.x, rect.origin.y, TestController::viewWidth, TestController::viewHeight));
@@ -906,11 +920,15 @@ static bool parseBooleanTestHeaderValue(const std::string& value)
     return false;
 }
 
-static void updateTestOptionsFromTestHeader(TestOptions& testOptions, const std::string& pathOrURL)
+static void updateTestOptionsFromTestHeader(TestOptions& testOptions, const std::string& pathOrURL, const std::string& absolutePath)
 {
-    // Gross. Need to reduce conversions between all the string types and URLs.
-    WKRetainPtr<WKURLRef> wkURL(AdoptWK, createTestURL(pathOrURL.c_str()));
-    std::string filename = testPath(wkURL.get());
+    std::string filename = absolutePath;
+    if (filename.empty()) {
+        // Gross. Need to reduce conversions between all the string types and URLs.
+        WKRetainPtr<WKURLRef> wkURL(AdoptWK, createTestURL(pathOrURL.c_str()));
+        filename = testPath(wkURL.get());
+    }
+
     if (filename.empty())
         return;
 
@@ -960,19 +978,23 @@ static void updateTestOptionsFromTestHeader(TestOptions& testOptions, const std:
             testOptions.useCharacterSelectionGranularity = parseBooleanTestHeaderValue(value);
         if (key == "enableIntersectionObserver")
             testOptions.enableIntersectionObserver = parseBooleanTestHeaderValue(value);
+        if (key == "enableModernMediaControls")
+            testOptions.enableModernMediaControls = parseBooleanTestHeaderValue(value);
+        if (key == "enablePointerLock")
+            testOptions.enablePointerLock = parseBooleanTestHeaderValue(value);
         pairStart = pairEnd + 1;
     }
 }
 
-TestOptions TestController::testOptionsForTest(const std::string& pathOrURL) const
+TestOptions TestController::testOptionsForTest(const TestCommand& command) const
 {
-    TestOptions options(pathOrURL);
+    TestOptions options(command.pathOrURL);
 
     options.useRemoteLayerTree = m_shouldUseRemoteLayerTree;
     options.shouldShowWebView = m_shouldShowWebView;
 
-    updatePlatformSpecificTestOptionsForTest(options, pathOrURL);
-    updateTestOptionsFromTestHeader(options, pathOrURL);
+    updatePlatformSpecificTestOptionsForTest(options, command.pathOrURL);
+    updateTestOptionsFromTestHeader(options, command.pathOrURL, command.absolutePath);
 
     return options;
 }
@@ -1002,15 +1024,6 @@ void TestController::configureViewForTest(const TestInvocation& test)
 
     platformConfigureViewForTest(test);
 }
-
-struct TestCommand {
-    TestCommand() : shouldDumpPixels(false), timeout(0) { }
-
-    std::string pathOrURL;
-    bool shouldDumpPixels;
-    std::string expectedPixelHash;
-    int timeout;
-};
 
 class CommandTokenizer {
 public:
@@ -1082,7 +1095,11 @@ TestCommand parseInputLine(const std::string& inputLine)
             result.shouldDumpPixels = true;
             if (tokenizer.hasNext())
                 result.expectedPixelHash = tokenizer.next();
-        } else
+        } else if (arg == std::string("--dump-jsconsolelog-in-stderr"))
+            result.dumpJSConsoleLogInStdErr = true;
+        else if (arg == std::string("--absolutePath"))
+            result.absolutePath = tokenizer.next();
+        else
             die(inputLine);
     }
     return result;
@@ -1095,7 +1112,7 @@ bool TestController::runTest(const char* inputLine)
 
     m_state = RunningTest;
     
-    TestOptions options = testOptionsForTest(command.pathOrURL);
+    TestOptions options = testOptionsForTest(command);
 
     WKRetainPtr<WKURLRef> wkURL(AdoptWK, createTestURL(command.pathOrURL.c_str()));
     m_currentInvocation = std::make_unique<TestInvocation>(wkURL.get(), options);
@@ -1104,6 +1121,7 @@ bool TestController::runTest(const char* inputLine)
         m_currentInvocation->setIsPixelTest(command.expectedPixelHash);
     if (command.timeout > 0)
         m_currentInvocation->setCustomTimeout(command.timeout);
+    m_currentInvocation->setDumpJSConsoleLogInStdErr(command.dumpJSConsoleLogInStdErr);
 
     platformWillRunTest(*m_currentInvocation);
 

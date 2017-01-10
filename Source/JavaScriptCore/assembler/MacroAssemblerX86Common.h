@@ -31,6 +31,10 @@
 #include "AbstractMacroAssembler.h"
 #include <wtf/Optional.h>
 
+#if COMPILER(MSVC)
+#include <intrin.h>
+#endif
+
 namespace JSC {
 
 class MacroAssemblerX86Common : public AbstractMacroAssembler<X86Assembler, MacroAssemblerX86Common> {
@@ -311,6 +315,16 @@ public:
         }
         m_assembler.bsr_mr(src.offset, src.base, dst);
         clz32AfterBsr(dst);
+    }
+
+    void countTrailingZeros32(RegisterID src, RegisterID dst)
+    {
+        if (supportsBMI1()) {
+            m_assembler.tzcnt_rr(src, dst);
+            return;
+        }
+        m_assembler.bsf_rr(src, dst);
+        ctzAfterBsf<32>(dst);
     }
 
     void lshift32(RegisterID shift_amount, RegisterID dest)
@@ -795,6 +809,16 @@ public:
     void floorFloat(Address src, FPRegisterID dst)
     {
         m_assembler.roundss_mr(src.offset, src.base, dst, X86Assembler::RoundingType::TowardNegativeInfiniti);
+    }
+
+    void roundTowardNearestIntDouble(FPRegisterID src, FPRegisterID dst)
+    {
+        m_assembler.roundsd_rr(src, dst, X86Assembler::RoundingType::ToNearestWithTiesToEven);
+    }
+
+    void roundTowardNearestIntFloat(FPRegisterID src, FPRegisterID dst)
+    {
+        m_assembler.roundss_rr(src, dst, X86Assembler::RoundingType::ToNearestWithTiesToEven);
     }
 
     void roundTowardZeroDouble(FPRegisterID src, FPRegisterID dst)
@@ -1565,6 +1589,36 @@ public:
         }
     }
 
+    void orDouble(FPRegisterID src, FPRegisterID dst)
+    {
+        m_assembler.orps_rr(src, dst);
+    }
+
+    void orDouble(FPRegisterID src1, FPRegisterID src2, FPRegisterID dst)
+    {
+        if (src1 == dst)
+            orDouble(src2, dst);
+        else {
+            moveDouble(src2, dst);
+            orDouble(src1, dst);
+        }
+    }
+
+    void orFloat(FPRegisterID src, FPRegisterID dst)
+    {
+        m_assembler.orps_rr(src, dst);
+    }
+
+    void orFloat(FPRegisterID src1, FPRegisterID src2, FPRegisterID dst)
+    {
+        if (src1 == dst)
+            orFloat(src2, dst);
+        else {
+            moveDouble(src2, dst);
+            orFloat(src1, dst);
+        }
+    }
+
     void xorDouble(FPRegisterID src, FPRegisterID dst)
     {
         m_assembler.xorps_rr(src, dst);
@@ -1658,15 +1712,13 @@ public:
         ASSERT(isSSE2Present());
         m_assembler.cvttsd2si_rr(src, dest);
     }
-    
-#if CPU(X86_64)
-    void truncateDoubleToUint32(FPRegisterID src, RegisterID dest)
+
+    void truncateFloatToInt32(FPRegisterID src, RegisterID dest)
     {
         ASSERT(isSSE2Present());
-        m_assembler.cvttsd2siq_rr(src, dest);
+        m_assembler.cvttss2si_rr(src, dest);
     }
-#endif
-    
+
     // Convert 'src' to an integer, and places the resulting 'dest'.
     // If the result is not representable as a 32 bit value, branch.
     // May also branch for some values that are representable in 32 bits
@@ -2835,6 +2887,39 @@ protected:
         return s_lzcntCheckState == CPUIDCheckState::Set;
     }
 
+    static bool supportsBMI1()
+    {
+        if (s_bmi1CheckState == CPUIDCheckState::NotChecked) {
+            int flags = 0;
+#if COMPILER(MSVC)
+            int cpuInfo[4];
+            __cpuid(cpuInfo, 0x80000001);
+            flags = cpuInfo[2];
+#elif COMPILER(GCC_OR_CLANG)
+            asm (
+                 "movl $0x7, %%eax;"
+                 "movl $0x0, %%ecx;"
+                 "cpuid;"
+                 "movl %%ebx, %0;"
+                 : "=g" (flags)
+                 :
+                 : "%eax", "%ebx", "%ecx", "%edx"
+                 );
+#endif // COMPILER(GCC_OR_CLANG)
+            static int BMI1FeatureBit = 1 << 3;
+            s_bmi1CheckState = (flags & BMI1FeatureBit) ? CPUIDCheckState::Set : CPUIDCheckState::Clear;
+        }
+        return s_bmi1CheckState == CPUIDCheckState::Set;
+    }
+
+    template<int sizeOfRegister>
+    void ctzAfterBsf(RegisterID dst)
+    {
+        Jump srcIsNonZero = m_assembler.jCC(x86Condition(NonZero));
+        move(TrustedImm32(sizeOfRegister), dst);
+        srcIsNonZero.link(this);
+    }
+
 private:
     // Only MacroAssemblerX86 should be using the following method; SSE2 is always available on
     // x86_64, and clients & subclasses of MacroAssembler should be using 'supportsFloatingPoint()'.
@@ -3005,6 +3090,7 @@ private:
     };
     JS_EXPORT_PRIVATE static CPUIDCheckState s_sse4_1CheckState;
     JS_EXPORT_PRIVATE static CPUIDCheckState s_avxCheckState;
+    static CPUIDCheckState s_bmi1CheckState;
     static CPUIDCheckState s_lzcntCheckState;
 };
 

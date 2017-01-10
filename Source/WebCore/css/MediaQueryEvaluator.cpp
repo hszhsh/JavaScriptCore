@@ -265,7 +265,7 @@ static bool colorGamutEvaluate(CSSValue* value, const CSSToLengthConversionData&
         // FIXME: At some point we should start detecting displays that support more colors.
         return false;
     default:
-        return true;
+        return false; // Any unknown value should not be considered a match.
     }
 }
 
@@ -699,7 +699,7 @@ static bool prefersReducedMotionEvaluate(CSSValue* value, const CSSToLengthConve
     if (!value)
         return userPrefersReducedMotion;
 
-    return downcast<CSSPrimitiveValue>(*value).valueID() == (userPrefersReducedMotion ? CSSValueReduce : CSSValueDefault);
+    return downcast<CSSPrimitiveValue>(*value).valueID() == (userPrefersReducedMotion ? CSSValueReduce : CSSValueNoPreference);
 }
 
 // Use this function instead of calling add directly to avoid inlining.

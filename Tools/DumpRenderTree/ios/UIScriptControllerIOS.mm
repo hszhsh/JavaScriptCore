@@ -37,6 +37,10 @@ extern DumpRenderTreeBrowserView *gWebBrowserView;
 extern DumpRenderTreeWebScrollView *gWebScrollView;
 
 namespace WTR {
+    
+void UIScriptController::checkForOutstandingCallbacks()
+{
+}
 
 void UIScriptController::doAsyncTask(JSValueRef callback)
 {
@@ -52,6 +56,11 @@ void UIScriptController::doAsyncTask(JSValueRef callback)
 void UIScriptController::doAfterPresentationUpdate(JSValueRef callback)
 {
     return doAsyncTask(callback);
+}
+
+void UIScriptController::doAfterNextStablePresentationUpdate(JSValueRef callback)
+{
+    doAsyncTask(callback);
 }
 
 void UIScriptController::zoomToScale(double scale, JSValueRef callback)
@@ -257,6 +266,16 @@ void UIScriptController::platformClearAllCallbacks()
 }
 
 JSObjectRef UIScriptController::selectionRangeViewRects() const
+{
+    return nullptr;
+}
+
+JSObjectRef UIScriptController::textSelectionCaretRect() const
+{
+    return nullptr;
+}
+
+JSObjectRef UIScriptController::inputViewBounds() const
 {
     return nullptr;
 }

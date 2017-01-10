@@ -35,7 +35,6 @@ namespace WebCore {
     macro(appendFromJS) \
     macro(autoAllocateChunkSize) \
     macro(body) \
-    macro(bytesFilled) \
     macro(cancel) \
     macro(cloneForJS) \
     macro(closeRequested) \
@@ -74,6 +73,7 @@ namespace WebCore {
     macro(queuedSetLocalDescription) \
     macro(queuedSetRemoteDescription) \
     macro(reader) \
+    macro(readIntoRequests) \
     macro(readRequests) \
     macro(readableStreamController) \
     macro(readyPromiseCapability) \

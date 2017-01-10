@@ -25,6 +25,7 @@
 
 #pragma once
 
+#include "APIInjectedBundleEditorClient.h"
 #include "APIInjectedBundleFormClient.h"
 #include "APIInjectedBundlePageContextMenuClient.h"
 #include "APIInjectedBundlePageUIClient.h"
@@ -35,7 +36,6 @@
 #include "GeolocationPermissionRequestManager.h"
 #include "ImageOptions.h"
 #include "InjectedBundlePageDiagnosticLoggingClient.h"
-#include "InjectedBundlePageEditorClient.h"
 #include "InjectedBundlePageFullScreenClient.h"
 #include "InjectedBundlePageLoaderClient.h"
 #include "InjectedBundlePagePolicyClient.h"
@@ -197,6 +197,7 @@ struct EditingRange;
 struct EditorState;
 class GamepadData;
 struct InteractionInformationAtPosition;
+struct InteractionInformationRequest;
 struct LoadParameters;
 struct PrintInfo;
 struct WebPageCreationParameters;
@@ -322,7 +323,7 @@ public:
 #if ENABLE(CONTEXT_MENUS)
     void setInjectedBundleContextMenuClient(std::unique_ptr<API::InjectedBundle::PageContextMenuClient>);
 #endif
-    void initializeInjectedBundleEditorClient(WKBundlePageEditorClientBase*);
+    void setInjectedBundleEditorClient(std::unique_ptr<API::InjectedBundle::EditorClient>);
     void setInjectedBundleFormClient(std::unique_ptr<API::InjectedBundle::FormClient>);
     void initializeInjectedBundleLoaderClient(WKBundlePageLoaderClientBase*);
     void initializeInjectedBundlePolicyClient(WKBundlePagePolicyClientBase*);
@@ -336,7 +337,7 @@ public:
 #if ENABLE(CONTEXT_MENUS)
     API::InjectedBundle::PageContextMenuClient& injectedBundleContextMenuClient() { return *m_contextMenuClient.get(); }
 #endif
-    InjectedBundlePageEditorClient& injectedBundleEditorClient() { return m_editorClient; }
+    API::InjectedBundle::EditorClient& injectedBundleEditorClient() { return *m_editorClient.get(); }
     API::InjectedBundle::FormClient& injectedBundleFormClient() { return *m_formClient.get(); }
     InjectedBundlePageLoaderClient& injectedBundleLoaderClient() { return m_loaderClient; }
     InjectedBundlePagePolicyClient& injectedBundlePolicyClient() { return m_policyClient; }
@@ -474,6 +475,8 @@ public:
     void hidePageBanners();
     void showPageBanners();
     
+    void setHeaderBannerHeightForTesting(int);
+    void setFooterBannerHeightForTesting(int);
 #endif // !PLATFORM(IOS)
 
     WebCore::IntPoint screenToRootView(const WebCore::IntPoint&);
@@ -561,8 +564,8 @@ public:
     void syncApplyAutocorrection(const String& correction, const String& originalText, bool& correctionApplied);
     void requestAutocorrectionContext(uint64_t callbackID);
     void getAutocorrectionContext(String& beforeText, String& markedText, String& selectedText, String& afterText, uint64_t& location, uint64_t& length);
-    void getPositionInformation(const WebCore::IntPoint&, InteractionInformationAtPosition&);
-    void requestPositionInformation(const WebCore::IntPoint&);
+    void getPositionInformation(const InteractionInformationRequest&, InteractionInformationAtPosition&);
+    void requestPositionInformation(const InteractionInformationRequest&);
     void startInteractionWithElementAtPosition(const WebCore::IntPoint&);
     void stopInteraction();
     void performActionOnElement(uint32_t action);
@@ -1081,7 +1084,7 @@ private:
 
     void setDrawsBackground(bool);
 
-#if PLATFORM(COCOA)
+#if HAVE(COREANIMATION_FENCES)
     void setTopContentInsetFenced(float, IPC::Attachment);
 #endif
     void setTopContentInset(float);
@@ -1177,7 +1180,10 @@ private:
     void userMediaAccessWasDenied(uint64_t userMediaID, uint64_t reason, String invalidConstraint);
 
     void didCompleteMediaDeviceEnumeration(uint64_t userMediaID, const Vector<WebCore::CaptureDevice>& devices, const String& deviceIdentifierHashSalt, bool originHasPersistentAccess);
-    void grantUserMediaDevicesSandboxExtension(const SandboxExtension::HandleArray&);
+#if ENABLE(SANDBOX_EXTENSIONS)
+    void grantUserMediaDeviceSandboxExtensions(const MediaDeviceSandboxExtensions&);
+    void revokeUserMediaDeviceSandboxExtensions(const Vector<String>&);
+#endif
 #endif
 
     void advanceToNextMisspelling(bool startBeforeSelection);
@@ -1337,7 +1343,7 @@ private:
 #if ENABLE(CONTEXT_MENUS)
     std::unique_ptr<API::InjectedBundle::PageContextMenuClient> m_contextMenuClient;
 #endif
-    InjectedBundlePageEditorClient m_editorClient;
+    std::unique_ptr<API::InjectedBundle::EditorClient> m_editorClient;
     std::unique_ptr<API::InjectedBundle::FormClient> m_formClient;
     InjectedBundlePageLoaderClient m_loaderClient;
     InjectedBundlePagePolicyClient m_policyClient;

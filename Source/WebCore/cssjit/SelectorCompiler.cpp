@@ -402,7 +402,7 @@ static inline FragmentRelation fragmentRelationForSelectorRelation(CSSSelector::
 {
     switch (relation) {
     case CSSSelector::DescendantSpace:
-#if ENABLE_CSS_SELECTORS_LEVEL4
+#if ENABLE(CSS_SELECTORS_LEVEL4)
     case CSSSelector::DescendantDoubleChild:
 #endif
         return FragmentRelation::Descendant;
@@ -3664,7 +3664,7 @@ void SelectorCodeGenerator::generateElementIsNthLastChildOf(Assembler::JumpList&
         for (const NthChildOfSelectorInfo& nthLastChildOfSelectorInfo : fragment.nthLastChildOfFilters) {
             if (nthFilterIsAlwaysSatisified(nthLastChildOfSelectorInfo.a, nthLastChildOfSelectorInfo.b))
                 continue;
-            validSubsetFilters.append(&nthLastChildOfSelectorInfo);
+            validSubsetFilters.uncheckedAppend(&nthLastChildOfSelectorInfo);
         }
         if (validSubsetFilters.isEmpty())
             return;

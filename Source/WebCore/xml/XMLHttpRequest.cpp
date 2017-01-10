@@ -669,6 +669,7 @@ ExceptionOr<void> XMLHttpRequest::createRequest()
     options.contentSecurityPolicyEnforcement = scriptExecutionContext()->shouldBypassMainWorldContentSecurityPolicy() ? ContentSecurityPolicyEnforcement::DoNotEnforce : ContentSecurityPolicyEnforcement::EnforceConnectSrcDirective;
     options.initiator = cachedResourceRequestInitiators().xmlhttprequest;
     options.sameOriginDataURLFlag = SameOriginDataURLFlag::Set;
+    options.filteringPolicy = ResponseFilteringPolicy::Enable;
 
     if (m_timeoutMilliseconds) {
         if (!m_async)
@@ -983,7 +984,7 @@ void XMLHttpRequest::didFinishLoading(unsigned long identifier, double)
     std::optional<String> decodedText;
     if (!m_binaryResponseBuilder)
         decodedText = m_responseBuilder.toStringPreserveCapacity();
-    InspectorInstrumentation::didFinishXHRLoading(scriptExecutionContext(), this, identifier, decodedText, m_url, m_lastSendURL, m_lastSendLineNumber, m_lastSendColumnNumber);
+    InspectorInstrumentation::didFinishXHRLoading(scriptExecutionContext(), identifier, decodedText, m_url, m_lastSendURL, m_lastSendLineNumber, m_lastSendColumnNumber);
 
     bool hadLoader = m_loader;
     m_loader = nullptr;
@@ -1015,10 +1016,8 @@ void XMLHttpRequest::didSendData(unsigned long long bytesSent, unsigned long lon
     }
 }
 
-void XMLHttpRequest::didReceiveResponse(unsigned long identifier, const ResourceResponse& response)
+void XMLHttpRequest::didReceiveResponse(unsigned long, const ResourceResponse& response)
 {
-    InspectorInstrumentation::didReceiveXHRResponse(scriptExecutionContext(), identifier);
-
     m_response = response;
     if (!m_mimeTypeOverride.isEmpty())
         m_response.setHTTPHeaderField(HTTPHeaderName::ContentType, m_mimeTypeOverride);

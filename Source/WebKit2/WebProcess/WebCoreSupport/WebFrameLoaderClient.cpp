@@ -53,6 +53,7 @@
 #include "WebPageProxyMessages.h"
 #include "WebProcess.h"
 #include "WebProcessPoolMessages.h"
+#include "WebsitePolicies.h"
 #include <JavaScriptCore/APICast.h>
 #include <JavaScriptCore/JSObject.h>
 #include <WebCore/CachedFrame.h>
@@ -432,11 +433,11 @@ void WebFrameLoaderClient::dispatchDidReceiveTitle(const StringWithDirection& ti
     RefPtr<API::Object> userData;
 
     // Notify the bundle client.
-    // FIXME: use direction of title.
-    webPage->injectedBundleLoaderClient().didReceiveTitleForFrame(webPage, title.string(), m_frame, userData);
+    // FIXME: Use direction of title.
+    webPage->injectedBundleLoaderClient().didReceiveTitleForFrame(webPage, title.string, m_frame, userData);
 
     // Notify the UIProcess.
-    webPage->send(Messages::WebPageProxy::DidReceiveTitleForFrame(m_frame->frameID(), title.string(), UserData(WebProcess::singleton().transformObjectsToHandles(userData.get()).get())));
+    webPage->send(Messages::WebPageProxy::DidReceiveTitleForFrame(m_frame->frameID(), title.string, UserData(WebProcess::singleton().transformObjectsToHandles(userData.get()).get())));
 }
 
 void WebFrameLoaderClient::dispatchDidCommitLoad(std::optional<HasInsecureContent> hasInsecureContent)
@@ -807,10 +808,15 @@ void WebFrameLoaderClient::dispatchDecidePolicyForNavigationAction(const Navigat
     // Notify the UIProcess.
     Ref<WebFrame> protect(*m_frame);
     WebCore::Frame* originatingCoreFrame = originatingFrame ? originatingFrame->coreFrame() : nullptr;
-    if (!webPage->sendSync(Messages::WebPageProxy::DecidePolicyForNavigationAction(m_frame->frameID(), SecurityOriginData::fromFrame(coreFrame), documentLoader->navigationID(), navigationActionData, originatingFrame ? originatingFrame->frameID() : 0, SecurityOriginData::fromFrame(originatingCoreFrame), navigationAction.resourceRequest(), request, listenerID, UserData(WebProcess::singleton().transformObjectsToHandles(userData.get()).get())), Messages::WebPageProxy::DecidePolicyForNavigationAction::Reply(receivedPolicyAction, newNavigationID, policyAction, downloadID))) {
+    WebsitePolicies websitePolicies;
+    if (!webPage->sendSync(Messages::WebPageProxy::DecidePolicyForNavigationAction(m_frame->frameID(), SecurityOriginData::fromFrame(coreFrame), documentLoader->navigationID(), navigationActionData, originatingFrame ? originatingFrame->frameID() : 0, SecurityOriginData::fromFrame(originatingCoreFrame), navigationAction.resourceRequest(), request, listenerID, UserData(WebProcess::singleton().transformObjectsToHandles(userData.get()).get())), Messages::WebPageProxy::DecidePolicyForNavigationAction::Reply(receivedPolicyAction, newNavigationID, policyAction, downloadID, websitePolicies))) {
         m_frame->didReceivePolicyDecision(listenerID, PolicyIgnore, 0, { });
         return;
     }
+
+    // Only setUserContentExtensionsEnabled if it hasn't already been disabled by reloading without content blockers.
+    if (documentLoader->userContentExtensionsEnabled())
+        documentLoader->setUserContentExtensionsEnabled(websitePolicies.contentBlockersEnabled);
 
     // We call this synchronously because WebCore cannot gracefully handle a frame load without a synchronous navigation policy reply.
     if (receivedPolicyAction)
@@ -995,8 +1001,8 @@ void WebFrameLoaderClient::updateGlobalHistory()
 
     WebNavigationDataStore data;
     data.url = loader->url().string();
-    // FIXME: use direction of title.
-    data.title = loader->title().string();
+    // FIXME: Use direction of title.
+    data.title = loader->title().string;
     data.originalRequest = loader->originalRequestCopy();
     data.response = loader->response();
 
@@ -1268,8 +1274,8 @@ void WebFrameLoaderClient::setTitle(const StringWithDirection& title, const URL&
     if (!webPage || !webPage->pageGroup()->isVisibleToHistoryClient())
         return;
 
-    // FIXME: use direction of title.
-    webPage->send(Messages::WebPageProxy::DidUpdateHistoryTitle(title.string(), url.string(), m_frame->frameID()));
+    // FIXME: Use direction of title.
+    webPage->send(Messages::WebPageProxy::DidUpdateHistoryTitle(title.string, url.string(), m_frame->frameID()));
 }
 
 String WebFrameLoaderClient::userAgent(const URL& url)
@@ -1364,7 +1370,8 @@ void WebFrameLoaderClient::didSaveToPageCache()
     if (!webPage)
         return;
 
-    webPage->send(Messages::WebPageProxy::DidSaveToPageCache());
+    if (m_frame->isMainFrame())
+        webPage->send(Messages::WebPageProxy::DidSaveToPageCache());
 }
 
 void WebFrameLoaderClient::didRestoreFromPageCache()

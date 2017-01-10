@@ -28,6 +28,7 @@ package CodeGenerator;
 
 use strict;
 
+use File::Basename;
 use File::Find;
 use Carp qw<longmess>;
 use Data::Dumper;
@@ -89,12 +90,6 @@ my %primitiveTypeHash = (
     "boolean" => 1, 
     "void" => 1,
     "Date" => 1
-);
-
-# WebCore types used directly in IDL files.
-my %webCoreTypeHash = (
-    "Dictionary" => 1,
-    "SerializedScriptValue" => 1,
 );
 
 my %dictionaryTypeImplementationNameOverrides = ();
@@ -209,11 +204,24 @@ sub ProcessDocument
 
     my $dictionaries = $useDocument->dictionaries;
     if (@$dictionaries) {
-        die "Multiple standalone dictionaries per document are not supported" if @$dictionaries > 1;
+        my $dictionary;
+        my $otherDictionaries;
+        if (@$dictionaries == 1) {
+            $dictionary = @$dictionaries[0];
+        } else {
+            my $primaryDictionaryName = fileparse($targetIdlFilePath, ".idl");
+            for my $candidate (@$dictionaries) {
+                if ($candidate->type->name eq $primaryDictionaryName) {
+                    $dictionary = $candidate;
+                } else {
+                    push @$otherDictionaries, $candidate;
+                }
+            }
+            die "Multiple dictionaries per document are only supported if one matches the filename" unless $dictionary;
+        }
 
-        my $dictionary = @$dictionaries[0];
         print "Generating $useGenerator bindings code for IDL dictionary \"" . $dictionary->type->name . "\"...\n" if $verbose;
-        $codeGenerator->GenerateDictionary($dictionary, $useDocument->enumerations);
+        $codeGenerator->GenerateDictionary($dictionary, $useDocument->enumerations, $otherDictionaries);
         $codeGenerator->WriteData($dictionary, $useOutputDir, $useOutputHeadersDir);
         return;
     }
@@ -603,6 +611,7 @@ sub IsRefPtrType
     return 0 if $object->IsStringType($type);
     return 0 if $type->isUnion;
     return 0 if $type->name eq "any";
+    return 0 if $type->name eq "object";
 
     return 1;
 }
@@ -855,18 +864,54 @@ sub SetterExpression
     return ($functionName, $contentAttributeName);
 }
 
+sub IsBuiltinType
+{
+    my ($object, $type) = @_;
+
+    assert("Not a type") if ref($type) ne "IDLType";
+
+    return 1 if $object->IsPrimitiveType($type);
+    return 1 if $object->IsSequenceOrFrozenArrayType($type);
+    return 1 if $object->IsRecordType($type);
+    return 1 if $object->IsStringType($type);
+    return 1 if $object->IsTypedArrayType($type);
+    return 1 if $type->isUnion;
+    return 1 if $type->name eq "BufferSource";
+    return 1 if $type->name eq "EventListener";
+    return 1 if $type->name eq "IDBKey";
+    return 1 if $type->name eq "JSON";
+    return 1 if $type->name eq "Promise";
+    return 1 if $type->name eq "SerializedScriptValue";
+    return 1 if $type->name eq "XPathNSResolver";
+    return 1 if $type->name eq "any";
+    return 1 if $type->name eq "object";
+
+    return 0;
+}
+
+sub IsInterfaceType
+{
+    my ($object, $type) = @_;
+
+    assert("Not a type") if ref($type) ne "IDLType";
+
+    return 0 if $object->IsBuiltinType($type);
+    return 0 if $object->IsDictionaryType($type);
+    return 0 if $object->IsEnumType($type);
+
+    return 1;
+}
+
 sub IsWrapperType
 {
     my ($object, $type) = @_;
 
     assert("Not a type") if ref($type) ne "IDLType";
 
-    return 0 if !$object->IsRefPtrType($type);
-    return 0 if $object->IsTypedArrayType($type);
-    return 0 if $type->name eq "BufferSource";
-    return 0 if $webCoreTypeHash{$type->name};
+    return 1 if $object->IsInterfaceType($type);
+    return 1 if $type->name eq "XPathNSResolver";
 
-    return 1;
+    return 0;
 }
 
 sub GetInterfaceExtendedAttributesFromName
@@ -907,7 +952,7 @@ sub ComputeIsCallbackInterface
 
     assert("Not a type") if ref($type) ne "IDLType";
 
-    return 0 unless $object->IsWrapperType($type);
+    return 0 unless $object->IsInterfaceType($type);
 
     my $typeName = $type->name;
     my $idlFile = $object->IDLFileForInterface($typeName) or assert("Could NOT find IDL file for interface \"$typeName\"!\n");
@@ -944,7 +989,7 @@ sub ComputeIsCallbackFunction
 
     assert("Not a type") if ref($type) ne "IDLType";
 
-    return 0 unless $object->IsWrapperType($type);
+    return 0 unless $object->IsInterfaceType($type);
 
     my $typeName = $type->name;
     my $idlFile = $object->IDLFileForInterface($typeName) or assert("Could NOT find IDL file for interface \"$typeName\"!\n");
@@ -1092,14 +1137,5 @@ sub InheritsExtendedAttribute
     return $found;
 }
 
-sub ShouldPassWrapperByReference
-{
-    my ($object, $argument) = @_;
-
-    return 0 if $argument->type->isNullable;
-    return 0 if !$object->IsWrapperType($argument->type) && !$object->IsTypedArrayType($argument->type);
-
-    return 1;
-}
 
 1;

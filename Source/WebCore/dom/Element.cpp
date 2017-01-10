@@ -40,7 +40,6 @@
 #include "CustomElementReactionQueue.h"
 #include "CustomElementRegistry.h"
 #include "DOMTokenList.h"
-#include "Dictionary.h"
 #include "DocumentAnimation.h"
 #include "DocumentSharedObjectPool.h"
 #include "ElementIterator.h"
@@ -318,7 +317,7 @@ bool Element::dispatchWheelEvent(const PlatformWheelEvent& event)
     if (!event.deltaX() && !event.deltaY())
         wheelEvent->stopPropagation();
 
-    return EventDispatcher::dispatchEvent(this, wheelEvent) && !wheelEvent->defaultHandled();
+    return EventDispatcher::dispatchEvent(*this, wheelEvent) && !wheelEvent->defaultHandled();
 }
 
 bool Element::dispatchKeyEvent(const PlatformKeyboardEvent& platformEvent)
@@ -328,7 +327,7 @@ bool Element::dispatchKeyEvent(const PlatformKeyboardEvent& platformEvent)
         if (frame->eventHandler().accessibilityPreventsEventPropogation(event))
             event->stopPropagation();
     }
-    return EventDispatcher::dispatchEvent(this, event) && !event->defaultHandled();
+    return EventDispatcher::dispatchEvent(*this, event) && !event->defaultHandled();
 }
 
 void Element::dispatchSimulatedClick(Event* underlyingEvent, SimulatedClickMouseEventOptions eventOptions, SimulatedClickVisualOptions visualOptions)
@@ -649,12 +648,13 @@ void Element::scrollIntoView(bool alignToTop)
     if (!renderer())
         return;
 
-    LayoutRect bounds = renderer()->anchorRect();
+    bool insideFixed;
+    LayoutRect absoluteBounds = renderer()->absoluteAnchorRect(&insideFixed);
     // Align to the top / bottom and to the closest edge.
     if (alignToTop)
-        renderer()->scrollRectToVisible(SelectionRevealMode::Reveal, bounds, ScrollAlignment::alignToEdgeIfNeeded, ScrollAlignment::alignTopAlways);
+        renderer()->scrollRectToVisible(SelectionRevealMode::Reveal, absoluteBounds, insideFixed, ScrollAlignment::alignToEdgeIfNeeded, ScrollAlignment::alignTopAlways);
     else
-        renderer()->scrollRectToVisible(SelectionRevealMode::Reveal, bounds, ScrollAlignment::alignToEdgeIfNeeded, ScrollAlignment::alignBottomAlways);
+        renderer()->scrollRectToVisible(SelectionRevealMode::Reveal, absoluteBounds, insideFixed, ScrollAlignment::alignToEdgeIfNeeded, ScrollAlignment::alignBottomAlways);
 }
 
 void Element::scrollIntoViewIfNeeded(bool centerIfNeeded)
@@ -664,11 +664,12 @@ void Element::scrollIntoViewIfNeeded(bool centerIfNeeded)
     if (!renderer())
         return;
 
-    LayoutRect bounds = renderer()->anchorRect();
+    bool insideFixed;
+    LayoutRect absoluteBounds = renderer()->absoluteAnchorRect(&insideFixed);
     if (centerIfNeeded)
-        renderer()->scrollRectToVisible(SelectionRevealMode::Reveal, bounds, ScrollAlignment::alignCenterIfNeeded, ScrollAlignment::alignCenterIfNeeded);
+        renderer()->scrollRectToVisible(SelectionRevealMode::Reveal, absoluteBounds, insideFixed, ScrollAlignment::alignCenterIfNeeded, ScrollAlignment::alignCenterIfNeeded);
     else
-        renderer()->scrollRectToVisible(SelectionRevealMode::Reveal, bounds, ScrollAlignment::alignToEdgeIfNeeded, ScrollAlignment::alignToEdgeIfNeeded);
+        renderer()->scrollRectToVisible(SelectionRevealMode::Reveal, absoluteBounds, insideFixed, ScrollAlignment::alignToEdgeIfNeeded, ScrollAlignment::alignToEdgeIfNeeded);
 }
 
 void Element::scrollIntoViewIfNotVisible(bool centerIfNotVisible)
@@ -678,11 +679,12 @@ void Element::scrollIntoViewIfNotVisible(bool centerIfNotVisible)
     if (!renderer())
         return;
     
-    LayoutRect bounds = renderer()->anchorRect();
+    bool insideFixed;
+    LayoutRect absoluteBounds = renderer()->absoluteAnchorRect(&insideFixed);
     if (centerIfNotVisible)
-        renderer()->scrollRectToVisible(SelectionRevealMode::Reveal, bounds, ScrollAlignment::alignCenterIfNotVisible, ScrollAlignment::alignCenterIfNotVisible);
+        renderer()->scrollRectToVisible(SelectionRevealMode::Reveal, absoluteBounds, insideFixed, ScrollAlignment::alignCenterIfNotVisible, ScrollAlignment::alignCenterIfNotVisible);
     else
-        renderer()->scrollRectToVisible(SelectionRevealMode::Reveal, bounds, ScrollAlignment::alignToEdgeIfNotVisible, ScrollAlignment::alignToEdgeIfNotVisible);
+        renderer()->scrollRectToVisible(SelectionRevealMode::Reveal, absoluteBounds, insideFixed, ScrollAlignment::alignToEdgeIfNotVisible, ScrollAlignment::alignToEdgeIfNotVisible);
 }
 
 void Element::scrollBy(const ScrollToOptions& options)
@@ -1670,7 +1672,7 @@ void Element::removedFrom(ContainerNode& insertionPoint)
 #endif
 #if ENABLE(POINTER_LOCK)
     if (document().page())
-        document().page()->pointerLockController().elementRemoved(this);
+        document().page()->pointerLockController().elementRemoved(*this);
 #endif
 
     setSavedLayerScrollPosition(ScrollPosition());
@@ -2426,14 +2428,17 @@ void Element::updateFocusAppearance(SelectionRestorationMode, SelectionRevealMod
             frame->selection().setSelection(newSelection, FrameSelection::defaultSetSelectionOptions(), Element::defaultFocusTextStateChangeIntent());
             frame->selection().revealSelection(revealMode);
         }
-    } else if (renderer() && !renderer()->isWidget())
-        renderer()->scrollRectToVisible(revealMode, renderer()->anchorRect());
+    } else if (renderer() && !renderer()->isWidget()) {
+        bool insideFixed;
+        LayoutRect absoluteBounds = renderer()->absoluteAnchorRect(&insideFixed);
+        renderer()->scrollRectToVisible(revealMode, absoluteBounds, insideFixed);
+    }
 }
 
 void Element::blur()
 {
     cancelFocusAppearanceUpdate();
-    if (treeScope().focusedElement() == this) {
+    if (treeScope().focusedElementInScope() == this) {
         if (Frame* frame = document().frame())
             frame->page()->focusController().setFocusedElement(0, frame);
         else
@@ -2460,7 +2465,7 @@ void Element::dispatchFocusEvent(RefPtr<Element>&& oldFocusedElement, FocusDirec
     if (document().page())
         document().page()->chrome().client().elementDidFocus(this);
 
-    EventDispatcher::dispatchEvent(this, FocusEvent::create(eventNames().focusEvent, false, false, document().defaultView(), 0, WTFMove(oldFocusedElement)));
+    EventDispatcher::dispatchEvent(*this, FocusEvent::create(eventNames().focusEvent, false, false, document().defaultView(), 0, WTFMove(oldFocusedElement)));
 }
 
 void Element::dispatchBlurEvent(RefPtr<Element>&& newFocusedElement)
@@ -2468,7 +2473,7 @@ void Element::dispatchBlurEvent(RefPtr<Element>&& newFocusedElement)
     if (document().page())
         document().page()->chrome().client().elementDidBlur(this);
 
-    EventDispatcher::dispatchEvent(this, FocusEvent::create(eventNames().blurEvent, false, false, document().defaultView(), 0, WTFMove(newFocusedElement)));
+    EventDispatcher::dispatchEvent(*this, FocusEvent::create(eventNames().blurEvent, false, false, document().defaultView(), 0, WTFMove(newFocusedElement)));
 }
 
 bool Element::dispatchMouseForceWillBegin()
@@ -3018,20 +3023,6 @@ void Element::setUnsignedIntegralAttribute(const QualifiedName& attributeName, u
     setAttribute(attributeName, AtomicString::number(limitToOnlyHTMLNonNegative(value)));
 }
 
-#if ENABLE(INDIE_UI)
-
-void Element::setUIActions(const AtomicString& actions)
-{
-    setAttribute(uiactionsAttr, actions);
-}
-
-const AtomicString& Element::UIActions() const
-{
-    return getAttribute(uiactionsAttr);
-}
-
-#endif
-
 bool Element::childShouldCreateRenderer(const Node& child) const
 {
     // Only create renderers for SVG elements whose parents are SVG elements, or for proper <svg xmlns="svgNS"> subdocuments.
@@ -3046,12 +3037,7 @@ bool Element::childShouldCreateRenderer(const Node& child) const
 #if ENABLE(FULLSCREEN_API)
 void Element::webkitRequestFullscreen()
 {
-    document().requestFullScreenForElement(this, ALLOW_KEYBOARD_INPUT, Document::EnforceIFrameAllowFullScreenRequirement);
-}
-
-void Element::webkitRequestFullScreen(unsigned short flags)
-{
-    document().requestFullScreenForElement(this, (flags | LEGACY_MOZILLA_REQUEST), Document::EnforceIFrameAllowFullScreenRequirement);
+    document().requestFullScreenForElement(this, Document::EnforceIFrameAllowFullScreenRequirement);
 }
 
 bool Element::containsFullScreenElement() const
@@ -3236,6 +3222,9 @@ void Element::updateNameForDocument(HTMLDocument& document, const AtomicString& 
 {
     ASSERT(oldName != newName);
 
+    if (isInShadowTree())
+        return;
+
     if (WindowNameCollection::elementMatchesIfNameAttributeMatch(*this)) {
         const AtomicString& id = WindowNameCollection::elementMatchesIfIdAttributeMatch(*this) ? getIdAttribute() : nullAtom;
         if (!oldName.isEmpty() && oldName != id)
@@ -3286,6 +3275,9 @@ void Element::updateIdForDocument(HTMLDocument& document, const AtomicString& ol
     ASSERT(inDocument());
     ASSERT(oldId != newId);
 
+    if (isInShadowTree())
+        return;
+
     if (WindowNameCollection::elementMatchesIfIdAttributeMatch(*this)) {
         const AtomicString& name = condition == UpdateHTMLDocumentNamedItemMapsOnlyIfDiffersFromNameAttribute && WindowNameCollection::elementMatchesIfNameAttributeMatch(*this) ? getNameAttribute() : nullAtom;
         if (!oldId.isEmpty() && oldId != name)
@@ -3330,7 +3322,7 @@ void Element::willModifyAttribute(const QualifiedName& name, const AtomicString&
             updateLabel(treeScope(), oldValue, newValue);
     }
 
-    if (std::unique_ptr<MutationObserverInterestGroup> recipients = MutationObserverInterestGroup::createForAttributesMutation(*this, name))
+    if (auto recipients = MutationObserverInterestGroup::createForAttributesMutation(*this, name))
         recipients->enqueueMutationRecord(MutationRecord::createAttributes(*this, name, oldValue));
 
     InspectorInstrumentation::willModifyDOMAttr(document(), *this, oldValue, newValue);

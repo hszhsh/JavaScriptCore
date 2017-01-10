@@ -37,6 +37,12 @@ UIScriptController::UIScriptController(UIScriptContext& context)
 {
 }
 
+#if !PLATFORM(IOS)
+void UIScriptController::checkForOutstandingCallbacks()
+{
+}
+#endif
+
 void UIScriptController::contextDestroyed()
 {
     m_context = nullptr;
@@ -62,6 +68,10 @@ void simulateAccessibilitySettingsChangeNotification(JSValueRef)
 }
 
 void UIScriptController::doAfterPresentationUpdate(JSValueRef)
+{
+}
+
+void UIScriptController::doAfterNextStablePresentationUpdate(JSValueRef)
 {
 }
 #endif
@@ -303,6 +313,16 @@ JSObjectRef UIScriptController::contentVisibleRect() const
 }
 
 JSObjectRef UIScriptController::selectionRangeViewRects() const
+{
+    return nullptr;
+}
+
+JSObjectRef UIScriptController::textSelectionCaretRect() const
+{
+    return nullptr;
+}
+
+JSObjectRef UIScriptController::inputViewBounds() const
 {
     return nullptr;
 }

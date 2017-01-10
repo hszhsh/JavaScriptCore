@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 1999 Lars Knoll (knoll@kde.org)
  *           (C) 1999 Antti Koivisto (koivisto@kde.org)
- * Copyright (C) 2004, 2005, 2006, 2007, 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2004-2017 Apple Inc. All rights reserved.
  * Copyright (C) 2009 Torch Mobile Inc. All rights reserved. (http://www.torchmobile.com/)
  * Copyright (C) 2011 Motorola Mobility. All rights reserved.
  *
@@ -25,7 +25,7 @@
 #include "config.h"
 #include "HTMLElement.h"
 
-#include "CSSParser.h"
+#include "CSSMarkup.h"
 #include "CSSPropertyNames.h"
 #include "CSSValueKeywords.h"
 #include "CSSValuePool.h"
@@ -117,7 +117,7 @@ void HTMLElement::mapLanguageAttributeToLocale(const AtomicString& value, Mutabl
 {
     if (!value.isEmpty()) {
         // Have to quote so the locale id is treated as a string instead of as a CSS keyword.
-        addPropertyToPresentationAttributeStyle(style, CSSPropertyWebkitLocale, quoteCSSString(value));
+        addPropertyToPresentationAttributeStyle(style, CSSPropertyWebkitLocale, serializeString(value));
     } else {
         // The empty string means the language is explicitly unknown.
         addPropertyToPresentationAttributeStyle(style, CSSPropertyWebkitLocale, CSSValueAuto);
@@ -752,7 +752,7 @@ RenderPtr<RenderElement> HTMLElement::createElementRenderer(RenderStyle&& style,
     return RenderElement::createFor(*this, WTFMove(style));
 }
 
-HTMLFormElement* HTMLElement::virtualForm() const
+HTMLFormElement* HTMLElement::form() const
 {
     return HTMLFormElement::findClosestFormAncestor(*this);
 }

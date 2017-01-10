@@ -287,8 +287,11 @@ typedef NS_ENUM(NSInteger, _WKImmediateActionType) {
 
 - (void)_didShowForcePressPreview WK_API_AVAILABLE(ios(WK_IOS_TBA));
 - (void)_didDismissForcePressPreview WK_API_AVAILABLE(ios(WK_IOS_TBA));
+- (void)_doAfterNextStablePresentationUpdate:(dispatch_block_t)updateBlock WK_API_AVAILABLE(ios(WK_IOS_TBA));
 
-@property (nonatomic, readonly) NSArray<UIView *> *_uiTextSelectionRectViews WK_API_AVAILABLE(ios(WK_IOS_TBA));
+@property (nonatomic, readonly) NSArray<NSValue *> *_uiTextSelectionRects WK_API_AVAILABLE(ios(WK_IOS_TBA));
+@property (nonatomic, readonly) CGRect _uiTextCaretRect WK_API_AVAILABLE(ios(WK_IOS_TBA));
+@property (nonatomic, readonly) CGRect _inputViewBounds WK_API_AVAILABLE(ios(WK_IOS_TBA));
 
 @property (nonatomic, readonly) NSString *_scrollingTreeAsText WK_API_AVAILABLE(ios(WK_IOS_TBA));
 
@@ -309,12 +312,16 @@ typedef NS_ENUM(NSInteger, _WKImmediateActionType) {
 - (void)_handleActiveNowPlayingSessionInfoResponse:(BOOL)hasActiveSession title:(NSString *)title duration:(double)duration elapsedTime:(double)elapsedTime WK_API_AVAILABLE(macosx(WK_MAC_TBA));
 
 - (void)_insertText:(id)string replacementRange:(NSRange)replacementRange WK_API_AVAILABLE(macosx(WK_MAC_TBA));
+
+- (void)_setHeaderBannerHeight:(int)height WK_API_AVAILABLE(macosx(WK_MAC_TBA));
+- (void)_setFooterBannerHeight:(int)height WK_API_AVAILABLE(macosx(WK_MAC_TBA));
 #endif
 
 - (void)_setPageScale:(CGFloat)scale withOrigin:(CGPoint)origin WK_API_AVAILABLE(ios(WK_IOS_TBA));
 - (CGFloat)_pageScale WK_API_AVAILABLE(ios(WK_IOS_TBA));
 
 - (void)_doAfterNextPresentationUpdate:(void (^)(void))updateBlock WK_API_AVAILABLE(macosx(10.12), ios(10.0));
+- (void)_doAfterNextPresentationUpdateWithoutWaitingForPainting:(void (^)(void))updateBlock WK_API_AVAILABLE(macosx(WK_MAC_TBA), ios(WK_IOS_TBA));
 
 - (void)_disableBackForwardSnapshotVolatilityForTesting WK_API_AVAILABLE(macosx(WK_MAC_TBA), ios(WK_IOS_TBA));
 

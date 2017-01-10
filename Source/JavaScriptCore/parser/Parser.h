@@ -1381,13 +1381,8 @@ private:
     }
     
     NEVER_INLINE void logError(bool);
-    template <typename A> NEVER_INLINE void logError(bool, const A&);
-    template <typename A, typename B> NEVER_INLINE void logError(bool, const A&, const B&);
-    template <typename A, typename B, typename C> NEVER_INLINE void logError(bool, const A&, const B&, const C&);
-    template <typename A, typename B, typename C, typename D> NEVER_INLINE void logError(bool, const A&, const B&, const C&, const D&);
-    template <typename A, typename B, typename C, typename D, typename E> NEVER_INLINE void logError(bool, const A&, const B&, const C&, const D&, const E&);
-    template <typename A, typename B, typename C, typename D, typename E, typename F> NEVER_INLINE void logError(bool, const A&, const B&, const C&, const D&, const E&, const F&);
-    template <typename A, typename B, typename C, typename D, typename E, typename F, typename G> NEVER_INLINE void logError(bool, const A&, const B&, const C&, const D&, const E&, const F&, const G&);
+    template <typename... Args>
+    NEVER_INLINE void logError(bool, Args&&...);
     
     NEVER_INLINE void updateErrorWithNameAndMessage(const char* beforeMessage, const String& name, const char* afterMessage)
     {
@@ -1790,8 +1785,8 @@ std::unique_ptr<ParsedNode> Parser<LexerType>::parse(ParserError& error, const I
     errMsg = String();
 
     JSTokenLocation startLocation(tokenLocation());
-    ASSERT(m_source->startColumn() > 0);
-    unsigned startColumn = m_source->startColumn() - 1;
+    ASSERT(m_source->startColumn() > OrdinalNumber::beforeFirst());
+    unsigned startColumn = m_source->startColumn().zeroBasedInt();
 
     String parseError = parseInner(calleeName, parseMode);
 
@@ -1830,7 +1825,7 @@ std::unique_ptr<ParsedNode> Parser<LexerType>::parse(ParserError& error, const I
                                     currentScope()->innerArrowFunctionFeatures(),
                                     m_numConstants,
                                     WTFMove(m_moduleScopeData));
-        result->setLoc(m_source->firstLine(), m_lexer->lineNumber(), m_lexer->currentOffset(), m_lexer->currentLineStartOffset());
+        result->setLoc(m_source->firstLine().oneBasedInt(), m_lexer->lineNumber(), m_lexer->currentOffset(), m_lexer->currentLineStartOffset());
         result->setEndOffset(m_lexer->currentOffset());
 
         if (!isFunctionParseMode(parseMode)) {

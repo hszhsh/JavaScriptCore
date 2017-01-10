@@ -117,6 +117,7 @@
 #include "JSWeakMap.h"
 #include "JSWeakSet.h"
 #include "JSWebAssembly.h"
+#include "JSWebAssemblyCallee.h"
 #include "JSWithScope.h"
 #include "LazyClassStructureInlines.h"
 #include "LazyPropertyInlines.h"
@@ -245,7 +246,19 @@ namespace JSC {
 
 const ClassInfo JSGlobalObject::s_info = { "GlobalObject", &Base::s_info, &globalObjectTable, CREATE_METHOD_TABLE(JSGlobalObject) };
 
-const GlobalObjectMethodTable JSGlobalObject::s_globalObjectMethodTable = { &supportsRichSourceInfo, &shouldInterruptScript, &javaScriptRuntimeFlags, nullptr, &shouldInterruptScriptBeforeTimeout, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
+const GlobalObjectMethodTable JSGlobalObject::s_globalObjectMethodTable = {
+    &supportsRichSourceInfo,
+    &shouldInterruptScript,
+    &javaScriptRuntimeFlags,
+    nullptr,
+    &shouldInterruptScriptBeforeTimeout,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr
+};
 
 /* Source for JSGlobalObject.lut.h
 @begin globalObjectTable
@@ -259,6 +272,7 @@ const GlobalObjectMethodTable JSGlobalObject::s_globalObjectMethodTable = { &sup
   encodeURI             globalFuncEncodeURI                          DontEnum|Function 1
   encodeURIComponent    globalFuncEncodeURIComponent                 DontEnum|Function 1
   EvalError             JSGlobalObject::m_evalErrorConstructor       DontEnum|CellProperty
+  global                JSGlobalObject::m_globalThis                 DontEnum|CellProperty
   ReferenceError        JSGlobalObject::m_referenceErrorConstructor  DontEnum|CellProperty
   SyntaxError           JSGlobalObject::m_syntaxErrorConstructor     DontEnum|CellProperty
   URIError              JSGlobalObject::m_URIErrorConstructor        DontEnum|CellProperty
@@ -566,10 +580,8 @@ void JSGlobalObject::init(VM& vm)
     
     m_arrayBufferPrototype.set(vm, this, JSArrayBufferPrototype::create(vm, this, JSArrayBufferPrototype::createStructure(vm, this, m_objectPrototype.get()), ArrayBufferSharingMode::Default));
     m_arrayBufferStructure.set(vm, this, JSArrayBuffer::createStructure(vm, this, m_arrayBufferPrototype.get()));
-    if (m_runtimeFlags.isSharedArrayBufferEnabled()) {
-        m_sharedArrayBufferPrototype.set(vm, this, JSArrayBufferPrototype::create(vm, this, JSArrayBufferPrototype::createStructure(vm, this, m_objectPrototype.get()), ArrayBufferSharingMode::Shared));
-        m_sharedArrayBufferStructure.set(vm, this, JSArrayBuffer::createStructure(vm, this, m_sharedArrayBufferPrototype.get()));
-    }
+    m_sharedArrayBufferPrototype.set(vm, this, JSArrayBufferPrototype::create(vm, this, JSArrayBufferPrototype::createStructure(vm, this, m_objectPrototype.get()), ArrayBufferSharingMode::Shared));
+    m_sharedArrayBufferStructure.set(vm, this, JSArrayBuffer::createStructure(vm, this, m_sharedArrayBufferPrototype.get()));
 
 #define CREATE_PROTOTYPE_FOR_SIMPLE_TYPE(capitalName, lowerName, properName, instanceType, jsName, prototypeBase) \
 m_ ## lowerName ## Prototype.set(vm, this, capitalName##Prototype::create(vm, this, capitalName##Prototype::createStructure(vm, this, m_ ## prototypeBase ## Prototype.get()))); \
@@ -624,10 +636,8 @@ m_ ## properName ## Structure.set(vm, this, instanceType::createStructure(vm, th
     JSArrayBufferConstructor* arrayBufferConstructor = JSArrayBufferConstructor::create(vm, JSArrayBufferConstructor::createStructure(vm, this, m_functionPrototype.get()), m_arrayBufferPrototype.get(), m_speciesGetterSetter.get(), ArrayBufferSharingMode::Default);
     m_arrayBufferPrototype->putDirectWithoutTransition(vm, vm.propertyNames->constructor, arrayBufferConstructor, DontEnum);
     JSArrayBufferConstructor* sharedArrayBufferConstructor = nullptr;
-    if (m_runtimeFlags.isSharedArrayBufferEnabled()) {
-        sharedArrayBufferConstructor = JSArrayBufferConstructor::create(vm, JSArrayBufferConstructor::createStructure(vm, this, m_functionPrototype.get()), m_sharedArrayBufferPrototype.get(), m_speciesGetterSetter.get(), ArrayBufferSharingMode::Shared);
-        m_sharedArrayBufferPrototype->putDirectWithoutTransition(vm, vm.propertyNames->constructor, sharedArrayBufferConstructor, DontEnum);
-    }
+    sharedArrayBufferConstructor = JSArrayBufferConstructor::create(vm, JSArrayBufferConstructor::createStructure(vm, this, m_functionPrototype.get()), m_sharedArrayBufferPrototype.get(), m_speciesGetterSetter.get(), ArrayBufferSharingMode::Shared);
+    m_sharedArrayBufferPrototype->putDirectWithoutTransition(vm, vm.propertyNames->constructor, sharedArrayBufferConstructor, DontEnum);
     
 #define CREATE_CONSTRUCTOR_FOR_SIMPLE_TYPE(capitalName, lowerName, properName, instanceType, jsName, prototypeBase) \
 capitalName ## Constructor* lowerName ## Constructor = capitalName ## Constructor::create(vm, capitalName ## Constructor::createStructure(vm, this, m_functionPrototype.get()), m_ ## lowerName ## Prototype.get(), m_speciesGetterSetter.get()); \
@@ -691,8 +701,7 @@ m_ ## lowerName ## Prototype->putDirectWithoutTransition(vm, vm.propertyNames->c
     putDirectWithoutTransition(vm, vm.propertyNames->builtinNames().ArrayPrivateName(), arrayConstructor, DontEnum | DontDelete | ReadOnly);
 
     putDirectWithoutTransition(vm, vm.propertyNames->ArrayBuffer, arrayBufferConstructor, DontEnum);
-    if (m_runtimeFlags.isSharedArrayBufferEnabled())
-        putDirectWithoutTransition(vm, vm.propertyNames->SharedArrayBuffer, sharedArrayBufferConstructor, DontEnum);
+    putDirectWithoutTransition(vm, vm.propertyNames->SharedArrayBuffer, sharedArrayBufferConstructor, DontEnum);
 
 #define PUT_CONSTRUCTOR_FOR_SIMPLE_TYPE(capitalName, lowerName, properName, instanceType, jsName, prototypeBase) \
 putDirectWithoutTransition(vm, vm.propertyNames-> jsName, lowerName ## Constructor, DontEnum); \
@@ -724,6 +733,7 @@ putDirectWithoutTransition(vm, vm.propertyNames-> jsName, lowerName ## Construct
     JSFunction* privateFuncTrunc = JSFunction::create(vm, this, 0, String(), mathProtoFuncTrunc, TruncIntrinsic);
 
     JSFunction* privateFuncGetTemplateObject = JSFunction::create(vm, this, 0, String(), getTemplateObject);
+    JSFunction* privateFuncImportModule = JSFunction::create(vm, this, 0, String(), globalFuncImportModule);
     JSFunction* privateFuncTypedArrayLength = JSFunction::create(vm, this, 0, String(), typedArrayViewPrivateFuncLength);
     JSFunction* privateFuncTypedArrayGetOriginalConstructor = JSFunction::create(vm, this, 0, String(), typedArrayViewPrivateFuncGetOriginalConstructor);
     JSFunction* privateFuncTypedArraySort = JSFunction::create(vm, this, 0, String(), typedArrayViewPrivateFuncSort);
@@ -777,6 +787,7 @@ putDirectWithoutTransition(vm, vm.propertyNames-> jsName, lowerName ## Construct
         GlobalPropertyInfo(vm.propertyNames->undefinedKeyword, jsUndefined(), DontEnum | DontDelete | ReadOnly),
         GlobalPropertyInfo(vm.propertyNames->builtinNames().ownEnumerablePropertyKeysPrivateName(), JSFunction::create(vm, this, 0, String(), ownEnumerablePropertyKeys), DontEnum | DontDelete | ReadOnly),
         GlobalPropertyInfo(vm.propertyNames->builtinNames().getTemplateObjectPrivateName(), privateFuncGetTemplateObject, DontEnum | DontDelete | ReadOnly),
+        GlobalPropertyInfo(vm.propertyNames->builtinNames().importModulePrivateName(), privateFuncImportModule, DontEnum | DontDelete | ReadOnly),
         GlobalPropertyInfo(vm.propertyNames->builtinNames().enqueueJobPrivateName(), JSFunction::create(vm, this, 0, String(), enqueueJob), DontEnum | DontDelete | ReadOnly),
         GlobalPropertyInfo(vm.propertyNames->builtinNames().ErrorPrivateName(), m_errorConstructor.get(), DontEnum | DontDelete | ReadOnly),
         GlobalPropertyInfo(vm.propertyNames->builtinNames().RangeErrorPrivateName(), m_rangeErrorConstructor.get(), DontEnum | DontDelete | ReadOnly),
@@ -876,6 +887,8 @@ putDirectWithoutTransition(vm, vm.propertyNames-> jsName, lowerName ## Construct
     if (Options::useWebAssembly()) {
         auto* webAssemblyPrototype = WebAssemblyPrototype::create(vm, this, WebAssemblyPrototype::createStructure(vm, this, m_objectPrototype.get()));
         m_webAssemblyStructure.set(vm, this, JSWebAssembly::createStructure(vm, this, webAssemblyPrototype));
+        m_webAssemblyModuleRecordStructure.set(vm, this, WebAssemblyModuleRecord::createStructure(vm, this, m_objectPrototype.get()));
+        m_webAssemblyFunctionStructure.set(vm, this, WebAssemblyFunction::createStructure(vm, this, m_objectPrototype.get()));
         auto* webAssembly = JSWebAssembly::create(vm, this, m_webAssemblyStructure.get());
         putDirectWithoutTransition(vm, Identifier::fromString(exec, "WebAssembly"), webAssembly, DontEnum);
 
@@ -1150,109 +1163,111 @@ void JSGlobalObject::visitChildren(JSCell* cell, SlotVisitor& visitor)
     ASSERT_GC_OBJECT_INHERITS(thisObject, info());
     Base::visitChildren(thisObject, visitor);
 
-    visitor.append(&thisObject->m_globalThis);
+    visitor.append(thisObject->m_globalThis);
 
-    visitor.append(&thisObject->m_globalLexicalEnvironment);
-    visitor.append(&thisObject->m_globalScopeExtension);
-    visitor.append(&thisObject->m_globalCallee);
-    visitor.append(&thisObject->m_regExpConstructor);
-    visitor.append(&thisObject->m_errorConstructor);
-    visitor.append(&thisObject->m_nativeErrorPrototypeStructure);
-    visitor.append(&thisObject->m_nativeErrorStructure);
+    visitor.append(thisObject->m_globalLexicalEnvironment);
+    visitor.append(thisObject->m_globalScopeExtension);
+    visitor.append(thisObject->m_globalCallee);
+    visitor.append(thisObject->m_regExpConstructor);
+    visitor.append(thisObject->m_errorConstructor);
+    visitor.append(thisObject->m_nativeErrorPrototypeStructure);
+    visitor.append(thisObject->m_nativeErrorStructure);
     thisObject->m_evalErrorConstructor.visit(visitor);
-    visitor.append(&thisObject->m_rangeErrorConstructor);
+    visitor.append(thisObject->m_rangeErrorConstructor);
     thisObject->m_referenceErrorConstructor.visit(visitor);
     thisObject->m_syntaxErrorConstructor.visit(visitor);
-    visitor.append(&thisObject->m_typeErrorConstructor);
+    visitor.append(thisObject->m_typeErrorConstructor);
     thisObject->m_URIErrorConstructor.visit(visitor);
-    visitor.append(&thisObject->m_objectConstructor);
-    visitor.append(&thisObject->m_promiseConstructor);
+    visitor.append(thisObject->m_objectConstructor);
+    visitor.append(thisObject->m_promiseConstructor);
 
-    visitor.append(&thisObject->m_nullGetterFunction);
-    visitor.append(&thisObject->m_nullSetterFunction);
+    visitor.append(thisObject->m_nullGetterFunction);
+    visitor.append(thisObject->m_nullSetterFunction);
 
-    visitor.append(&thisObject->m_parseIntFunction);
-    visitor.append(&thisObject->m_evalFunction);
-    visitor.append(&thisObject->m_callFunction);
-    visitor.append(&thisObject->m_applyFunction);
-    visitor.append(&thisObject->m_throwTypeErrorFunction);
+    visitor.append(thisObject->m_parseIntFunction);
+    visitor.append(thisObject->m_evalFunction);
+    visitor.append(thisObject->m_callFunction);
+    visitor.append(thisObject->m_applyFunction);
+    visitor.append(thisObject->m_throwTypeErrorFunction);
     thisObject->m_arrayProtoToStringFunction.visit(visitor);
     thisObject->m_arrayProtoValuesFunction.visit(visitor);
     thisObject->m_initializePromiseFunction.visit(visitor);
     thisObject->m_iteratorProtocolFunction.visit(visitor);
-    visitor.append(&thisObject->m_newPromiseCapabilityFunction);
-    visitor.append(&thisObject->m_functionProtoHasInstanceSymbolFunction);
+    visitor.append(thisObject->m_newPromiseCapabilityFunction);
+    visitor.append(thisObject->m_functionProtoHasInstanceSymbolFunction);
     thisObject->m_throwTypeErrorGetterSetter.visit(visitor);
-    visitor.append(&thisObject->m_throwTypeErrorArgumentsCalleeAndCallerGetterSetter);
-    visitor.append(&thisObject->m_moduleLoader);
+    visitor.append(thisObject->m_throwTypeErrorArgumentsCalleeAndCallerGetterSetter);
+    visitor.append(thisObject->m_moduleLoader);
 
-    visitor.append(&thisObject->m_objectPrototype);
-    visitor.append(&thisObject->m_functionPrototype);
-    visitor.append(&thisObject->m_arrayPrototype);
-    visitor.append(&thisObject->m_errorPrototype);
-    visitor.append(&thisObject->m_iteratorPrototype);
-    visitor.append(&thisObject->m_generatorFunctionPrototype);
-    visitor.append(&thisObject->m_generatorPrototype);
-    visitor.append(&thisObject->m_asyncFunctionPrototype);
-    visitor.append(&thisObject->m_moduleLoaderPrototype);
+    visitor.append(thisObject->m_objectPrototype);
+    visitor.append(thisObject->m_functionPrototype);
+    visitor.append(thisObject->m_arrayPrototype);
+    visitor.append(thisObject->m_errorPrototype);
+    visitor.append(thisObject->m_iteratorPrototype);
+    visitor.append(thisObject->m_generatorFunctionPrototype);
+    visitor.append(thisObject->m_generatorPrototype);
+    visitor.append(thisObject->m_asyncFunctionPrototype);
+    visitor.append(thisObject->m_moduleLoaderPrototype);
 
     thisObject->m_debuggerScopeStructure.visit(visitor);
     thisObject->m_withScopeStructure.visit(visitor);
-    visitor.append(&thisObject->m_strictEvalActivationStructure);
-    visitor.append(&thisObject->m_lexicalEnvironmentStructure);
+    visitor.append(thisObject->m_strictEvalActivationStructure);
+    visitor.append(thisObject->m_lexicalEnvironmentStructure);
     thisObject->m_moduleEnvironmentStructure.visit(visitor);
-    visitor.append(&thisObject->m_directArgumentsStructure);
-    visitor.append(&thisObject->m_scopedArgumentsStructure);
-    visitor.append(&thisObject->m_clonedArgumentsStructure);
-    visitor.append(&thisObject->m_objectStructureForObjectConstructor);
+    visitor.append(thisObject->m_directArgumentsStructure);
+    visitor.append(thisObject->m_scopedArgumentsStructure);
+    visitor.append(thisObject->m_clonedArgumentsStructure);
+    visitor.append(thisObject->m_objectStructureForObjectConstructor);
     for (unsigned i = 0; i < NumberOfIndexingShapes; ++i)
-        visitor.append(&thisObject->m_originalArrayStructureForIndexingShape[i]);
+        visitor.append(thisObject->m_originalArrayStructureForIndexingShape[i]);
     for (unsigned i = 0; i < NumberOfIndexingShapes; ++i)
-        visitor.append(&thisObject->m_arrayStructureForIndexingShapeDuringAllocation[i]);
+        visitor.append(thisObject->m_arrayStructureForIndexingShapeDuringAllocation[i]);
     thisObject->m_callbackConstructorStructure.visit(visitor);
     thisObject->m_callbackFunctionStructure.visit(visitor);
     thisObject->m_callbackObjectStructure.visit(visitor);
-    visitor.append(&thisObject->m_propertyNameIteratorStructure);
+    visitor.append(thisObject->m_propertyNameIteratorStructure);
 #if JSC_OBJC_API_ENABLED
     thisObject->m_objcCallbackFunctionStructure.visit(visitor);
     thisObject->m_objcWrapperObjectStructure.visit(visitor);
 #endif
     thisObject->m_nullPrototypeObjectStructure.visit(visitor);
-    visitor.append(&thisObject->m_errorStructure);
-    visitor.append(&thisObject->m_calleeStructure);
-    visitor.append(&thisObject->m_functionStructure);
+    visitor.append(thisObject->m_errorStructure);
+    visitor.append(thisObject->m_calleeStructure);
+    visitor.append(thisObject->m_functionStructure);
     thisObject->m_customGetterSetterFunctionStructure.visit(visitor);
     thisObject->m_boundFunctionStructure.visit(visitor);
-    visitor.append(&thisObject->m_getterSetterStructure);
+    visitor.append(thisObject->m_getterSetterStructure);
     thisObject->m_nativeStdFunctionStructure.visit(visitor);
     thisObject->m_namedFunctionStructure.visit(visitor);
-    visitor.append(&thisObject->m_symbolObjectStructure);
-    visitor.append(&thisObject->m_regExpStructure);
-    visitor.append(&thisObject->m_generatorFunctionStructure);
-    visitor.append(&thisObject->m_asyncFunctionStructure);
-    visitor.append(&thisObject->m_iteratorResultObjectStructure);
-    visitor.append(&thisObject->m_regExpMatchesArrayStructure);
-    visitor.append(&thisObject->m_moduleRecordStructure);
-    visitor.append(&thisObject->m_moduleNamespaceObjectStructure);
-    visitor.append(&thisObject->m_dollarVMStructure);
-    visitor.append(&thisObject->m_proxyObjectStructure);
-    visitor.append(&thisObject->m_callableProxyObjectStructure);
-    visitor.append(&thisObject->m_proxyRevokeStructure);
-    visitor.append(&thisObject->m_moduleLoaderStructure);
+    visitor.append(thisObject->m_symbolObjectStructure);
+    visitor.append(thisObject->m_regExpStructure);
+    visitor.append(thisObject->m_generatorFunctionStructure);
+    visitor.append(thisObject->m_asyncFunctionStructure);
+    visitor.append(thisObject->m_iteratorResultObjectStructure);
+    visitor.append(thisObject->m_regExpMatchesArrayStructure);
+    visitor.append(thisObject->m_moduleRecordStructure);
+    visitor.append(thisObject->m_moduleNamespaceObjectStructure);
+    visitor.append(thisObject->m_dollarVMStructure);
+    visitor.append(thisObject->m_proxyObjectStructure);
+    visitor.append(thisObject->m_callableProxyObjectStructure);
+    visitor.append(thisObject->m_proxyRevokeStructure);
+    visitor.append(thisObject->m_moduleLoaderStructure);
     
-    visitor.append(&thisObject->m_arrayBufferPrototype);
-    visitor.append(&thisObject->m_arrayBufferStructure);
-    visitor.append(&thisObject->m_sharedArrayBufferPrototype);
-    visitor.append(&thisObject->m_sharedArrayBufferStructure);
+    visitor.append(thisObject->m_arrayBufferPrototype);
+    visitor.append(thisObject->m_arrayBufferStructure);
+    visitor.append(thisObject->m_sharedArrayBufferPrototype);
+    visitor.append(thisObject->m_sharedArrayBufferStructure);
 
 #define VISIT_SIMPLE_TYPE(CapitalName, lowerName, properName, instanceType, jsName, prototypeBase) \
-    visitor.append(&thisObject->m_ ## lowerName ## Prototype); \
-    visitor.append(&thisObject->m_ ## properName ## Structure); \
+    visitor.append(thisObject->m_ ## lowerName ## Prototype); \
+    visitor.append(thisObject->m_ ## properName ## Structure); \
 
     FOR_EACH_SIMPLE_BUILTIN_TYPE(VISIT_SIMPLE_TYPE)
     
 #if ENABLE(WEBASSEMBLY)
-    visitor.append(&thisObject->m_webAssemblyStructure);
+    visitor.append(thisObject->m_webAssemblyStructure);
+    visitor.append(thisObject->m_webAssemblyModuleRecordStructure);
+    visitor.append(thisObject->m_webAssemblyFunctionStructure);
     FOR_EACH_WEBASSEMBLY_CONSTRUCTOR_TYPE(VISIT_SIMPLE_TYPE)
 #endif // ENABLE(WEBASSEMBLY)
 
@@ -1269,7 +1284,7 @@ void JSGlobalObject::visitChildren(JSCell* cell, SlotVisitor& visitor)
     for (unsigned i = NUMBER_OF_TYPED_ARRAY_TYPES; i--;)
         thisObject->lazyTypedArrayStructure(indexToTypedArrayType(i)).visit(visitor);
     
-    visitor.append(&thisObject->m_speciesGetterSetter);
+    visitor.append(thisObject->m_speciesGetterSetter);
     thisObject->m_typedArrayProto.visit(visitor);
     thisObject->m_typedArraySuperConstructor.visit(visitor);
 }
@@ -1326,96 +1341,6 @@ void slowValidateCell(JSGlobalObject* globalObject)
 {
     RELEASE_ASSERT(globalObject->isGlobalObject());
     ASSERT_GC_OBJECT_INHERITS(globalObject, JSGlobalObject::info());
-}
-
-UnlinkedProgramCodeBlock* JSGlobalObject::createProgramCodeBlock(CallFrame* callFrame, ProgramExecutable* executable, JSObject** exception)
-{
-    ParserError error;
-    JSParserStrictMode strictMode = executable->isStrictMode() ? JSParserStrictMode::Strict : JSParserStrictMode::NotStrict;
-    DebuggerMode debuggerMode = hasInteractiveDebugger() ? DebuggerOn : DebuggerOff;
-    UnlinkedProgramCodeBlock* unlinkedCodeBlock = vm().codeCache()->getUnlinkedProgramCodeBlock(
-        vm(), executable, executable->source(), strictMode, 
-        debuggerMode, error);
-
-    if (hasDebugger())
-        debugger()->sourceParsed(callFrame, executable->source().provider(), error.line(), error.message());
-
-    if (error.isValid()) {
-        *exception = error.toErrorObject(this, executable->source());
-        return nullptr;
-    }
-    
-    return unlinkedCodeBlock;
-}
-
-UnlinkedEvalCodeBlock* JSGlobalObject::createLocalEvalCodeBlock(CallFrame* callFrame, DirectEvalExecutable* executable, const VariableEnvironment* variablesUnderTDZ)
-{
-    VM& vm = this->vm();
-    auto scope = DECLARE_THROW_SCOPE(vm);
-
-    ParserError error;
-    JSParserStrictMode strictMode = executable->isStrictMode() ? JSParserStrictMode::Strict : JSParserStrictMode::NotStrict;
-    DebuggerMode debuggerMode = hasInteractiveDebugger() ? DebuggerOn : DebuggerOff;
-    EvalContextType evalContextType = executable->executableInfo().evalContextType();
-
-    // We don't bother with CodeCache here because local eval uses a specialized EvalCodeCache.
-    UnlinkedEvalCodeBlock* unlinkedCodeBlock = generateUnlinkedCodeBlock<UnlinkedEvalCodeBlock>(
-        vm, executable, executable->source(), strictMode, JSParserScriptMode::Classic, debuggerMode, error, evalContextType, variablesUnderTDZ);
-
-    if (hasDebugger())
-        debugger()->sourceParsed(callFrame, executable->source().provider(), error.line(), error.message());
-
-    if (error.isValid()) {
-        throwVMError(callFrame, scope, error.toErrorObject(this, executable->source()));
-        return nullptr;
-    }
-
-    return unlinkedCodeBlock;
-}
-
-UnlinkedEvalCodeBlock* JSGlobalObject::createGlobalEvalCodeBlock(CallFrame* callFrame, IndirectEvalExecutable* executable)
-{
-    VM& vm = this->vm();
-    auto scope = DECLARE_THROW_SCOPE(vm);
-
-    ParserError error;
-    JSParserStrictMode strictMode = executable->isStrictMode() ? JSParserStrictMode::Strict : JSParserStrictMode::NotStrict;
-    DebuggerMode debuggerMode = hasInteractiveDebugger() ? DebuggerOn : DebuggerOff;
-    EvalContextType evalContextType = executable->executableInfo().evalContextType();
-    
-    UnlinkedEvalCodeBlock* unlinkedCodeBlock = vm.codeCache()->getUnlinkedGlobalEvalCodeBlock(
-        vm, executable, executable->source(), strictMode, debuggerMode, error, evalContextType);
-
-    if (hasDebugger())
-        debugger()->sourceParsed(callFrame, executable->source().provider(), error.line(), error.message());
-
-    if (error.isValid()) {
-        throwVMError(callFrame, scope, error.toErrorObject(this, executable->source()));
-        return nullptr;
-    }
-
-    return unlinkedCodeBlock;
-}
-
-UnlinkedModuleProgramCodeBlock* JSGlobalObject::createModuleProgramCodeBlock(CallFrame* callFrame, ModuleProgramExecutable* executable)
-{
-    VM& vm = this->vm();
-    auto scope = DECLARE_THROW_SCOPE(vm);
-
-    ParserError error;
-    DebuggerMode debuggerMode = hasInteractiveDebugger() ? DebuggerOn : DebuggerOff;
-    UnlinkedModuleProgramCodeBlock* unlinkedCodeBlock = vm.codeCache()->getUnlinkedModuleProgramCodeBlock(
-        vm, executable, executable->source(), debuggerMode, error);
-
-    if (hasDebugger())
-        debugger()->sourceParsed(callFrame, executable->source().provider(), error.line(), error.message());
-
-    if (error.isValid()) {
-        throwVMError(callFrame, scope, error.toErrorObject(this, executable->source()));
-        return nullptr;
-    }
-
-    return unlinkedCodeBlock;
 }
 
 void JSGlobalObject::setRemoteDebuggingEnabled(bool enabled)

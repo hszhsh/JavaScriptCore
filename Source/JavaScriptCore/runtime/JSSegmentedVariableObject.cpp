@@ -66,8 +66,11 @@ void JSSegmentedVariableObject::visitChildren(JSCell* cell, SlotVisitor& slotVis
     ASSERT_GC_OBJECT_INHERITS(thisObject, info());
     Base::visitChildren(thisObject, slotVisitor);
     
+    // FIXME: We could avoid locking here if SegmentedVector was lock-free. It could be made lock-free
+    // relatively easily.
+    auto locker = holdLock(thisObject->m_lock);
     for (unsigned i = thisObject->m_variables.size(); i--;)
-        slotVisitor.appendHidden(&thisObject->m_variables[i]);
+        slotVisitor.appendHidden(thisObject->m_variables[i]);
 }
 
 void JSSegmentedVariableObject::heapSnapshot(JSCell* cell, HeapSnapshotBuilder& builder)

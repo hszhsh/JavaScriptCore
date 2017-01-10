@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, 2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -72,7 +72,7 @@ JSC::JSInternalPromise* ScriptModuleLoader::resolve(JSC::JSGlobalObject* jsGloba
     // So there is no correct URL to retrieve the module source code. If the module name
     // value is a Symbol, it is used directly as a module key.
     if (moduleNameValue.isSymbol()) {
-        promise->resolve(asSymbol(moduleNameValue)->privateName());
+        promise->resolve<IDLAny>(toJS(exec, &globalObject, asSymbol(moduleNameValue)->privateName()));
         return jsPromise.promise();
     }
 
@@ -88,7 +88,7 @@ JSC::JSInternalPromise* ScriptModuleLoader::resolve(JSC::JSGlobalObject* jsGloba
     // 1. Apply the URL parser to specifier. If the result is not failure, return the result.
     URL absoluteURL(URL(), specifier);
     if (absoluteURL.isValid()) {
-        promise->resolve(absoluteURL.string());
+        promise->resolve<IDLDOMString>(absoluteURL.string());
         return jsPromise.promise();
     }
 
@@ -129,12 +129,16 @@ JSC::JSInternalPromise* ScriptModuleLoader::resolve(JSC::JSGlobalObject* jsGloba
         return jsPromise.promise();
     }
 
-    promise->resolve(completedURL.string());
+    promise->resolve<IDLDOMString>(completedURL.string());
     return jsPromise.promise();
 }
 
 JSC::JSInternalPromise* ScriptModuleLoader::fetch(JSC::JSGlobalObject* jsGlobalObject, JSC::ExecState* exec, JSC::JSModuleLoader*, JSC::JSValue moduleKeyValue, JSC::JSValue initiator)
 {
+    // FIXME: What guarantees these are true? Why don't we need to check?
+    ASSERT(JSC::jsDynamicCast<JSElement*>(initiator));
+    ASSERT(isScriptElement(JSC::jsDynamicCast<JSElement*>(initiator)->wrapped()));
+
     auto& globalObject = *JSC::jsCast<JSDOMGlobalObject*>(jsGlobalObject);
     auto& jsPromise = *JSC::JSInternalPromiseDeferred::create(exec, &globalObject);
     auto deferred = DeferredPromise::create(globalObject, jsPromise);
@@ -156,17 +160,12 @@ JSC::JSInternalPromise* ScriptModuleLoader::fetch(JSC::JSGlobalObject* jsGlobalO
         return jsPromise.promise();
     }
 
-    ASSERT_WITH_MESSAGE(JSC::jsDynamicCast<JSElement*>(initiator), "Initiator should be an JSElement");
-    auto* scriptElement = toScriptElementIfPossible(&JSC::jsCast<JSElement*>(initiator)->wrapped());
-    ASSERT_WITH_MESSAGE(scriptElement, "Initiator should be ScriptElement.");
-
     if (auto* frame = m_document.frame()) {
         auto loader = CachedModuleScriptLoader::create(*this, deferred.get());
         m_loaders.add(loader.copyRef());
-        if (!loader->load(*scriptElement, completedURL)) {
+        if (!loader->load(downcastScriptElement(JSC::jsCast<JSElement*>(initiator)->wrapped()), completedURL)) {
             loader->clearClient();
             m_loaders.remove(WTFMove(loader));
-
             deferred->reject(frame->script().moduleLoaderAlreadyReportedErrorSymbol());
             return jsPromise.promise();
         }
@@ -247,7 +246,7 @@ void ScriptModuleLoader::notifyFinished(CachedModuleScriptLoader& loader, RefPtr
 
     m_requestURLToResponseURLMap.add(cachedScript.url(), cachedScript.response().url());
     // FIXME: Let's wrap around ScriptSourceCode to propagate it directly through the module pipeline.
-    promise->resolve(ScriptSourceCode(&cachedScript, JSC::SourceProviderSourceType::Module).source().toString());
+    promise->resolve<IDLDOMString>(ScriptSourceCode(&cachedScript, JSC::SourceProviderSourceType::Module).source().toString());
 }
 
 }

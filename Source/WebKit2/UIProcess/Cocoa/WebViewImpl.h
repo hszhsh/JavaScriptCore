@@ -170,7 +170,7 @@ public:
     bool automaticallyAdjustsContentInsets() const { return m_automaticallyAdjustsContentInsets; }
     void updateContentInsetsIfAutomatic();
     void setTopContentInset(CGFloat);
-    CGFloat topContentInset() const { return m_topContentInset; }
+    CGFloat topContentInset() const;
 
     void prepareContentInRect(CGRect);
     void updateViewExposedRect();
@@ -493,7 +493,6 @@ public:
 
     void forceRequestCandidatesForTesting();
     bool shouldRequestCandidates() const;
-    void showCandidates(NSArray *candidates, NSString *, NSRect rectOfTypedString, NSRange selectedRange, NSView *, void (^completionHandler)(NSTextCheckingResult *acceptedCandidate));
 
     bool windowIsFrontWindowUnderMouse(NSEvent *);
 
@@ -541,10 +540,11 @@ private:
     RetainPtr<NSTouchBar> m_currentTouchBar;
     RetainPtr<NSTouchBar> m_richTextTouchBar;
     RetainPtr<NSTouchBar> m_plainTextTouchBar;
+    RetainPtr<NSTouchBar> m_passwordTextTouchBar;
     RetainPtr<WKTextTouchBarItemController> m_textTouchBarItemController;
     RetainPtr<NSCandidateListTouchBarItem> m_richTextCandidateListTouchBarItem;
     RetainPtr<NSCandidateListTouchBarItem> m_plainTextCandidateListTouchBarItem;
-    RetainPtr<NSArray> m_emptyCandidatesArray;
+    RetainPtr<NSCandidateListTouchBarItem> m_passwordTextCandidateListTouchBarItem;
     RetainPtr<WebPlaybackControlsManager> m_playbackControlsManager;
     RetainPtr<NSCustomTouchBarItem> m_exitFullScreenButton;
 
@@ -582,6 +582,7 @@ private:
 
     bool mightBeginDragWhileInactive();
     bool mightBeginScrollWhileInactive();
+    void createSandboxExtensionsIfNeeded(const Vector<String>& files, SandboxExtension::Handle&, SandboxExtension::HandleArray& handles);
 
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
     void handleRequestedCandidates(NSInteger sequenceNumber, NSArray<NSTextCheckingResult *> *candidates);
@@ -605,7 +606,7 @@ private:
     bool m_windowOcclusionDetectionEnabled { true };
 
     bool m_automaticallyAdjustsContentInsets { false };
-    CGFloat m_topContentInset { 0 };
+    CGFloat m_pendingTopContentInset { 0 };
     bool m_didScheduleSetTopContentInset { false };
 
     CGSize m_resizeScrollOffset { 0, 0 };

@@ -822,6 +822,16 @@ bool WKPreferencesGetMediaControlsScaleWithPageZoom(WKPreferencesRef preferences
     return toImpl(preferencesRef)->mediaControlsScaleWithPageZoom();
 }
 
+void WKPreferencesSetModernMediaControlsEnabled(WKPreferencesRef preferencesRef, bool flag)
+{
+    toImpl(preferencesRef)->setModernMediaControlsEnabled(flag);
+}
+
+bool WKPreferencesGetModernMediaControlsEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->modernMediaControlsEnabled();
+}
+
 void WKPreferencesSetShowsToolTipOverTruncatedText(WKPreferencesRef preferencesRef, bool flag)
 {
     toImpl(preferencesRef)->setShowsToolTipOverTruncatedText(flag);
@@ -1271,14 +1281,14 @@ bool WKPreferencesGetNewBlockInsideInlineModelEnabled(WKPreferencesRef preferenc
     return toImpl(preferencesRef)->newBlockInsideInlineModelEnabled();
 }
 
-void WKPreferencesSetNewCSSParserEnabled(WKPreferencesRef preferencesRef, bool flag)
+void WKPreferencesSetDeferredCSSParserEnabled(WKPreferencesRef preferencesRef, bool flag)
 {
-    toImpl(preferencesRef)->setNewCSSParserEnabled(flag);
+    toImpl(preferencesRef)->setDeferredCSSParserEnabled(flag);
 }
 
-bool WKPreferencesGetNewCSSParserEnabled(WKPreferencesRef preferencesRef)
+bool WKPreferencesGetDeferredCSSParserEnabled(WKPreferencesRef preferencesRef)
 {
-    return toImpl(preferencesRef)->newCSSParserEnabled();
+    return toImpl(preferencesRef)->deferredCSSParserEnabled();
 }
 
 void WKPreferencesSetSubpixelCSSOMElementMetricsEnabled(WKPreferencesRef preferencesRef, bool flag)
@@ -1309,6 +1319,16 @@ void WKPreferencesSetMediaStreamEnabled(WKPreferencesRef preferencesRef, bool en
 bool WKPreferencesGetMediaStreamEnabled(WKPreferencesRef preferencesRef)
 {
     return toImpl(preferencesRef)->mediaStreamEnabled();
+}
+
+void WKPreferencesSetPeerConnectionEnabled(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setPeerConnectionEnabled(enabled);
+}
+
+bool WKPreferencesGetPeerConnectionEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->peerConnectionEnabled();
 }
 
 void WKPreferencesSetSpatialNavigationEnabled(WKPreferencesRef preferencesRef, bool enabled)
@@ -1541,16 +1561,6 @@ bool WKPreferencesGetDownloadAttributeEnabled(WKPreferencesRef preferencesRef)
     return toImpl(preferencesRef)->downloadAttributeEnabled();
 }
 
-void WKPreferencesSetES6ModulesEnabled(WKPreferencesRef preferencesRef, bool flag)
-{
-    toImpl(preferencesRef)->setES6ModulesEnabled(flag);
-}
-
-bool WKPreferencesGetES6ModulesEnabled(WKPreferencesRef preferencesRef)
-{
-    return toImpl(preferencesRef)->es6ModulesEnabled();
-}
-
 void WKPreferencesSetIntersectionObserverEnabled(WKPreferencesRef preferencesRef, bool flag)
 {
     toImpl(preferencesRef)->setIntersectionObserverEnabled(flag);
@@ -1601,3 +1611,22 @@ void WKPreferencesSetApplePayCapabilityDisclosureAllowed(WKPreferencesRef prefer
     WebKit::toImpl(preferencesRef)->setApplePayCapabilityDisclosureAllowed(allowed);
 }
 
+void WKPreferencesSetSubtleCryptoEnabled(WKPreferencesRef preferencesRef, bool flag)
+{
+    toImpl(preferencesRef)->setSubtleCryptoEnabled(flag);
+}
+
+bool WKPreferencesGetSubtleCryptoEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->subtleCryptoEnabled();
+}
+
+void WKPreferencesSetShouldSuppressKeyboardInputDuringProvisionalNavigation(WKPreferencesRef preferencesRef, bool flag)
+{
+    toImpl(preferencesRef)->setShouldSuppressKeyboardInputDuringProvisionalNavigation(flag);
+}
+
+bool WKPreferencesGetShouldSuppressKeyboardInputDuringProvisionalNavigation(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->shouldSuppressKeyboardInputDuringProvisionalNavigation();
+}

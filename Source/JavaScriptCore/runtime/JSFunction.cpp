@@ -52,7 +52,7 @@ EncodedJSValue JSC_HOST_CALL callHostFunctionAsConstructor(ExecState* exec)
 {
     VM& vm = exec->vm();
     auto scope = DECLARE_THROW_SCOPE(vm);
-    return throwVMError(exec, scope, createNotAConstructorError(exec, exec->callee()));
+    return throwVMError(exec, scope, createNotAConstructorError(exec, exec->jsCallee()));
 }
 
 const ClassInfo JSFunction::s_info = { "Function", &Base::s_info, 0, CREATE_METHOD_TABLE(JSFunction) };
@@ -73,16 +73,6 @@ JSFunction* JSFunction::create(VM& vm, FunctionExecutable* executable, JSScope* 
     executable->singletonFunction()->notifyWrite(vm, result, "Allocating a function");
     return result;
 }
-
-#if ENABLE(WEBASSEMBLY)
-JSFunction* JSFunction::create(VM& vm, WebAssemblyExecutable* executable, JSScope* scope)
-{
-    JSFunction* function = new (NotNull, allocateCell<JSFunction>(vm.heap)) JSFunction(vm, executable, scope);
-    ASSERT(function->structure(vm)->globalObject());
-    function->finishCreation(vm);
-    return function;
-}
-#endif
 
 JSFunction* JSFunction::create(VM& vm, JSGlobalObject* globalObject, int length, const String& name, NativeFunction nativeFunction, Intrinsic intrinsic, NativeFunction nativeConstructor, const DOMJIT::Signature* signature)
 {
@@ -217,9 +207,8 @@ void JSFunction::visitChildren(JSCell* cell, SlotVisitor& visitor)
     ASSERT_GC_OBJECT_INHERITS(thisObject, info());
     Base::visitChildren(thisObject, visitor);
 
-    visitor.append(&thisObject->m_executable);
-    if (thisObject->m_rareData)
-        visitor.append(&thisObject->m_rareData);
+    visitor.append(thisObject->m_executable);
+    visitor.append(thisObject->m_rareData);
 }
 
 CallType JSFunction::getCallData(JSCell* cell, CallData& callData)
@@ -246,7 +235,7 @@ public:
 
     StackVisitor::Status operator()(StackVisitor& visitor) const
     {
-        JSObject* callee = visitor->callee();
+        JSCell* callee = visitor->callee();
         if (callee != m_targetCallee)
             return StackVisitor::Continue;
 
@@ -288,7 +277,7 @@ public:
 
     StackVisitor::Status operator()(StackVisitor& visitor) const
     {
-        JSObject* callee = visitor->callee();
+        JSCell* callee = visitor->callee();
 
         if (callee && callee->inherits(JSBoundFunction::info()))
             return StackVisitor::Continue;

@@ -68,7 +68,6 @@
 #include "Settings.h"
 #include "ShadowRoot.h"
 #include "ShapeOutsideInfo.h"
-#include <wtf/text/TextBreakIterator.h>
 #include "TransformState.h"
 
 #include <wtf/NeverDestroyed.h>
@@ -672,7 +671,7 @@ static void getInlineRun(RenderObject* start, RenderObject* boundary,
 void RenderBlock::deleteLines()
 {
     if (AXObjectCache* cache = document().existingAXObjectCache())
-        cache->recomputeIsIgnored(this);
+        cache->recomputeDeferredIsIgnored(*this);
 }
 
 void RenderBlock::makeChildrenNonInline(RenderObject* insertionPoint)
@@ -1644,15 +1643,15 @@ void RenderBlock::paintCaret(PaintInfo& paintInfo, const LayoutPoint& paintOffse
         caretPainter = frame().selection().caretRendererWithoutUpdatingLayout();
         isContentEditable = frame().selection().selection().hasEditableStyle();
     } else {
-        caretPainter = frame().page()->dragCaretController().caretRenderer();
-        isContentEditable = frame().page()->dragCaretController().isContentEditable();
+        caretPainter = page().dragCaretController().caretRenderer();
+        isContentEditable = page().dragCaretController().isContentEditable();
     }
 
     if (caretPainter == this && (isContentEditable || caretBrowsing)) {
         if (type == CursorCaret)
             frame().selection().paintCaret(paintInfo.context(), paintOffset, paintInfo.rect);
         else
-            frame().page()->dragCaretController().paintDragCaret(&frame(), paintInfo.context(), paintOffset, paintInfo.rect);
+            page().dragCaretController().paintDragCaret(&frame(), paintInfo.context(), paintOffset, paintInfo.rect);
     }
 }
 
@@ -2199,38 +2198,6 @@ LayoutUnit RenderBlock::logicalRightSelectionOffset(RenderBlock& rootBlock, Layo
         currentCache = info.cache();
     }
     return logicalRight;
-}
-
-RenderBlock* RenderBlock::blockBeforeWithinSelectionRoot(LayoutSize& offset) const
-{
-    if (isSelectionRoot())
-        return nullptr;
-
-    const RenderElement* object = this;
-    RenderObject* sibling;
-    do {
-        sibling = object->previousSibling();
-        while (sibling && (!is<RenderBlock>(*sibling) || downcast<RenderBlock>(*sibling).isSelectionRoot()))
-            sibling = sibling->previousSibling();
-
-        offset -= LayoutSize(downcast<RenderBlock>(*object).logicalLeft(), downcast<RenderBlock>(*object).logicalTop());
-        object = object->parent();
-    } while (!sibling && is<RenderBlock>(object) && !downcast<RenderBlock>(*object).isSelectionRoot());
-
-    if (!sibling)
-        return nullptr;
-
-    RenderBlock* beforeBlock = downcast<RenderBlock>(sibling);
-
-    offset += LayoutSize(beforeBlock->logicalLeft(), beforeBlock->logicalTop());
-
-    RenderObject* child = beforeBlock->lastChild();
-    while (is<RenderBlock>(child)) {
-        beforeBlock = downcast<RenderBlock>(child);
-        offset += LayoutSize(beforeBlock->logicalLeft(), beforeBlock->logicalTop());
-        child = beforeBlock->lastChild();
-    }
-    return beforeBlock;
 }
 
 TrackedRendererListHashSet* RenderBlock::positionedObjects() const
@@ -2825,9 +2792,7 @@ void RenderBlock::computeBlockPreferredLogicalWidths(LayoutUnit& minLogicalWidth
         LayoutUnit childMinPreferredLogicalWidth, childMaxPreferredLogicalWidth;
         if (is<RenderBox>(*child) && child->isHorizontalWritingMode() != isHorizontalWritingMode()) {
             auto& childBox = downcast<RenderBox>(*child);
-            LogicalExtentComputedValues computedValues;
-            childBox.computeLogicalHeight(childBox.borderAndPaddingLogicalHeight(), 0, computedValues);
-            childMinPreferredLogicalWidth = childMaxPreferredLogicalWidth = computedValues.m_extent;
+            childMinPreferredLogicalWidth = childMaxPreferredLogicalWidth = childBox.computeLogicalHeight(childBox.borderAndPaddingLogicalHeight(), 0).m_extent;
         } else {
             childMinPreferredLogicalWidth = child->minPreferredLogicalWidth();
             childMaxPreferredLogicalWidth = child->maxPreferredLogicalWidth();
@@ -3671,9 +3636,7 @@ void RenderBlock::estimateRegionRangeForBoxChild(const RenderBox& box) const
         return;
     }
 
-    LogicalExtentComputedValues estimatedValues;
-    box.computeLogicalHeight(RenderFlowThread::maxLogicalHeight(), logicalTopForChild(box), estimatedValues);
-
+    auto estimatedValues = box.computeLogicalHeight(RenderFlowThread::maxLogicalHeight(), logicalTopForChild(box));
     LayoutUnit offsetFromLogicalTopOfFirstRegion = box.offsetFromLogicalTopOfFirstPage();
     RenderRegion* startRegion = flowThread->regionAtBlockOffset(this, offsetFromLogicalTopOfFirstRegion, true);
     RenderRegion* endRegion = flowThread->regionAtBlockOffset(this, offsetFromLogicalTopOfFirstRegion + estimatedValues.m_extent, true);

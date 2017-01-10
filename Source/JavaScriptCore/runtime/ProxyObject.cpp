@@ -499,7 +499,7 @@ static EncodedJSValue JSC_HOST_CALL performProxyCall(ExecState* exec)
         throwStackOverflowError(exec, scope);
         return encodedJSValue();
     }
-    ProxyObject* proxy = jsCast<ProxyObject*>(exec->callee());
+    ProxyObject* proxy = jsCast<ProxyObject*>(exec->jsCallee());
     JSValue handlerValue = proxy->handler();
     if (handlerValue.isNull())
         return throwVMTypeError(exec, scope, ASCIILiteral(s_proxyAlreadyRevokedErrorMessage));
@@ -549,7 +549,7 @@ static EncodedJSValue JSC_HOST_CALL performProxyConstruct(ExecState* exec)
         throwStackOverflowError(exec, scope);
         return encodedJSValue();
     }
-    ProxyObject* proxy = jsCast<ProxyObject*>(exec->callee());
+    ProxyObject* proxy = jsCast<ProxyObject*>(exec->jsCallee());
     JSValue handlerValue = proxy->handler();
     if (handlerValue.isNull())
         return throwVMTypeError(exec, scope, ASCIILiteral(s_proxyAlreadyRevokedErrorMessage));
@@ -1157,8 +1157,8 @@ void ProxyObject::visitChildren(JSCell* cell, SlotVisitor& visitor)
     ASSERT_GC_OBJECT_INHERITS(thisObject, info());
     Base::visitChildren(thisObject, visitor);
 
-    visitor.append(&thisObject->m_target);
-    visitor.append(&thisObject->m_handler);
+    visitor.append(thisObject->m_target);
+    visitor.append(thisObject->m_handler);
 }
 
 } // namespace JSC

@@ -111,6 +111,7 @@
 #define WebKitWebGLEnabledPreferenceKey @"WebKitWebGLEnabled"
 #define WebKitWebGL2EnabledPreferenceKey @"WebKitWebGL2Enabled"
 #define WebKitForceSoftwareWebGLRenderingPreferenceKey @"WebKitForceSoftwareWebGLRendering"
+#define WebKitPreferLowPowerWebGLRenderingPreferenceKey @"WebKitPreferLowPowerWebGLRendering"
 #define WebKitAccelerated2dCanvasEnabledPreferenceKey @"WebKitAccelerated2dCanvasEnabled"
 #define WebKitFrameFlatteningEnabledPreferenceKey @"WebKitFrameFlatteningEnabled"
 #define WebKitSpatialNavigationEnabledPreferenceKey @"WebKitSpatialNavigationEnabled"
@@ -141,7 +142,8 @@
 #define WebKitSuppressesIncrementalRenderingKey @"WebKitSuppressesIncrementalRendering"
 #define WebKitSubpixelCSSOMElementMetricsEnabledPreferenceKey @"WebKitSubpixelCSSOMElementMetricsEnabled"
 #define WebKitResourceLoadStatisticsEnabledPreferenceKey @"WebKitResourceLoadStatisticsEnabled"
-#define WebKitAsyncImageDecodingEnabledPreferenceKey @"WebKitAsyncImageDecodingEnabledEnabled"
+#define WebKitLargeImageAsyncDecodingEnabledPreferenceKey @"WebKitLargeImageAsyncDecodingEnabled"
+#define WebKitAnimatedImageAsyncDecodingEnabledPreferenceKey @"WebKitAnimatedImageAsyncDecodingEnabled"
 #if TARGET_OS_IPHONE
 #define WebKitAudioSessionCategoryOverride @"WebKitAudioSessionCategoryOverride"
 #define WebKitAVKitEnabled @"WebKitAVKitEnabled"
@@ -167,11 +169,12 @@
 #define WebKitDOMIteratorEnabledPreferenceKey @"WebKitDOMIteratorEnabled"
 #define WebKitFetchAPIEnabledPreferenceKey @"WebKitFetchAPIEnabled"
 #define WebKitDownloadAttributeEnabledPreferenceKey @"WebKitDownloadAttributeEnabled"
-#define WebKitES6ModulesEnabledPreferenceKey @"WebKitES6ModulesEnabled"
 #define WebKitCSSGridLayoutEnabledPreferenceKey @"WebKitCSSGridLayoutEnabled"
 #define WebKitVisualViewportEnabledPreferenceKey @"WebKitVisualViewportEnabled"
 #define WebKitModernMediaControlsEnabledPreferenceKey @"WebKitModernMediaControlsEnabled"
-#define WebKitPointerLockEnabledPreferenceKey @"WebKitPointerLockEnabled"
+#define WebKitSubtleCryptoEnabledPreferenceKey @"WebKitSubtleCryptoEnabled"
+#define WebKitMediaStreamEnabledPreferenceKey @"WebKitMediaStreamEnabled"
+#define WebKitPeerConnectionEnabledPreferenceKey @"WebKitPeerConnectionEnabled"
 
 #if !TARGET_OS_IPHONE
 // These are private both because callers should be using the cover methods and because the

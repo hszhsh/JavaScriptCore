@@ -1929,7 +1929,7 @@ private:
             && canBeInternal(value->child(0))
             && value->child(0)->opcode() == Add) {
             innerAdd = value->child(0);
-            offset = value->child(1)->asInt32();
+            offset = static_cast<int32_t>(value->child(1)->asInt());
             value = value->child(0);
         }
         
@@ -2153,7 +2153,7 @@ private:
         }
 
         case BitOr: {
-            appendBinOp<Or32, Or64, Commutative>(
+            appendBinOp<Or32, Or64, OrDouble, OrFloat, Commutative>(
                 m_value->child(0), m_value->child(1));
             return;
         }
@@ -2842,7 +2842,7 @@ private:
         Air::Opcode div = m_value->type() == Int32 ? X86UDiv32 : X86UDiv64;
 
         ASSERT(op == UDiv || op == UMod);
-        X86Registers::RegisterID result = op == Div ? X86Registers::eax : X86Registers::edx;
+        X86Registers::RegisterID result = op == UDiv ? X86Registers::eax : X86Registers::edx;
 
         append(Move, tmp(m_value->child(0)), eax);
         append(Xor64, edx, edx);

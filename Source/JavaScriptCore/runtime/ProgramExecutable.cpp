@@ -27,6 +27,7 @@
 
 #include "BatchedTransitionOptimizer.h"
 #include "CodeBlock.h"
+#include "CodeCache.h"
 #include "Debugger.h"
 #include "Exception.h"
 #include "JIT.h"
@@ -79,11 +80,28 @@ JSObject* ProgramExecutable::initializeGlobalProperties(VM& vm, CallFrame* callF
     RELEASE_ASSERT(globalObject);
     ASSERT(&globalObject->vm() == &vm);
 
-    JSObject* exception = nullptr;
-    UnlinkedProgramCodeBlock* unlinkedCodeBlock = globalObject->createProgramCodeBlock(callFrame, this, &exception);
-    if (UNLIKELY(exception))
-        return exception;
+    ParserError error;
+    JSParserStrictMode strictMode = isStrictMode() ? JSParserStrictMode::Strict : JSParserStrictMode::NotStrict;
+    DebuggerMode debuggerMode = globalObject->hasInteractiveDebugger() ? DebuggerOn : DebuggerOff;
 
+    UnlinkedProgramCodeBlock* unlinkedCodeBlock = vm.codeCache()->getUnlinkedProgramCodeBlock(
+        vm, this, source(), strictMode, debuggerMode, error);
+
+    if (globalObject->hasDebugger())
+        globalObject->debugger()->sourceParsed(callFrame, source().provider(), error.line(), error.message());
+
+    if (error.isValid())
+        return error.toErrorObject(globalObject, source());
+
+    JSValue nextPrototype = globalObject->getPrototypeDirect();
+    while (nextPrototype && nextPrototype.isObject()) {
+        if (UNLIKELY(asObject(nextPrototype)->type() == ProxyObjectType)) {
+            ExecState* exec = globalObject->globalExec();
+            return createTypeError(exec, ASCIILiteral("Proxy is not allowed in the global prototype chain."));
+        }
+        nextPrototype = asObject(nextPrototype)->getPrototypeDirect();
+    }
+    
     JSGlobalLexicalEnvironment* globalLexicalEnvironment = globalObject->globalLexicalEnvironment();
     const VariableEnvironment& variableDeclarations = unlinkedCodeBlock->variableDeclarations();
     const VariableEnvironment& lexicalDeclarations = unlinkedCodeBlock->lexicalDeclarations();
@@ -177,7 +195,7 @@ JSObject* ProgramExecutable::initializeGlobalProperties(VM& vm, CallFrame* callF
             RELEASE_ASSERT(offsetForAssert == offset);
         }
     }
-    return 0;
+    return nullptr;
 }
 
 void ProgramExecutable::visitChildren(JSCell* cell, SlotVisitor& visitor)
@@ -185,9 +203,9 @@ void ProgramExecutable::visitChildren(JSCell* cell, SlotVisitor& visitor)
     ProgramExecutable* thisObject = jsCast<ProgramExecutable*>(cell);
     ASSERT_GC_OBJECT_INHERITS(thisObject, info());
     ScriptExecutable::visitChildren(thisObject, visitor);
-    visitor.append(&thisObject->m_unlinkedProgramCodeBlock);
-    if (thisObject->m_programCodeBlock)
-        thisObject->m_programCodeBlock->visitWeakly(visitor);
+    visitor.append(thisObject->m_unlinkedProgramCodeBlock);
+    if (ProgramCodeBlock* programCodeBlock = thisObject->m_programCodeBlock.get())
+        programCodeBlock->visitWeakly(visitor);
 }
 
 } // namespace JSC

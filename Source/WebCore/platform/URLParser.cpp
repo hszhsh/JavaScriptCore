@@ -1355,6 +1355,10 @@ void URLParser::parse(const CharacterType* input, const unsigned length, const U
                 break;
             default:
                 copyURLPartsUntil(base, URLPart::PathAfterLastSlash, c, isUTF8Encoding);
+                if (currentPosition(c) && parsedDataView(currentPosition(c) - 1) != '/') {
+                    appendToASCIIBuffer('/');
+                    m_url.m_pathAfterLastSlash = currentPosition(c);
+                }
                 state = State::Path;
                 break;
             }
@@ -2156,7 +2160,7 @@ std::optional<uint32_t> URLParser::parseIPv4Piece(CodePointIterator<CharacterTyp
             state = State::Octal;
             break;
         case State::Decimal:
-            if (*iterator < '0' || *iterator > '9')
+            if (!isASCIIDigit(*iterator))
                 return std::nullopt;
             value *= 10;
             value += *iterator - '0';

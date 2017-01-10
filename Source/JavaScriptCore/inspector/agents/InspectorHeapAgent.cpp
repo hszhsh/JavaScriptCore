@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, 2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -251,7 +251,7 @@ void InspectorHeapAgent::getPreview(ErrorString& errorString, int heapObjectId, 
     // String preview.
     JSCell* cell = optionalNode->cell;
     if (cell->isString()) {
-        *resultString = cell->getString(nullptr);
+        *resultString = asString(cell)->tryGetValue();
         return;
     }
 
@@ -285,7 +285,7 @@ void InspectorHeapAgent::getPreview(ErrorString& errorString, int heapObjectId, 
     objectPreview = injectedScript.previewValue(cell);
 }
 
-void InspectorHeapAgent::getRemoteObject(ErrorString& errorString, int heapObjectId, const String* optionalObjectGroup, RefPtr<Inspector::Protocol::Runtime::RemoteObject>& result)
+void InspectorHeapAgent::getRemoteObject(ErrorString& errorString, int heapObjectId, const String* const optionalObjectGroup, RefPtr<Inspector::Protocol::Runtime::RemoteObject>& result)
 {
     // Prevent the cell from getting collected as we look it up.
     VM& vm = m_environment.vm();
@@ -334,16 +334,23 @@ static Inspector::Protocol::Heap::GarbageCollection::Type protocolTypeForHeapOpe
 
 void InspectorHeapAgent::willGarbageCollect()
 {
-    ASSERT(m_enabled);
-    ASSERT(std::isnan(m_gcStartTime));
+    if (!m_enabled)
+        return;
 
     m_gcStartTime = m_environment.executionStopwatch()->elapsedTime();
 }
 
 void InspectorHeapAgent::didGarbageCollect(CollectionScope scope)
 {
-    ASSERT(m_enabled);
-    ASSERT(!std::isnan(m_gcStartTime));
+    if (!m_enabled) {
+        m_gcStartTime = NAN;
+        return;
+    }
+
+    if (std::isnan(m_gcStartTime)) {
+        // We were not enabled when the GC began.
+        return;
+    }
 
     // FIXME: Include number of bytes freed by collection.
 

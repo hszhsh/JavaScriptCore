@@ -53,8 +53,7 @@ typedef enum {
 } WebStorageBlockingPolicy;
 
 typedef enum {
-    WebKitJavaScriptRuntimeFlagsSharedArrayBufferEnabled = 1u << 0,
-    WebKitJavaScriptRuntimeFlagsAllEnabled = WebKitJavaScriptRuntimeFlagsSharedArrayBufferEnabled
+    WebKitJavaScriptRuntimeFlagsAllEnabled = 0
 } WebKitJavaScriptRuntimeFlags;
 
 extern NSString *WebPreferencesChangedNotification;
@@ -160,6 +159,15 @@ extern NSString *WebPreferencesCacheModelChangedInternalNotification;
 - (BOOL)isSpatialNavigationEnabled;
 - (void)setSpatialNavigationEnabled:(BOOL)flag;
 
+- (void)setSubtleCryptoEnabled:(BOOL)flag;
+- (BOOL)subtleCryptoEnabled;
+
+- (void)setMediaStreamEnabled:(BOOL)flag;
+- (BOOL)mediaStreamEnabled;
+
+- (void)setPeerConnectionEnabled:(BOOL)flag;
+- (BOOL)peerConnectionEnabled;
+
 #if !TARGET_OS_IPHONE
 // zero means do AutoScale
 - (float)PDFScaleFactor;
@@ -240,6 +248,9 @@ extern NSString *WebPreferencesCacheModelChangedInternalNotification;
 - (BOOL)forceSoftwareWebGLRendering;
 - (void)setForceSoftwareWebGLRendering:(BOOL)forced;
 
+- (BOOL)preferLowPowerWebGLRendering;
+- (void)setPreferLowPowerWebGLRendering:(BOOL)preferLowPower;
+
 - (BOOL)accelerated2dCanvasEnabled;
 - (void)setAccelerated2dCanvasEnabled:(BOOL)enabled;
 
@@ -280,9 +291,6 @@ extern NSString *WebPreferencesCacheModelChangedInternalNotification;
 
 - (void)setAllowsPictureInPictureMediaPlayback:(BOOL)flag;
 - (BOOL)allowsPictureInPictureMediaPlayback;
-
-- (void)setPointerLockEnabled:(BOOL)flag;
-- (BOOL)pointerLockEnabled;
 
 - (NSString *)pictographFontFamily;
 - (void)setPictographFontFamily:(NSString *)family;
@@ -500,9 +508,6 @@ extern NSString *WebPreferencesCacheModelChangedInternalNotification;
 - (void)setDownloadAttributeEnabled:(BOOL)flag;
 - (BOOL)downloadAttributeEnabled;
 
-- (void)setES6ModulesEnabled:(BOOL)flag;
-- (BOOL)es6ModulesEnabled;
-
 - (void)setCSSGridLayoutEnabled:(BOOL)flag;
 - (BOOL)isCSSGridLayoutEnabled;
 
@@ -513,7 +518,8 @@ extern NSString *WebPreferencesCacheModelChangedInternalNotification;
 - (BOOL)modernMediaControlsEnabled;
 
 @property (nonatomic) BOOL visualViewportEnabled;
-@property (nonatomic) BOOL asyncImageDecodingEnabled;
+@property (nonatomic) BOOL largeImageAsyncDecodingEnabled;
+@property (nonatomic) BOOL animatedImageAsyncDecodingEnabled;
 @property (nonatomic) BOOL javaScriptMarkupEnabled;
 @property (nonatomic) BOOL mediaDataLoadsAutomatically;
 @property (nonatomic) BOOL attachmentElementEnabled;

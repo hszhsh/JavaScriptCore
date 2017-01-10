@@ -86,7 +86,7 @@ static inline Vector<LayoutUnit> convertToLayoutUnits(const Vector<float>& snapO
     Vector<LayoutUnit> snapOffsets;
     snapOffsets.reserveInitialCapacity(snapOffsetsAsFloat.size());
     for (auto offset : snapOffsetsAsFloat)
-        snapOffsets.append(offset);
+        snapOffsets.uncheckedAppend(offset);
 
     return snapOffsets;
 }
@@ -391,8 +391,6 @@ void ScrollingTreeFrameScrollingNodeMac::setScrollPositionWithoutContentEdgeCons
     std::optional<FloatPoint> layoutViewportOrigin;
     if (scrollingTree().visualViewportEnabled()) {
         FloatPoint visibleContentOrigin = scrollPosition;
-        float counterScale = 1 / frameScaleFactor();
-        visibleContentOrigin.scale(counterScale, counterScale);
         FloatRect newLayoutViewport = layoutViewportForScrollPosition(visibleContentOrigin, frameScaleFactor());
         setLayoutViewport(newLayoutViewport);
         layoutViewportOrigin = newLayoutViewport.location();

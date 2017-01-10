@@ -37,6 +37,7 @@
 #include "JSMap.h"
 #include "JSModuleEnvironment.h"
 #include "JSModuleLoader.h"
+#include "JSModuleNamespaceObject.h"
 #include "JSModuleRecord.h"
 #include "ModuleAnalyzer.h"
 #include "Nodes.h"
@@ -51,8 +52,8 @@ static EncodedJSValue JSC_HOST_CALL moduleLoaderPrototypeEvaluate(ExecState*);
 static EncodedJSValue JSC_HOST_CALL moduleLoaderPrototypeModuleDeclarationInstantiation(ExecState*);
 static EncodedJSValue JSC_HOST_CALL moduleLoaderPrototypeResolve(ExecState*);
 static EncodedJSValue JSC_HOST_CALL moduleLoaderPrototypeFetch(ExecState*);
-static EncodedJSValue JSC_HOST_CALL moduleLoaderPrototypeTranslate(ExecState*);
 static EncodedJSValue JSC_HOST_CALL moduleLoaderPrototypeInstantiate(ExecState*);
+static EncodedJSValue JSC_HOST_CALL moduleLoaderPrototypeGetModuleNamespaceObject(ExecState*);
 
 }
 
@@ -66,17 +67,13 @@ const ClassInfo ModuleLoaderPrototype::s_info = { "ModuleLoader", &Base::s_info,
 
 /* Source for ModuleLoaderPrototype.lut.h
 @begin moduleLoaderPrototypeTable
-    setStateToMax                  JSBuiltin                                           DontEnum|Function 2
-    newRegistryEntry               JSBuiltin                                           DontEnum|Function 1
     ensureRegistered               JSBuiltin                                           DontEnum|Function 1
     forceFulfillPromise            JSBuiltin                                           DontEnum|Function 2
     fulfillFetch                   JSBuiltin                                           DontEnum|Function 2
-    fulfillTranslate               JSBuiltin                                           DontEnum|Function 2
     fulfillInstantiate             JSBuiltin                                           DontEnum|Function 2
     commitInstantiated             JSBuiltin                                           DontEnum|Function 3
     instantiation                  JSBuiltin                                           DontEnum|Function 3
     requestFetch                   JSBuiltin                                           DontEnum|Function 2
-    requestTranslate               JSBuiltin                                           DontEnum|Function 2
     requestInstantiate             JSBuiltin                                           DontEnum|Function 2
     requestSatisfy                 JSBuiltin                                           DontEnum|Function 2
     requestInstantiateAll          JSBuiltin                                           DontEnum|Function 2
@@ -90,11 +87,12 @@ const ClassInfo ModuleLoaderPrototype::s_info = { "ModuleLoader", &Base::s_info,
     loadAndEvaluateModule          JSBuiltin                                           DontEnum|Function 3
     loadModule                     JSBuiltin                                           DontEnum|Function 3
     linkAndEvaluateModule          JSBuiltin                                           DontEnum|Function 2
+    importModule                   JSBuiltin                                           DontEnum|Function 3
+    getModuleNamespaceObject       moduleLoaderPrototypeGetModuleNamespaceObject       DontEnum|Function 1
     parseModule                    moduleLoaderPrototypeParseModule                    DontEnum|Function 2
     requestedModules               moduleLoaderPrototypeRequestedModules               DontEnum|Function 1
     resolve                        moduleLoaderPrototypeResolve                        DontEnum|Function 2
     fetch                          moduleLoaderPrototypeFetch                          DontEnum|Function 2
-    translate                      moduleLoaderPrototypeTranslate                      DontEnum|Function 3
     instantiate                    moduleLoaderPrototypeInstantiate                    DontEnum|Function 3
 @end
 */
@@ -114,10 +112,10 @@ EncodedJSValue JSC_HOST_CALL moduleLoaderPrototypeParseModule(ExecState* exec)
     const Identifier moduleKey = exec->argument(0).toPropertyKey(exec);
     RETURN_IF_EXCEPTION(scope, encodedJSValue());
 
-    String source = exec->argument(1).toString(exec)->value(exec);
+    String source = exec->argument(1).toWTFString(exec);
     RETURN_IF_EXCEPTION(scope, encodedJSValue());
 
-    SourceCode sourceCode = makeSource(source, moduleKey.impl(), TextPosition::minimumPosition(), SourceProviderSourceType::Module);
+    SourceCode sourceCode = makeSource(source, SourceOrigin { moduleKey.impl() }, moduleKey.impl(), TextPosition(), SourceProviderSourceType::Module);
 
     CodeProfiling profile(sourceCode);
 
@@ -203,23 +201,11 @@ EncodedJSValue JSC_HOST_CALL moduleLoaderPrototypeFetch(ExecState* exec)
     return JSValue::encode(loader->fetch(exec, exec->argument(0), exec->argument(1)));
 }
 
-EncodedJSValue JSC_HOST_CALL moduleLoaderPrototypeTranslate(ExecState* exec)
-{
-    // Hook point, Loader.translate
-    // https://whatwg.github.io/loader/#browser-translate
-    // Take the key and the fetched source code and translate it to the ES6 source code.
-    // Typically it is used by the transpilers.
-    JSModuleLoader* loader = jsDynamicCast<JSModuleLoader*>(exec->thisValue());
-    if (!loader)
-        return JSValue::encode(jsUndefined());
-    return JSValue::encode(loader->translate(exec, exec->argument(0), exec->argument(1), exec->argument(2)));
-}
-
 EncodedJSValue JSC_HOST_CALL moduleLoaderPrototypeInstantiate(ExecState* exec)
 {
     // Hook point, Loader.instantiate
     // https://whatwg.github.io/loader/#browser-instantiate
-    // Take the key and the translated source code, and instantiate the module record
+    // Take the key and the fetched source code, and instantiate the module record
     // by parsing the module source code.
     // It has the chance to provide the optional module instance that is different from
     // the ordinary one.
@@ -227,6 +213,19 @@ EncodedJSValue JSC_HOST_CALL moduleLoaderPrototypeInstantiate(ExecState* exec)
     if (!loader)
         return JSValue::encode(jsUndefined());
     return JSValue::encode(loader->instantiate(exec, exec->argument(0), exec->argument(1), exec->argument(2)));
+}
+
+EncodedJSValue JSC_HOST_CALL moduleLoaderPrototypeGetModuleNamespaceObject(ExecState* exec)
+{
+    VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
+    auto* loader = jsDynamicCast<JSModuleLoader*>(exec->thisValue());
+    if (!loader)
+        return JSValue::encode(jsUndefined());
+    auto* moduleNamespaceObject = loader->getModuleNamespaceObject(exec, exec->argument(0));
+    RETURN_IF_EXCEPTION(scope, encodedJSValue());
+    return JSValue::encode(moduleNamespaceObject);
 }
 
 // ------------------- Additional Hook Functions ---------------------------

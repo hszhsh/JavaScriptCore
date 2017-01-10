@@ -62,7 +62,8 @@ ThreadIdentifierData::~ThreadIdentifierData()
 
 void ThreadIdentifierData::initializeOnce()
 {
-    if (pthread_key_create(&m_key, destruct))
+    int error = pthread_key_create(&m_key, destruct);
+    if (error)
         CRASH();
 }
 

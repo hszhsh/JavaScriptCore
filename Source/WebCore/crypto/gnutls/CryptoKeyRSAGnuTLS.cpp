@@ -31,6 +31,7 @@
 #include "CryptoAlgorithmRegistry.h"
 #include "CryptoKeyDataRSAComponents.h"
 #include "CryptoKeyPair.h"
+#include "ExceptionCode.h"
 #include "NotImplemented.h"
 
 namespace WebCore {
@@ -109,6 +110,34 @@ void CryptoKeyRSA::generatePair(CryptoAlgorithmIdentifier algorithm, CryptoAlgor
     UNUSED_PARAM(usage);
     UNUSED_PARAM(callback);
     UNUSED_PARAM(context);
+}
+
+RefPtr<CryptoKeyRSA> CryptoKeyRSA::importSpki(CryptoAlgorithmIdentifier, std::optional<CryptoAlgorithmIdentifier>, Vector<uint8_t>&&, bool, CryptoKeyUsageBitmap)
+{
+    notImplemented();
+
+    return nullptr;
+}
+
+ExceptionOr<Vector<uint8_t>> CryptoKeyRSA::exportSpki() const
+{
+    notImplemented();
+
+    return Exception { NOT_SUPPORTED_ERR };
+}
+
+RefPtr<CryptoKeyRSA> CryptoKeyRSA::importPkcs8(CryptoAlgorithmIdentifier, std::optional<CryptoAlgorithmIdentifier>, Vector<uint8_t>&&, bool, CryptoKeyUsageBitmap)
+{
+    notImplemented();
+
+    return nullptr;
+}
+
+ExceptionOr<Vector<uint8_t>> CryptoKeyRSA::exportPkcs8() const
+{
+    notImplemented();
+
+    return Exception { NOT_SUPPORTED_ERR };
 }
 
 } // namespace WebCore

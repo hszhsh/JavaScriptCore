@@ -68,7 +68,7 @@ public:
     virtual void waitForBackingStoreUpdateOnNextPaint() { }
 
     const WebCore::IntSize& size() const { return m_size; }
-    void setSize(const WebCore::IntSize&, const WebCore::IntSize&, const WebCore::IntSize& scrollOffset);
+    bool setSize(const WebCore::IntSize&, const WebCore::IntSize&, const WebCore::IntSize& scrollOffset);
 
     // The timeout we use when waiting for a DidUpdateGeometry message.
     static constexpr Seconds didUpdateBackingStoreStateTimeout() { return Seconds::fromMilliseconds(500); }
@@ -102,6 +102,8 @@ public:
     virtual bool hasVisibleContent() const { return true; }
 
     virtual void willSendUpdateGeometry() { }
+
+    virtual void prepareForAppSuspension() { }
 
 #if PLATFORM(COCOA)
     virtual WebCore::MachSendRight createFence();

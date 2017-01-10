@@ -31,6 +31,7 @@
 #include "CSSParser.h"
 #include "CSSParserObserver.h"
 #include "CSSPropertyNames.h"
+#include "CSSPropertyParser.h"
 #include "CSSPropertySourceData.h"
 #include "CSSRule.h"
 #include "CSSRuleList.h"
@@ -385,12 +386,15 @@ enum MediaListSource {
     MediaListSourceImportRule
 };
 
-static RefPtr<Inspector::Protocol::CSS::SourceRange> buildSourceRangeObject(const SourceRange& range, Vector<size_t>* lineEndings)
+static RefPtr<Inspector::Protocol::CSS::SourceRange> buildSourceRangeObject(const SourceRange& range, Vector<size_t>* lineEndings, int* endingLine = nullptr)
 {
     if (!lineEndings)
         return nullptr;
     TextPosition start = ContentSearchUtilities::textPositionFromOffset(range.start, *lineEndings);
     TextPosition end = ContentSearchUtilities::textPositionFromOffset(range.end, *lineEndings);
+
+    if (endingLine)
+        *endingLine = end.m_line.zeroBasedInt();
 
     return Inspector::Protocol::CSS::SourceRange::create()
         .setStartLine(start.m_line.zeroBasedInt())
@@ -600,6 +604,9 @@ void InspectorStyle::populateAllProperties(Vector<InspectorStyleProperty>* resul
         ASSERT(!styleDeclarationOrException.hasException());
         String styleDeclaration = styleDeclarationOrException.hasException() ? emptyString() : styleDeclarationOrException.releaseReturnValue();
         for (auto& sourceData : *sourcePropertyData) {
+            // FIXME: <https://webkit.org/b/166787> Web Inspector: Frontend should be made to expect and handle disabled properties
+            if (sourceData.disabled)
+                continue;
             InspectorStyleProperty p(sourceData, true, sourceData.disabled);
             p.setRawTextFromStyleDeclaration(styleDeclaration);
             result->append(p);
@@ -802,7 +809,6 @@ Ref<InspectorStyleSheet> InspectorStyleSheet::create(InspectorPageAgent* pageAge
     return adoptRef(*new InspectorStyleSheet(pageAgent, id, WTFMove(pageStyleSheet), origin, documentURL, listener));
 }
 
-// static
 String InspectorStyleSheet::styleSheetURL(CSSStyleSheet* pageStyleSheet)
 {
     if (pageStyleSheet && !pageStyleSheet->contents().baseURL().isEmpty())
@@ -1029,7 +1035,7 @@ RefPtr<Inspector::Protocol::CSS::CSSStyleSheetHeader> InspectorStyleSheet::build
         .setSourceURL(finalURL())
         .setTitle(styleSheet->title())
         .setFrameId(m_pageAgent->frameId(frame))
-        .setIsInline(styleSheet->isInline() && styleSheet->startPosition() != TextPosition::minimumPosition())
+        .setIsInline(styleSheet->isInline() && styleSheet->startPosition() != TextPosition())
         .setStartLine(styleSheet->startPosition().m_line.zeroBasedInt())
         .setStartColumn(styleSheet->startPosition().m_column.zeroBasedInt())
         .release();
@@ -1115,7 +1121,7 @@ Ref<Inspector::Protocol::CSS::CSSSelector> InspectorStyleSheet::buildObjectForSe
     return buildObjectForSelectorHelper(selector->selectorText(), *selector, element);
 }
 
-Ref<Inspector::Protocol::CSS::SelectorList> InspectorStyleSheet::buildObjectForSelectorList(CSSStyleRule* rule, Element* element)
+Ref<Inspector::Protocol::CSS::SelectorList> InspectorStyleSheet::buildObjectForSelectorList(CSSStyleRule* rule, Element* element, int& endingLine)
 {
     RefPtr<CSSRuleSourceData> sourceData;
     if (ensureParsedDataReady())
@@ -1138,7 +1144,7 @@ Ref<Inspector::Protocol::CSS::SelectorList> InspectorStyleSheet::buildObjectForS
         .setText(selectorText)
         .release();
     if (sourceData)
-        result->setRange(buildSourceRangeObject(sourceData->ruleHeaderRange, lineEndings().get()));
+        result->setRange(buildSourceRangeObject(sourceData->ruleHeaderRange, lineEndings().get(), &endingLine));
     return result;
 }
 
@@ -1148,9 +1154,10 @@ RefPtr<Inspector::Protocol::CSS::CSSRule> InspectorStyleSheet::buildObjectForRul
     if (!styleSheet)
         return nullptr;
 
+    int endingLine = 0;
     auto result = Inspector::Protocol::CSS::CSSRule::create()
-        .setSelectorList(buildObjectForSelectorList(rule, element))
-        .setSourceLine(rule->styleRule().sourceLine())
+        .setSelectorList(buildObjectForSelectorList(rule, element, endingLine))
+        .setSourceLine(endingLine)
         .setOrigin(m_origin)
         .setStyle(buildObjectForStyle(&rule->style()))
         .release();
@@ -1329,11 +1336,8 @@ bool InspectorStyleSheet::ensureSourceData()
     auto ruleSourceDataResult = std::make_unique<RuleSourceDataList>();
     
     CSSParserContext context(parserContextForDocument(m_pageStyleSheet->ownerDocument()));
-    if (context.useNewParser) {
-        StyleSheetHandler handler(m_parsedStyleSheet->text(), m_pageStyleSheet->ownerDocument(), ruleSourceDataResult.get());
-        CSSParser::parseSheetForInspector(context, newStyleSheet.get(), m_parsedStyleSheet->text(), handler);
-    } else
-        CSSParser(context).parseSheet(newStyleSheet.get(), m_parsedStyleSheet->text(), TextPosition(), ruleSourceDataResult.get(), false);
+    StyleSheetHandler handler(m_parsedStyleSheet->text(), m_pageStyleSheet->ownerDocument(), ruleSourceDataResult.get());
+    CSSParser::parseSheetForInspector(context, newStyleSheet.get(), m_parsedStyleSheet->text(), handler);
     m_parsedStyleSheet->setSourceData(WTFMove(ruleSourceDataResult));
     return m_parsedStyleSheet->hasSourceData();
 }
@@ -1572,17 +1576,10 @@ Ref<CSSRuleSourceData> InspectorStyleSheetForInlineStyle::ruleSourceData() const
     }
 
     CSSParserContext context(parserContextForDocument(&m_element->document()));
-    if (context.useNewParser) {
-        RuleSourceDataList ruleSourceDataResult;
-        StyleSheetHandler handler(m_styleText, &m_element->document(), &ruleSourceDataResult);
-        CSSParser::parseDeclarationForInspector(context, m_styleText, handler);
-        return WTFMove(ruleSourceDataResult.first());
-    }
-    
-    auto result = CSSRuleSourceData::create(StyleRule::Style);
-    auto tempDeclaration = MutableStyleProperties::create();
-    CSSParser(context).parseDeclaration(tempDeclaration, m_styleText, result.ptr(), nullptr);
-    return result;
+    RuleSourceDataList ruleSourceDataResult;
+    StyleSheetHandler handler(m_styleText, &m_element->document(), &ruleSourceDataResult);
+    CSSParser::parseDeclarationForInspector(context, m_styleText, handler);
+    return WTFMove(ruleSourceDataResult.first());
 }
 
 } // namespace WebCore

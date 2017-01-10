@@ -41,7 +41,6 @@ class ClientRect;
 class ClientRectList;
 class CustomElementReactionQueue;
 class DatasetDOMStringMap;
-class Dictionary;
 class DOMTokenList;
 class ElementRareData;
 class HTMLDocument;
@@ -444,6 +443,8 @@ public:
     virtual bool isInRange() const { return false; }
     virtual bool isOutOfRange() const { return false; }
     virtual bool isFrameElementBase() const { return false; }
+    virtual bool isUploadButton() const { return false; }
+    virtual bool isSliderContainerElement() const { return false; }
 
     bool canContainRangeEndPoint() const override;
 
@@ -459,17 +460,9 @@ public:
     virtual void buildPendingResource() { };
 
 #if ENABLE(FULLSCREEN_API)
-    enum {
-        ALLOW_KEYBOARD_INPUT = 1 << 0,
-        LEGACY_MOZILLA_REQUEST = 1 << 1,
-    };
-    
-    WEBCORE_EXPORT void webkitRequestFullScreen(unsigned short flags);
     WEBCORE_EXPORT bool containsFullScreenElement() const;
     void setContainsFullScreenElement(bool);
     void setContainsFullScreenElementOnAncestorsCrossingFrameBoundaries(bool);
-
-    // W3C API
     WEBCORE_EXPORT void webkitRequestFullscreen();
 #endif
 
@@ -477,11 +470,6 @@ public:
     WEBCORE_EXPORT void requestPointerLock();
 #endif
 
-#if ENABLE(INDIE_UI)
-    void setUIActions(const AtomicString&);
-    const AtomicString& UIActions() const;
-#endif
-    
     bool isSpellCheckingEnabled() const;
 
     RenderNamedFlowFragment* renderNamedFlowFragment() const;

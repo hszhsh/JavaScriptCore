@@ -1421,11 +1421,7 @@ double AccessibilityRenderObject::estimatedLoadingProgress() const
     if (isLoaded())
         return 1.0;
     
-    Page* page = m_renderer->document().page();
-    if (!page)
-        return 0;
-    
-    return page->progress().estimatedProgress();
+    return m_renderer->page().progress().estimatedProgress();
 }
     
 int AccessibilityRenderObject::layoutCount() const
@@ -2790,6 +2786,10 @@ AccessibilityRole AccessibilityRenderObject::determineAccessibilityRole()
         return LandmarkBannerRole;
     if (node && node->hasTagName(footerTag) && !isDescendantOfElementType(articleTag) && !isDescendantOfElementType(sectionTag))
         return FooterRole;
+    
+    // menu tags with toolbar type should have Toolbar role.
+    if (node && node->hasTagName(menuTag) && equalLettersIgnoringASCIICase(getAttribute(typeAttr), "toolbar"))
+        return ToolbarRole;
     
     // If the element does not have role, but it has ARIA attributes, or accepts tab focus, accessibility should fallback to exposing it as a group.
     if (supportsARIAAttributes() || canSetFocusAttribute())

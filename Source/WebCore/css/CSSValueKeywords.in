@@ -1092,6 +1092,8 @@ elements
 // -webkit-scroll-snap-type
 mandatory
 proximity
+x
+y
 #endif
 
 // -webkit-region-fragment
@@ -1168,6 +1170,7 @@ repeating-radial-gradient
 -webkit-named-image
 filter
 -webkit-filter
+dashboard-region
 
 // deprecated gradients
 from
@@ -1325,6 +1328,7 @@ display-p3
 
 // prefers-reduced-motion
 reduce
+no-preference
 
 #if defined(ENABLE_CSS_GRID_LAYOUT) && ENABLE_CSS_GRID_LAYOUT
 // auto-repeat
