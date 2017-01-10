@@ -557,11 +557,13 @@ void* MachineThreads::Thread::Registers::stackPointer() const
 
 #elif OS(ANDROID)
     
-    // TODO x86 x86_64 and mips
+    // TODO x86_64 and mips
 #if CPU(ARM)
     return reinterpret_cast<void*>((uintptr_t) regs.machineContext.arm_sp);
 #elif CPU(ARM64)
     return reinterpret_cast<void*>((uintptr_t) regs.machineContext.sp);
+#elif CPU(X86)
+    return reinterpret_cast<void*>((uintptr_t) regs.machineContext.gregs[REG_ESP]);
 #endif
     
 #else

@@ -1772,6 +1772,11 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 5D247B7314689C4700E78B76 /* WTF.xcconfig */;
 			buildSettings = {
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(DEBUG_DEFINES)",
+					"$(inherited)",
+					"RELEASE_LOG_DISABLED=1",
+				);
 			};
 			name = Debug;
 		};
@@ -1779,6 +1784,11 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 5D247B7314689C4700E78B76 /* WTF.xcconfig */;
 			buildSettings = {
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(DEBUG_DEFINES)",
+					"$(inherited)",
+					"RELEASE_LOG_DISABLED=1",
+				);
 			};
 			name = Release;
 		};
@@ -1793,6 +1803,11 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 5D247B7314689C4700E78B76 /* WTF.xcconfig */;
 			buildSettings = {
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(DEBUG_DEFINES)",
+					"$(inherited)",
+					"RELEASE_LOG_DISABLED=1",
+				);
 			};
 			name = Production;
 		};
