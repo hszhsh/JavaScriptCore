@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013, 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,41 +25,27 @@
 
 #pragma once
 
-#include <wtf/FastMalloc.h>
+#include <wtf/Vector.h>
 
-namespace JSC {
+namespace WebCore {
 
-class Heap;
-class JSCell;
-
-class WriteBarrierBuffer {
-public:
-    WriteBarrierBuffer(unsigned capacity);
-    ~WriteBarrierBuffer();
-
-    void add(JSCell*);
-    void flush(Heap&);
-    void reset();
-
-    unsigned* currentIndexAddress()
-    {
-        return &m_currentIndex;
-    }
-
-    unsigned capacity() const
-    {
-        return m_capacity;
-    }
-
-    JSCell** buffer()
-    {
-        return m_buffer;
-    }
-
-private:
-    unsigned m_currentIndex;
-    const unsigned m_capacity;
-    JSCell** const m_buffer;
+template <typename T>
+struct ScrollOffsetRange {
+    T start;
+    T end;
 };
 
-} // namespace JSC
+template <typename T>
+struct ScrollSnapOffsetsInfo {
+    Vector<T> horizontalSnapOffsets;
+    Vector<T> verticalSnapOffsets;
+
+    // Snap offset ranges represent non-empty ranges of scroll offsets in which scrolling may rest after scroll snapping.
+    // These are used in two cases: (1) for proximity scroll snapping, where portions of areas between adjacent snap offsets
+    // may emit snap offset ranges, and (2) in the case where the snap area is larger than the snap port, in which case areas
+    // where the snap port fits within the snap area are considered to be valid snap positions.
+    Vector<ScrollOffsetRange<T>> horizontalSnapOffsetRanges;
+    Vector<ScrollOffsetRange<T>> verticalSnapOffsetRanges;
+};
+
+}; // namespace WebCore

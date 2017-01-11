@@ -1,3 +1,694 @@
+2017-01-10  Sam Weinig  <sam@webkit.org>
+
+        [WebIDL] Remove most of the custom bindings for the WebGL code
+        https://bugs.webkit.org/show_bug.cgi?id=166834
+
+        Reviewed by Alex Christensen.
+
+        Removes all but one custom getter (getExtension) from the WebGL code.
+
+        * Modules/indexeddb/IDBKeyRange.idl:
+        Replace use of non-standard type, with new OverrideIDLType extended attribute, allowing us
+        to stay more consistent with the IDL files spec's provide.
+
+        * WebCore.xcodeproj/project.pbxproj:
+        Move JSWebGL2RenderingContextCustom to the GC/Wrapping only group.
+
+        * bindings/IDLTypes.h:
+        Add IDLWebGLAny, and simplify IDLIDBKey to not be templatized.
+
+        * bindings/js/JSDOMConvert.h:
+        (WebCore::Converter<IDLLong>::convert):
+        (WebCore::Converter<IDLFloat>::convert):
+        (WebCore::Converter<IDLUnrestrictedFloat>::convert):
+        (WebCore::Converter<IDLDouble>::convert):
+        (WebCore::Converter<IDLUnrestrictedDouble>::convert):
+        Add overloads of convert that convert a double to the numeric type.
+
+        (WebCore::Detail::GenericSequenceConverter::convert):
+        Add optimized specialization for JSArrays that does not use the iterator protocol.
+
+        (WebCore::Detail::NumericSequenceConverter::convert):
+        Add an even more optimized specialization for numeric types, which checks to see
+        if the array's butterfly has an optimized shape, and extracts the numeric values
+        from that.
+
+        (WebCore::Detail::SequenceConverter::convert):
+        (WebCore::Detail::SequenceConverter<IDLLong>::convert):
+        (WebCore::Detail::SequenceConverter<IDLFloat>::convert):
+        (WebCore::Detail::SequenceConverter<IDLUnrestrictedFloat>::convert):
+        (WebCore::Detail::SequenceConverter<IDLDouble>::convert):
+        (WebCore::Detail::SequenceConverter<IDLUnrestrictedDouble>::convert):
+        Select the right specialization based on type.
+
+        (WebCore::Converter<IDLSequence<T>>::convert):
+        (WebCore::Converter<IDLFrozenArray<T>>::convert):
+        Rename converter to be more accurate.
+
+        (WebCore::JSConverter<IDLWebGLAny>::convert):
+        Added. Calls through to converter in WebGLAny.h. We should replace this with a
+        call to the IDLUnion JSConverter when feasible.
+
+        * bindings/js/JSWebGL2RenderingContextCustom.cpp:
+        (WebCore::JSWebGL2RenderingContext::getInternalformatParameter): Deleted.
+        (WebCore::JSWebGL2RenderingContext::getQueryParameter): Deleted.
+        (WebCore::JSWebGL2RenderingContext::getSamplerParameter): Deleted.
+        (WebCore::JSWebGL2RenderingContext::getSyncParameter): Deleted.
+        (WebCore::JSWebGL2RenderingContext::getIndexedParameter): Deleted.
+        (WebCore::JSWebGL2RenderingContext::getActiveUniformBlockParameter): Deleted.
+        (WebCore::JSWebGL2RenderingContext::getActiveUniformBlockName): Deleted.
+        Remove unnecessary custom functions.
+
+        * bindings/js/JSWebGLRenderingContextBaseCustom.cpp:
+        (WebCore::objectParameter): Deleted.
+        (WebCore::JSWebGLRenderingContextBase::getAttachedShaders): Deleted.
+        (WebCore::JSWebGLRenderingContextBase::getBufferParameter): Deleted.
+        (WebCore::JSWebGLRenderingContextBase::getFramebufferAttachmentParameter): Deleted.
+        (WebCore::JSWebGLRenderingContextBase::getParameter): Deleted.
+        (WebCore::JSWebGLRenderingContextBase::getProgramParameter): Deleted.
+        (WebCore::JSWebGLRenderingContextBase::getRenderbufferParameter): Deleted.
+        (WebCore::JSWebGLRenderingContextBase::getShaderParameter): Deleted.
+        (WebCore::JSWebGLRenderingContextBase::getSupportedExtensions): Deleted.
+        (WebCore::JSWebGLRenderingContextBase::getTexParameter): Deleted.
+        (WebCore::JSWebGLRenderingContextBase::getUniform): Deleted.
+        (WebCore::JSWebGLRenderingContextBase::getVertexAttrib): Deleted.
+        (WebCore::toNumberVector): Deleted.
+        (WebCore::functionForUniform): Deleted.
+        (WebCore::dataFunctionf): Deleted.
+        (WebCore::dataFunctioni): Deleted.
+        (WebCore::dataFunctionMatrix): Deleted.
+        (WebCore::JSWebGLRenderingContextBase::uniform1fv): Deleted.
+        (WebCore::JSWebGLRenderingContextBase::uniform1iv): Deleted.
+        (WebCore::JSWebGLRenderingContextBase::uniform2fv): Deleted.
+        (WebCore::JSWebGLRenderingContextBase::uniform2iv): Deleted.
+        (WebCore::JSWebGLRenderingContextBase::uniform3fv): Deleted.
+        (WebCore::JSWebGLRenderingContextBase::uniform3iv): Deleted.
+        (WebCore::JSWebGLRenderingContextBase::uniform4fv): Deleted.
+        (WebCore::JSWebGLRenderingContextBase::uniform4iv): Deleted.
+        (WebCore::JSWebGLRenderingContextBase::uniformMatrix2fv): Deleted.
+        (WebCore::JSWebGLRenderingContextBase::uniformMatrix3fv): Deleted.
+        (WebCore::JSWebGLRenderingContextBase::uniformMatrix4fv): Deleted.
+        (WebCore::JSWebGLRenderingContextBase::vertexAttrib1fv): Deleted.
+        (WebCore::JSWebGLRenderingContextBase::vertexAttrib2fv): Deleted.
+        (WebCore::JSWebGLRenderingContextBase::vertexAttrib3fv): Deleted.
+        (WebCore::JSWebGLRenderingContextBase::vertexAttrib4fv): Deleted.
+        Remove unnecessary custom functions.
+
+        * bindings/scripts/CodeGenerator.pm:
+        (IsBuiltinType):
+        Remove specialization of IDBKey.
+
+        * bindings/scripts/CodeGeneratorJS.pm:
+        (GetBaseIDLType):
+        (GetIDLType):
+        (NativeToJSValueDOMConvertNeedsState):
+        (NativeToJSValueDOMConvertNeedsGlobalObject):
+        (NativeToJSValue):
+        Allow IDL files to override the type of signature using a new OverrideIDLType
+        extended attribute. Currently this only works conversion to JS, but could be
+        extended to support more.
+
+        * bindings/scripts/IDLAttributes.txt:
+        Add OverrideIDLType.
+
+        * html/canvas/WebGL2RenderingContext.idl:
+        Add OverrideIDLType=IDLWebGLAny annotations to remove the need for custom functions.
+
+        * html/canvas/WebGLAny.cpp:
+        (WebCore::convertToJSValue):
+        (WebCore::toJS): Deleted.
+        * html/canvas/WebGLAny.h:
+        Rename the toJS function to convertToJSValue to avoid a template specialization issue.
+
+        * html/canvas/WebGLRenderingContextBase.cpp:
+        (WebCore::WebGLRenderingContextBase::getAttachedShaders):
+        Update signature to match IDL, replacing bool return value plus out parameter with an
+        optional return value. Modernize the code a bit.
+
+        (WebCore::WebGLRenderingContextBase::uniform2f):
+        (WebCore::WebGLRenderingContextBase::uniform3f):
+        (WebCore::WebGLRenderingContextBase::uniform4f):
+        (WebCore::WebGLRenderingContextBase::uniform1i):
+        (WebCore::WebGLRenderingContextBase::uniform3i):
+        (WebCore::WebGLRenderingContextBase::uniform4i):
+        (WebCore::WebGLRenderingContextBase::uniform1fv):
+        (WebCore::WebGLRenderingContextBase::uniform2fv):
+        (WebCore::WebGLRenderingContextBase::uniform3fv):
+        (WebCore::WebGLRenderingContextBase::uniform4fv):
+        (WebCore::WebGLRenderingContextBase::uniform1iv):
+        (WebCore::WebGLRenderingContextBase::uniform2iv):
+        (WebCore::WebGLRenderingContextBase::uniform3iv):
+        (WebCore::WebGLRenderingContextBase::uniform4iv):
+        (WebCore::WebGLRenderingContextBase::uniformMatrix2fv):
+        (WebCore::WebGLRenderingContextBase::uniformMatrix3fv):
+        (WebCore::WebGLRenderingContextBase::uniformMatrix4fv):
+        (WebCore::WebGLRenderingContextBase::vertexAttrib4f):
+        (WebCore::WebGLRenderingContextBase::vertexAttrib1fv):
+        (WebCore::WebGLRenderingContextBase::vertexAttrib2fv):
+        (WebCore::WebGLRenderingContextBase::vertexAttrib3fv):
+        (WebCore::WebGLRenderingContextBase::vertexAttrib4fv):
+        (WebCore::WebGLRenderingContextBase::validateUniformParameters):
+        (WebCore::WebGLRenderingContextBase::validateUniformMatrixParameters):
+        (WebCore::WebGLRenderingContextBase::vertexAttribfvImpl):
+        * html/canvas/WebGLRenderingContextBase.h:
+        (WebCore::WebGLRenderingContextBase::TypedList::TypedList):
+        (WebCore::WebGLRenderingContextBase::TypedList::data):
+        (WebCore::WebGLRenderingContextBase::TypedList::length):
+        Re-order/group to match order in the IDL file. Remove overloads taking a pointer and 
+        length, and replace it by having the main function take a specialized TypedList. TypedList
+        allows the bindings to pass the correct Variant type, but then the code to only think in
+        terms of the data() and length() functions.
+
+        * html/canvas/WebGLRenderingContextBase.idl:
+        Remove [Custom] annotations and re-order/group to match the spec. Update types of uniform*fv/iv
+        functions to take typedef'd unions.
+
+2017-01-10  Ryosuke Niwa  <rniwa@webkit.org>
+
+        :active and :hover states may not be updated across slots
+        https://bugs.webkit.org/show_bug.cgi?id=166881
+        <rdar://problem/29944582>
+
+        Reviewed by Antti Koivisto.
+
+        The bug was caused by updateHoverActiveState not updating :hover and :active states on elements
+        when nodes are assigned to slots because they were walking up the tree using parentOrShadowHostElement
+        and parentNode. Fixed the bug by using parentElementInComposedTree instead since :hover and :active
+        states need to be updated in accordance with the render tree, which is created from the "flat tree"
+        or the "composed tree" in WebKit's terminology (this is old terminology in the spec).
+
+        Tests: fast/shadow-dom/clear-active-state-in-shadow.html
+               fast/shadow-dom/hover-over-nested-slotted-content.html
+
+        * dom/Document.cpp:
+        (WebCore::Document::updateHoverActiveState): Fixed the bug.
+        * dom/Node.cpp:
+        (WebCore::Node::parentElementInComposedTree): Added.
+        * dom/Node.h:
+
+2017-01-10  Keith Rollin  <krollin@apple.com>
+
+        Missing logging in IconLoader::startLoading
+        https://bugs.webkit.org/show_bug.cgi?id=166904
+
+        Reviewed by Sam Weinig.
+
+        The LOG_ERROR in startLoading references 'resourceRequest', which has
+        been WTF::Moved as part of a preceding function call. As such, the
+        logging statement doesn't print out a possibly useful URL. Fix this by
+        making a copy of the URL before it's affected by the Move.
+
+        No new tests -- change only affects logging code.
+
+        * loader/icon/IconLoader.cpp:
+        (WebCore::IconLoader::startLoading):
+
+2017-01-10  Wenson Hsieh  <wenson_hsieh@apple.com>
+
+        Implement "proximity" scroll snapping
+        https://bugs.webkit.org/show_bug.cgi?id=135994
+        <rdar://problem/18162418>
+
+        Reviewed by Dean Jackson.
+
+        Adds support for proximity scroll snapping. To do this, we introduce scroll offset ranges, a list of scroll
+        offset ranges that are plumbed alongside the list of scroll snap offsets. Similar to a snap offset, a snap
+        offset range contains scroll offsets on which scrolling is allowed to come to a rest within a scroll snapping
+        container. However, unlike normal snap offsets, scrolling may only come to rest within a snap offset range if
+        the predicted scroll offset already lies within the range. The new algorithm for selecting a target scroll snap
+        position given a destination offset is now:
+
+        -   If the scroll destination lies within a snap offset range, return the scroll destination
+        -   Otherwise, compute the nearest lower/upper snap offsets and lower/upper snap offset ranges
+        -   If scrolling ended with no velocity, return the nearest snap offset
+        -   If scrolling ended with positive velocity, choose the upper snap offset only if there is no snap offset
+            range in between the scroll destination and the snap offset; else, choose the lower snap offset
+        -   If scrolling ended with negative velocity, choose the lower snap offset only if there is no snap offset
+            range in between the scroll destination and the snap offset; else, choose the upper snap offset
+
+        The extra rule accounting for scroll offset ranges in between the scroll destination and a potential snap offset
+        handles the corner case where the user scrolls with momentum very lightly away from a snap offset, such that the
+        predicted scroll destination is still within proximity of the snap offset. In this case, the regular (mandatory
+        scroll snapping) behavior would be to snap to the next offset in the direction of momentum scrolling, but
+        instead, it is more intuitive to return to the original snap position.
+
+        We also move scrolling prediction logic into ScrollingMomentumCalculator and adopt the platform
+        _NSScrollingMomentumCalculator's destinationOrigin property when computing the predicted scroll destination.
+        Previously, we were simply multiplying by an empirically-derived constant to approximate the scroll destination,
+        but now that we are supporting proximity scroll snapping, we need more exact scroll destinaton prediction in
+        order to make sure that scrolling to a snap offset range feels natural.
+
+        Tests: tiled-drawing/scrolling/scroll-snap/scroll-snap-mandatory-then-proximity.html
+               tiled-drawing/scrolling/scroll-snap/scroll-snap-proximity-mainframe.html
+               tiled-drawing/scrolling/scroll-snap/scroll-snap-proximity-overflow.html
+
+        * WebCore.xcodeproj/project.pbxproj:
+        * page/scrolling/AsyncScrollingCoordinator.cpp:
+        (WebCore::setStateScrollingNodeSnapOffsetsAsFloat):
+        (WebCore::AsyncScrollingCoordinator::updateOverflowScrollingNode):
+        (WebCore::AsyncScrollingCoordinator::updateScrollSnapPropertiesWithFrameView):
+
+        Make boilerplate changes to plumb lists of horizontal and vertical snap offset ranges alongside the lists of
+        horizontal and vertical snap offsets.
+
+        * page/scrolling/AxisScrollSnapOffsets.cpp:
+        (WebCore::snapOffsetRangesToString):
+        (WebCore::indicesOfNearestSnapOffsetRanges):
+        (WebCore::indicesOfNearestSnapOffsets):
+        (WebCore::adjustAxisSnapOffsetsForScrollExtent):
+        (WebCore::computeAxisProximitySnapOffsetRanges):
+        (WebCore::updateSnapOffsetsForScrollableArea):
+        (WebCore::closestSnapOffset):
+
+        Adjust the snap offset selection algorithm to take snap offset ranges into account. See above for more details.
+        Additionally, augment snap offset update logic to emit snap offset ranges for proximity scroll snapping. To do
+        this, we run the following steps on the final list of processed snap offsets:
+        -   Compute the proximity distance, which (for now) is arbitrarily 0.3 * the length or width of the scroll snap
+            port, depending on whether scroll snapping is taking place in the X or Y axis.
+        -   For each pair of adjacent snap offsets, if they are more than 2 * proximity distance away from each other,
+            emit a snap offset range starting from (lower snap offset + proximity distance) and ending on (upper snap
+            offset + proximity distance).
+
+        * page/scrolling/AxisScrollSnapOffsets.h:
+        (WebCore::closestSnapOffset): Deleted.
+        * page/scrolling/ScrollSnapOffsetsInfo.h:
+
+        Introduce ScrollSnapOffsetsInfo, a struct which contains data relevant to scroll snapping. This includes
+        vertical and horizontal snap offsets, as well as vertical and horizontal snap offset ranges. Snap offset ranges
+        consist of a vector of ranges of scroll offsets.
+
+        * page/scrolling/ScrollingCoordinator.h:
+        * page/scrolling/ScrollingMomentumCalculator.cpp:
+        (WebCore::projectedInertialScrollDistance):
+        (WebCore::ScrollingMomentumCalculator::ScrollingMomentumCalculator):
+        (WebCore::ScrollingMomentumCalculator::setRetargetedScrollOffset):
+        (WebCore::ScrollingMomentumCalculator::predictedDestinationOffset):
+        (WebCore::ScrollingMomentumCalculator::create):
+        (WebCore::ScrollingMomentumCalculator::setPlatformMomentumScrollingPredictionEnabled):
+        (WebCore::BasicScrollingMomentumCalculator::BasicScrollingMomentumCalculator):
+        (WebCore::BasicScrollingMomentumCalculator::linearlyInterpolatedOffsetAtProgress):
+        (WebCore::BasicScrollingMomentumCalculator::initializeInterpolationCoefficientsIfNecessary):
+        (WebCore::BasicScrollingMomentumCalculator::initializeSnapProgressCurve):
+        * page/scrolling/ScrollingMomentumCalculator.h:
+        (WebCore::ScrollingMomentumCalculator::retargetedScrollOffset):
+        (WebCore::ScrollingMomentumCalculator::retargetedScrollOffsetDidChange):
+
+        Currently, the ScrollingMomentumCalculator is responsible for taking an initial position, initial velocity, and
+        target position and animating the scroll offset from the initial to target position. Now, we refactor the
+        ScrollingMomentumCalculator interface to no longer take a target offset upon initialization, and instead compute
+        the predicted scroll destination given initial position and velocity; clients of the ScrollingMomentumCalculator
+        then use this predicted scroll destination to compute a retargeted scroll offset and then call
+        setRetargetedScrollOffset on the calculator, which sets up an animation curve to the new retargeted offset. This
+        allows both the AppKit-based scrolling momentum calculator and platform-invariant momentum calculator to be used
+        interchangeably, while still allowing them to compute a destination offset from initial parameters of the
+        scroll.
+
+        * page/scrolling/ScrollingStateScrollingNode.cpp:
+        (WebCore::ScrollingStateScrollingNode::ScrollingStateScrollingNode):
+        (WebCore::ScrollingStateScrollingNode::setHorizontalSnapOffsets):
+        (WebCore::ScrollingStateScrollingNode::setVerticalSnapOffsets):
+        (WebCore::ScrollingStateScrollingNode::setHorizontalSnapOffsetRanges):
+        (WebCore::ScrollingStateScrollingNode::setVerticalSnapOffsetRanges):
+        * page/scrolling/ScrollingStateScrollingNode.h:
+        (WebCore::ScrollingStateScrollingNode::horizontalSnapOffsets):
+        (WebCore::ScrollingStateScrollingNode::verticalSnapOffsets):
+        (WebCore::ScrollingStateScrollingNode::horizontalSnapOffsetRanges):
+        (WebCore::ScrollingStateScrollingNode::verticalSnapOffsetRanges):
+        * page/scrolling/ScrollingTreeScrollingNode.cpp:
+        (WebCore::ScrollingTreeScrollingNode::commitStateBeforeChildren):
+        (WebCore::ScrollingTreeScrollingNode::dumpProperties):
+        * page/scrolling/ScrollingTreeScrollingNode.h:
+        (WebCore::ScrollingTreeScrollingNode::horizontalSnapOffsets):
+        (WebCore::ScrollingTreeScrollingNode::verticalSnapOffsets):
+        (WebCore::ScrollingTreeScrollingNode::horizontalSnapOffsetRanges):
+        (WebCore::ScrollingTreeScrollingNode::verticalSnapOffsetRanges):
+
+        Add more boilerplate support for snap offset ranges.
+
+        * page/scrolling/mac/ScrollingMomentumCalculatorMac.h:
+        * page/scrolling/mac/ScrollingMomentumCalculatorMac.mm:
+        (WebCore::ScrollingMomentumCalculator::create):
+        (WebCore::ScrollingMomentumCalculator::setPlatformMomentumScrollingPredictionEnabled):
+        (WebCore::ScrollingMomentumCalculatorMac::ScrollingMomentumCalculatorMac):
+        (WebCore::ScrollingMomentumCalculatorMac::scrollOffsetAfterElapsedTime):
+        (WebCore::ScrollingMomentumCalculatorMac::predictedDestinationOffset):
+        (WebCore::ScrollingMomentumCalculatorMac::retargetedScrollOffsetDidChange):
+        (WebCore::ScrollingMomentumCalculatorMac::animationDuration):
+        (WebCore::ScrollingMomentumCalculatorMac::requiresMomentumScrolling):
+        (WebCore::ScrollingMomentumCalculatorMac::ensurePlatformMomentumCalculator):
+
+        Hook into AppKit momentum scroll offset prediction.
+
+        * page/scrolling/mac/ScrollingTreeFrameScrollingNodeMac.mm:
+        (WebCore::convertToLayoutUnits):
+        (WebCore::ScrollingTreeFrameScrollingNodeMac::commitStateBeforeChildren):
+        * platform/ScrollableArea.cpp:
+        (WebCore::ScrollableArea::ensureSnapOffsetsInfo):
+        (WebCore::ScrollableArea::horizontalSnapOffsets):
+        (WebCore::ScrollableArea::horizontalSnapOffsetRanges):
+        (WebCore::ScrollableArea::verticalSnapOffsetRanges):
+        (WebCore::ScrollableArea::verticalSnapOffsets):
+        (WebCore::ScrollableArea::setHorizontalSnapOffsets):
+        (WebCore::ScrollableArea::setVerticalSnapOffsets):
+        (WebCore::ScrollableArea::setHorizontalSnapOffsetRanges):
+        (WebCore::ScrollableArea::setVerticalSnapOffsetRanges):
+        (WebCore::ScrollableArea::clearHorizontalSnapOffsets):
+        (WebCore::ScrollableArea::clearVerticalSnapOffsets):
+        * platform/ScrollableArea.h:
+        (WebCore::ScrollableArea::horizontalSnapOffsets): Deleted.
+        (WebCore::ScrollableArea::verticalSnapOffsets): Deleted.
+        * platform/cocoa/ScrollController.h:
+        * platform/cocoa/ScrollController.mm:
+        (WebCore::ScrollController::processWheelEventForScrollSnap):
+
+        Fix an issue where initial scrolling velocity would be set to zero at the end of a drag gesture.
+
+        (WebCore::ScrollController::updateScrollSnapState):
+        (WebCore::ScrollController::updateScrollSnapPoints):
+        (WebCore::ScrollController::setNearestScrollSnapIndexForAxisAndOffset):
+        * platform/cocoa/ScrollSnapAnimatorState.h:
+        (WebCore::ScrollSnapAnimatorState::snapOffsetsForAxis):
+        (WebCore::ScrollSnapAnimatorState::snapOffsetRangesForAxis):
+        (WebCore::ScrollSnapAnimatorState::setSnapOffsetsAndPositionRangesForAxis):
+        (WebCore::ScrollSnapAnimatorState::setSnapOffsetsForAxis): Deleted.
+        * platform/cocoa/ScrollSnapAnimatorState.mm:
+        (WebCore::ScrollSnapAnimatorState::setupAnimationForState):
+        (WebCore::ScrollSnapAnimatorState::targetOffsetForStartOffset):
+        (WebCore::projectedInertialScrollDistance): Deleted.
+        * rendering/RenderLayerCompositor.cpp:
+        (WebCore::RenderLayerCompositor::updateScrollCoordinatedLayer):
+        * testing/Internals.cpp:
+        (WebCore::Internals::setPlatformMomentumScrollingPredictionEnabled):
+
+        Add a new hook for layout tests to force scrolling momentum calculators to use the platform-invariant momentum
+        scrolling prediction heuristic instead of the platform-dependent one.
+
+        (WebCore::Internals::scrollSnapOffsets):
+        * testing/Internals.h:
+        * testing/Internals.idl:
+
+2017-01-10  Chris Dumez  <cdumez@apple.com>
+
+        Make Event.initEvent()'s first parameter mandatory
+        https://bugs.webkit.org/show_bug.cgi?id=166894
+
+        Reviewed by Alex Christensen.
+
+        Make Event.initEvent()'s first parameter mandatory. As per the
+        specification, all parameters should be mandatory and we are
+        currently dicussing the possibility of making them optional in
+        the specification. However, having the first parameter optional
+        makes little sense as it would set the event's type to the string
+        "undefined".
+
+        Test: fast/events/initEvent-parameters.html
+
+        * dom/Event.idl:
+
+2017-01-10  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r210537.
+        https://bugs.webkit.org/show_bug.cgi?id=166903
+
+        This change introduced JSC test failures (Requested by
+        ryanhaddad on #webkit).
+
+        Reverted changeset:
+
+        "Implement JSSourceCode to propagate SourceCode in module
+        pipeline"
+        https://bugs.webkit.org/show_bug.cgi?id=166861
+        http://trac.webkit.org/changeset/210537
+
+2017-01-10  Chris Dumez  <cdumez@apple.com>
+
+        REGRESSION(r189555): ImageDocument title no longer includes the size of the image
+        https://bugs.webkit.org/show_bug.cgi?id=166876
+        <rdar://problem/29939970>
+
+        Reviewed by Ryosuke Niwa.
+
+        Add a code comment to clarify fix that was made in r210536.
+
+        * html/ImageDocument.cpp:
+        (WebCore::ImageDocument::createDocumentStructure):
+
+2017-01-10  Jer Noble  <jer.noble@apple.com>
+
+        Add support for MediaKeys.generateRequest().
+        https://bugs.webkit.org/show_bug.cgi?id=166880
+
+        Reviewed by Xabier Rodriguez-Calvar.
+
+        Test: media/encrypted-media/mock-MediaKeySession-generateRequest.html
+
+        Implement MediaKeySession::generateRequest(). This requires some additions
+        to CDM, CDMPrivate, and CDMInstance to support platform adoption and to
+        implement mock support for testing. Additionally, add an InitDataRegistry
+        object which can sanitize and extract key data from various initData types.
+        (At the moment, only the "keyids" initData type is implemented.)
+
+        Drive-by fixes: Change all instances of initDataType from String -> AtomicString.
+        Add "const" flags to all CDMPrivate methods that might be called from a const
+        reference.
+
+        * CMakeLists.txt:
+        * Modules/encryptedmedia/CDM.cpp:
+        (WebCore::CDM::supportsInitDataType):
+        (WebCore::CDM::sanitizeInitData):
+        (WebCore::CDM::supportsInitData):
+        * Modules/encryptedmedia/CDM.h:
+        * Modules/encryptedmedia/CDMInstance.h:
+        * Modules/encryptedmedia/CDMPrivate.h:
+        * Modules/encryptedmedia/InitDataRegistry.cpp: Added.
+        (WebCore::extractKeyIDsKeyids):
+        (WebCore::sanitizeKeyids):
+        (WebCore::sanitizeCenc):
+        (WebCore::extractKeyIDsCenc):
+        (WebCore::sanitizeWebM):
+        (WebCore::extractKeyIDsWebM):
+        (WebCore::InitDataRegistry::shared):
+        (WebCore::InitDataRegistry::InitDataRegistry):
+        (WebCore::InitDataRegistry::sanitizeInitData):
+        (WebCore::InitDataRegistry::extractKeyIDs):
+        (WebCore::InitDataRegistry::registerInitDataType):
+        * Modules/encryptedmedia/InitDataRegistry.h:
+        * Modules/encryptedmedia/MediaKeySession.cpp:
+        (WebCore::messageEventName):
+        (WebCore::MediaKeySession::MediaKeySession):
+        (WebCore::MediaKeySession::generateRequest):
+        (WebCore::MediaKeySession::enqueueMessage):
+        * Modules/encryptedmedia/MediaKeySession.h:
+        * Modules/encryptedmedia/MediaKeys.cpp:
+        (WebCore::MediaKeys::setServerCertificate):
+        * WebCore.xcodeproj/project.pbxproj:
+        * testing/MockCDMFactory.cpp:
+        (WebCore::MockCDMFactory::addKeysToSessionWithID):
+        (WebCore::MockCDMFactory::setSupportedDataTypes):
+        (WebCore::MockCDM::supportsInitDataType):
+        (WebCore::MockCDM::supportsConfiguration):
+        (WebCore::MockCDM::supportsConfigurationWithRestrictions):
+        (WebCore::MockCDM::supportsSessionTypeWithConfiguration):
+        (WebCore::MockCDM::supportsRobustness):
+        (WebCore::MockCDM::distinctiveIdentifiersRequirement):
+        (WebCore::MockCDM::persistentStateRequirement):
+        (WebCore::MockCDM::distinctiveIdentifiersAreUniquePerOriginAndClearable):
+        (WebCore::MockCDM::supportsInitData):
+        (WebCore::MockCDMInstance::setServerCertificate):
+        (WebCore::MockCDMInstance::requestLicense):
+        * testing/MockCDMFactory.h:
+        (WebCore::MockCDMFactory::supportedDataTypes):
+        (WebCore::MockCDMFactory::hasSessionWithID):
+        (WebCore::MockCDMFactory::removeSessionWithID):
+        (WebCore::MockCDMFactory::setSupportedDataTypes): Deleted.
+
+2017-01-10  Jer Noble  <jer.noble@apple.com>
+
+        Add support for MediaKeys.createSession().
+        https://bugs.webkit.org/show_bug.cgi?id=166796
+
+        Reviewed by Eric Carlson.
+
+        Test: media/encrypted-media/mock-MediaKeys-createSession.html
+
+        Implement MediaKeys::createSession(). This requires some additions to
+        CDM, CDMPrivate, and CDMInstance to support platform adoption and to
+        implement mock support for testing. Because the CDMInstance will now
+        be shared between MediaKeys and MediaKeySession, it cannot be a unique_ptr.
+        Make CDMInterface ref-counted and store it as a Ref.
+
+        * Modules/encryptedmedia/CDM.cpp:
+        (WebCore::CDM::createInstance):
+        (WebCore::CDM::supportsSessions):
+        * Modules/encryptedmedia/CDM.h:
+        * Modules/encryptedmedia/CDMInstance.h:
+        * Modules/encryptedmedia/CDMPrivate.h:
+        * Modules/encryptedmedia/MediaKeySession.cpp:
+        (WebCore::MediaKeySession::create):
+        (WebCore::MediaKeySession::MediaKeySession):
+        (WebCore::MediaKeySession::sessionId):
+        (WebCore::MediaKeySession::expiration):
+        (WebCore::MediaKeySession::keyStatuses):
+        * Modules/encryptedmedia/MediaKeySession.h:
+        * Modules/encryptedmedia/MediaKeySessionType.idl:
+        * Modules/encryptedmedia/MediaKeySystemAccess.cpp:
+        (WebCore::MediaKeySystemAccess::createMediaKeys):
+        * Modules/encryptedmedia/MediaKeys.cpp:
+        (WebCore::MediaKeys::MediaKeys):
+        (WebCore::MediaKeys::createSession):
+        * Modules/encryptedmedia/MediaKeys.h:
+        (WebCore::MediaKeys::create):
+        * Modules/encryptedmedia/MediaKeys.idl:
+
+2017-01-10  Jer Noble  <jer.noble@apple.com>
+
+        Add support for MediaKeys.setServerCertificate()
+        https://bugs.webkit.org/show_bug.cgi?id=166772
+
+        Reviewed by Darin Adler.
+
+        Test: media/encrypted-media/mock-MediaKeys-setServerCertificate.html
+
+        Implement MediaKeys::setServerCertificate(). This requires some additions
+        to CDM, CDMPrivate, and CDMInstance to support platform adoption and to
+        implement mock support for testing.
+
+        * Modules/encryptedmedia/CDM.cpp:
+        (WebCore::CDM::supportsServerCertificates):
+        * Modules/encryptedmedia/CDM.h:
+        * Modules/encryptedmedia/CDMInstance.h:
+        * Modules/encryptedmedia/CDMPrivate.h:
+        * Modules/encryptedmedia/MediaKeys.cpp:
+        (WebCore::MediaKeys::setServerCertificate):
+        * Modules/encryptedmedia/MediaKeys.h:
+        * testing/MockCDMFactory.cpp:
+        (WebCore::MockCDM::supportsServerCertificates):
+        (WebCore::MockCDMInstance::setServerCertificate):
+        * testing/MockCDMFactory.h:
+        (WebCore::MockCDMFactory::supportsServerCertificates):
+        (WebCore::MockCDMFactory::setSupportsServerCertificates):
+        * testing/MockCDMFactory.idl:
+
+2017-01-10  Youenn Fablet  <youenn@apple.com>
+
+        CachedScript cloning does not clone encodedSize
+        https://bugs.webkit.org/show_bug.cgi?id=166865
+
+        Reviewed by Darin Adler.
+
+        Covered by updated test.
+
+        * loader/cache/CachedResource.cpp:
+        (WebCore::CachedResource::setBodyDataFrom): set encoded size based on being cloned resource.
+        * loader/cache/CachedScript.cpp:
+        (WebCore::CachedScript::script):
+        (WebCore::CachedScript::setBodyDataFrom): Making use of CachedResource::setBodyDataFrom for complete cloning.
+
+2017-01-10  Zan Dobersek  <zdobersek@igalia.com>
+
+        Unreviewed. Remove the unused gReadyStateTimerInterval global from
+        the MediaPlayerPrivateGStreamerMSE implementation file as it's only
+        springing up a compiler warning.
+
+        * platform/graphics/gstreamer/mse/MediaPlayerPrivateGStreamerMSE.cpp:
+
+2017-01-10  Zan Dobersek  <zdobersek@igalia.com>
+
+        [CoordinatedGraphics] TextureMapperPlatformLayerProxy is constantly getting activated
+        https://bugs.webkit.org/show_bug.cgi?id=166856
+
+        Reviewed by Michael Catanzaro.
+
+        When CoordinatedGraphicsLayer::setContentsNeedsDisplay() is called, currently with
+        the threaded CoordinatedGraphics mode the platform layer is marked for synchronizing.
+        This means that at flush-time this layer swaps the buffer of the wrapped platform
+        layer and updates the layer state to indicate that the underlying
+        TextureMapperPlatformLayerProxy object has to be activated on the composition thread.
+
+        This current logic results in the TextureMapperPlatformLayerProxy object being
+        reactivated for every display request that arrives via setContentsNeedsDisplay().
+        This is pretty wasteful since this activation heap-allocates a RunLoop::Timer object
+        which internally also locks up the GLib main context to attach a new source, and
+        that's only after the source on the previous RunLoop::Timer was detached before
+        that RunLoop::Timer was destroyed.
+
+        To avoid this, CoordinatedGraphicsLayer::setContentsNeedsDisplay() sets a new flag,
+        m_shouldUpdatePlatformLayer. During flush, this flag is checked in
+        CoordinatedGraphicsLayer::updatePlatformLayer(), with the buffer swap performed in
+        case it's set. CoordinatedGraphicsLayer::syncPlatformLayer() now only sets the
+        platform layer proxy object for that layer's state.
+
+        * platform/graphics/texmap/coordinated/CoordinatedGraphicsLayer.cpp:
+        (WebCore::CoordinatedGraphicsLayer::CoordinatedGraphicsLayer):
+        (WebCore::CoordinatedGraphicsLayer::setContentsNeedsDisplay):
+        (WebCore::CoordinatedGraphicsLayer::syncPlatformLayer):
+        (WebCore::CoordinatedGraphicsLayer::updatePlatformLayer):
+        (WebCore::CoordinatedGraphicsLayer::flushCompositingStateForThisLayerOnly):
+        * platform/graphics/texmap/coordinated/CoordinatedGraphicsLayer.h:
+
+2017-01-10  Zan Dobersek  <zdobersek@igalia.com>
+
+        [TexMap] Use WTF::Function in TextureMapperPlatformLayerProxy
+        https://bugs.webkit.org/show_bug.cgi?id=166853
+
+        Reviewed by Michael Catanzaro.
+
+        Use WTF::Function in the TextureMapperPlatformLayerProxy, instead of
+        the std::function bloat.
+
+        * platform/graphics/texmap/TextureMapperPlatformLayerProxy.cpp:
+        (WebCore::TextureMapperPlatformLayerProxy::scheduleUpdateOnCompositorThread):
+        (WebCore::TextureMapperPlatformLayerProxy::compositorThreadUpdateTimerFired):
+        * platform/graphics/texmap/TextureMapperPlatformLayerProxy.h:
+
+2017-01-10  Zan Dobersek  <zdobersek@igalia.com>
+
+        [TextureMapper] TextureMapperPlatformLayerProxy::swapBuffers() should hold the lock throughout invocation
+        https://bugs.webkit.org/show_bug.cgi?id=166852
+
+        Reviewed by Michael Catanzaro.
+
+        * platform/graphics/texmap/TextureMapperPlatformLayerProxy.cpp:
+        (WebCore::TextureMapperPlatformLayerProxy::swapBuffer): Append to previous buffer
+        to the m_usedBuffers Vector while the object's lock is held. Everywhere else the
+        m_usedBuffers Vector is used under the lock, no reason to not do the same here.
+
+2017-01-09  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        Implement JSSourceCode to propagate SourceCode in module pipeline
+        https://bugs.webkit.org/show_bug.cgi?id=166861
+
+        Reviewed by Saam Barati.
+
+        Now SourceOrigin is correctly propagated through the module pipeline.
+        So the error reported by http/tests/security/contentSecurityPolicy/module-eval-blocked-expected.html
+        is updated.
+
+        * ForwardingHeaders/runtime/JSSourceCode.h: Added.
+        * bindings/js/JSDOMPromise.h:
+        (WebCore::DeferredPromise::resolveWithCallback):
+        * bindings/js/ScriptModuleLoader.cpp:
+        (WebCore::ScriptModuleLoader::notifyFinished):
+
+2017-01-09  Chris Dumez  <cdumez@apple.com>
+
+        REGRESSION(r189555): ImageDocument title no longer includes the size of the image
+        https://bugs.webkit.org/show_bug.cgi?id=166876
+        <rdar://problem/29939970>
+
+        Reviewed by Tim Horton.
+
+        ImageDocument title no longer included the size of the image after r189555.
+        This is because Document::setTitle() is a no-op if the document does not
+        have a <head> element. To address the issue, we now include a <head>
+        element in ImageDocuments so that their title element properly gets added
+        to it.
+
+        Test: fast/images/imageDocument-title.html
+
+        * html/ImageDocument.cpp:
+        (WebCore::ImageDocument::createDocumentStructure):
+
 2017-01-09  Zalan Bujtas  <zalan@apple.com>
 
         ASSERTION FAILED: newLogicalTop >= logicalTop in WebCore::RenderBlockFlow::getClearDelta

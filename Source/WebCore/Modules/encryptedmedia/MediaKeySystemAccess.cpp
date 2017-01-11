@@ -74,7 +74,7 @@ void MediaKeySystemAccess::createMediaKeys(Ref<DeferredPromise>&& promise)
         m_implementation->loadAndInitialize();
 
         // 2.5. Let instance be a new instance of the Key System implementation represented by this object's cdm implementation value.
-        std::unique_ptr<CDMInstance> instance = m_implementation->createInstance();
+        auto instance = m_implementation->createInstance();
         if (!instance) {
             promise->reject(INVALID_STATE_ERR);
             return;
@@ -105,7 +105,7 @@ void MediaKeySystemAccess::createMediaKeys(Ref<DeferredPromise>&& promise)
         // 2.10.3. Let the supported session types value be be the value of configuration's sessionTypes member.
         // 2.10.4. Let the cdm implementation value be this object's cdm implementation value.
         // 2.10.5. Let the cdm instance value be instance.
-        auto mediaKeys = MediaKeys::create(useDistinctiveIdentifier, persistentStateAllowed, m_configuration->sessionTypes, m_implementation.copyRef(), WTFMove(instance));
+        auto mediaKeys = MediaKeys::create(useDistinctiveIdentifier, persistentStateAllowed, m_configuration->sessionTypes, m_implementation.copyRef(), instance.releaseNonNull());
 
         // 2.11. Resolve promise with media keys.
         promise->resolveWithNewlyCreated<IDLInterface<MediaKeys>>(WTFMove(mediaKeys));

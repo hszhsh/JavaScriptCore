@@ -1,3 +1,213 @@
+2017-01-10  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r210052.
+        https://bugs.webkit.org/show_bug.cgi?id=166915
+
+        "breaks web compatability" (Requested by keith_miller on
+        #webkit).
+
+        Reverted changeset:
+
+        "Add support for global"
+        https://bugs.webkit.org/show_bug.cgi?id=165171
+        http://trac.webkit.org/changeset/210052
+
+2017-01-10  Sam Weinig  <sam@webkit.org>
+
+        [WebIDL] Remove most of the custom bindings for the WebGL code
+        https://bugs.webkit.org/show_bug.cgi?id=166834
+
+        Reviewed by Alex Christensen.
+
+        * fast/canvas/webgl/gl-object-get-calls-expected.txt:
+        Update result for better error message.
+
+2017-01-10  Ryosuke Niwa  <rniwa@webkit.org>
+
+        :active and :hover states may not be updated across slots
+        https://bugs.webkit.org/show_bug.cgi?id=166881
+        <rdar://problem/29944582>
+
+        Reviewed by Antti Koivisto.
+
+        Added two regression tests; one for clearing :active state across a slot, and another one for clearing
+        a hover state on an ancestor of a slot to which a slot with the hovered element is assigned.
+
+        * fast/shadow-dom/clear-active-state-in-shadow-expected.html: Added.
+        * fast/shadow-dom/clear-active-state-in-shadow.html: Added.
+        * fast/shadow-dom/hover-over-nested-slotted-content-expected.html: Added.
+        * fast/shadow-dom/hover-over-nested-slotted-content.html: Added.
+        * platform/ios-simulator/TestExpectations:
+
+2017-01-10  Wenson Hsieh  <wenson_hsieh@apple.com>
+
+        Implement "proximity" scroll snapping
+        https://bugs.webkit.org/show_bug.cgi?id=135994
+        <rdar://problem/18162418>
+
+        Reviewed by Dean Jackson.
+
+        Adds 3 new layout tests for proximity scroll snapping. Also tweaks some existing tests that test scroll snapping
+        after scrolling with momentum to use the custom heuristic for predicting scroll destination instead of platform
+        momentum scrolling. This ensures that the results of our layout tests that depend on predicting momentum scroll
+        destination are consistent across runs.
+
+        * tiled-drawing/scrolling/latched-div-with-scroll-snap.html:
+        * tiled-drawing/scrolling/scroll-snap/scroll-snap-iframe.html:
+        * tiled-drawing/scrolling/scroll-snap/scroll-snap-mandatory-2d-overflow.html:
+        * tiled-drawing/scrolling/scroll-snap/scroll-snap-mandatory-borders.html:
+        * tiled-drawing/scrolling/scroll-snap/scroll-snap-mandatory-hidden-scrollbars.html:
+        * tiled-drawing/scrolling/scroll-snap/scroll-snap-mandatory-mainframe-horizontal.html:
+        * tiled-drawing/scrolling/scroll-snap/scroll-snap-mandatory-mainframe-slow-horizontal.html:
+        * tiled-drawing/scrolling/scroll-snap/scroll-snap-mandatory-mainframe-slow-vertical.html:
+        * tiled-drawing/scrolling/scroll-snap/scroll-snap-mandatory-mainframe-vertical-then-horizontal.html:
+        * tiled-drawing/scrolling/scroll-snap/scroll-snap-mandatory-mainframe-vertical.html:
+        * tiled-drawing/scrolling/scroll-snap/scroll-snap-mandatory-overflow-stateless.html:
+        * tiled-drawing/scrolling/scroll-snap/scroll-snap-mandatory-overflow.html:
+        * tiled-drawing/scrolling/scroll-snap/scroll-snap-mandatory-padding.html:
+        * tiled-drawing/scrolling/scroll-snap/scroll-snap-mandatory-rotated.html:
+
+        Force these tests to use platform-independent scrolling momentum prediction, by multiplying the last scroll
+        delta upon release by a constant factor.
+
+        * tiled-drawing/scrolling/scroll-snap/scroll-snap-mandatory-then-proximity-expected.txt: Added.
+        * tiled-drawing/scrolling/scroll-snap/scroll-snap-mandatory-then-proximity.html: Added.
+
+        Tests that after changing scroll-snap-type from mandatory to proximity, swiping downwards no longer snaps the
+        scroll offset to the second box, but instead leaves the scroll offset somewhere in the middle of the first box.
+
+        * tiled-drawing/scrolling/scroll-snap/scroll-snap-proximity-mainframe-expected.txt: Added.
+        * tiled-drawing/scrolling/scroll-snap/scroll-snap-proximity-mainframe.html: Added.
+
+        Tests that when scroll-snap-type is proximity in the mainframe, scrolling slightly downwards snaps the scroll
+        offset back up to the top; scrolling somewhere in the middle of the first box does not snap the scroll offset;
+        and scrolling near the end of the first box snaps the scroll offset to the second box.
+
+        * tiled-drawing/scrolling/scroll-snap/scroll-snap-proximity-overflow-expected.txt: Added.
+        * tiled-drawing/scrolling/scroll-snap/scroll-snap-proximity-overflow.html: Added.
+
+        Similar to scroll-snap-proximity-mainframe.html, except for overflow scrolling instead of the mainframe.
+
+        * tiled-drawing/scrolling/scroll-snap/scroll-snap-scrolling-jumps-to-top.html:
+
+2017-01-10  Chris Dumez  <cdumez@apple.com>
+
+        Make Event.initEvent()'s first parameter mandatory
+        https://bugs.webkit.org/show_bug.cgi?id=166894
+
+        Reviewed by Alex Christensen.
+
+        Add layout test coverage.
+
+        * fast/events/initEvent-parameters-expected.txt: Added.
+        * fast/events/initEvent-parameters.html: Added.
+
+2017-01-10  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r210537.
+        https://bugs.webkit.org/show_bug.cgi?id=166903
+
+        This change introduced JSC test failures (Requested by
+        ryanhaddad on #webkit).
+
+        Reverted changeset:
+
+        "Implement JSSourceCode to propagate SourceCode in module
+        pipeline"
+        https://bugs.webkit.org/show_bug.cgi?id=166861
+        http://trac.webkit.org/changeset/210537
+
+2017-01-10  Jer Noble  <jer.noble@apple.com>
+
+        Add support for MediaKeys.generateRequest().
+        https://bugs.webkit.org/show_bug.cgi?id=166880
+
+        Reviewed by Xabier Rodriguez-Calvar.
+
+        Add shouldResolve() and shouldReject() to video-test.js and update existing
+        tests to use these new functions.
+
+        * media/encrypted-media/mock-MediaKeys-createSession-expected.txt: Added.
+        * media/encrypted-media/mock-MediaKeys-createSession.html: Added.
+        * media/encrypted-media/mock-MediaKeys-setServerCertificate.html:
+        * media/encrypted-media/mock-MediaKeySession-generateRequest.html:
+        * media/encrypted-media/mock-MediaKeySystemAccess.html:
+        * media/encrypted-media/mock-navigator-requestMediaKeySystemAccess.html:
+        * media/video-test.js:
+        (shouldResolve):
+        (shouldReject):
+        * platform/mac/TestExpectations:
+
+2017-01-10  Jer Noble  <jer.noble@apple.com>
+
+        Add support for MediaKeys.createSession().
+        https://bugs.webkit.org/show_bug.cgi?id=166796
+
+        Reviewed by Eric Carlson.
+
+        * media/encrypted-media/mock-MediaKeys-createSession-expected.txt: Added.
+        * media/encrypted-media/mock-MediaKeys-createSession.html: Added.
+        * platform/mac/TestExpectations:
+
+2017-01-10  Jer Noble  <jer.noble@apple.com>
+
+        Add support for MediaKeys.setServerCertificate()
+        https://bugs.webkit.org/show_bug.cgi?id=166772
+
+        Reviewed by Darin Adler.
+
+        * media/encrypted-media/mock-MediaKeys-setServerCertificate-expected.txt: Added.
+        * media/encrypted-media/mock-MediaKeys-setServerCertificate.html: Added.
+
+2017-01-10  Youenn Fablet  <youenn@apple.com>
+
+        CachedScript cloning does not clone encodedSize
+        https://bugs.webkit.org/show_bug.cgi?id=166865
+
+        Reviewed by Darin Adler.
+
+        * http/tests/security/cross-origin-cached-scripts-expected.txt:
+        * http/tests/security/cross-origin-cached-scripts.html:
+        * http/tests/security/resources/notify-loaded.js:
+
+2017-01-09  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Add an iOS test for tapping on a text node assigned to a slot
+        https://bugs.webkit.org/show_bug.cgi?id=166877
+
+        Reviewed by Andy Estes.
+
+        Add a test for tapping on a text node assigned to a slot.
+        touchstart event must be fired on a parent of the slot with a touch event handler.
+
+        * TestExpectations:
+        * fast/shadow-dom/touch-event-on-text-assigned-to-slot-expected.txt: Added.
+        * fast/shadow-dom/touch-event-on-text-assigned-to-slot.html: Added.
+        * resources/ui-helper.js:
+        (window.UIHelper.tapAt): Added.
+
+2017-01-09  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        Implement JSSourceCode to propagate SourceCode in module pipeline
+        https://bugs.webkit.org/show_bug.cgi?id=166861
+
+        Reviewed by Saam Barati.
+
+        * http/tests/security/contentSecurityPolicy/module-eval-blocked-expected.txt:
+
+2017-01-09  Chris Dumez  <cdumez@apple.com>
+
+        REGRESSION(r189555): ImageDocument title no longer includes the size of the image
+        https://bugs.webkit.org/show_bug.cgi?id=166876
+        <rdar://problem/29939970>
+
+        Reviewed by Tim Horton.
+
+        Add layout test coverage.
+
+        * fast/images/imageDocument-title-expected.txt: Added.
+        * fast/images/imageDocument-title.html: Added.
+
 2017-01-09  Zalan Bujtas  <zalan@apple.com>
 
         ASSERTION FAILED: newLogicalTop >= logicalTop in WebCore::RenderBlockFlow::getClearDelta

@@ -1,3 +1,76 @@
+2017-01-10  Mark Lam  <mark.lam@apple.com>
+
+        Reverting run-jsc-stress-tests' $buildType to use string values.
+        https://bugs.webkit.org/show_bug.cgi?id=166912
+
+        Rubber stamped by Filip Pizlo.
+
+        This is so that we can test for it in the tests e.g.
+        //@ if $buildType == "debug" then runDefault("--maxSingleAllocationSize=1048576") else skip end
+
+        * Scripts/run-jsc-stress-tests:
+
+2017-01-10  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Temporarily add back the file removed in r210463 to unbreak internal bots.
+
+        * Scripts/webkitpy/benchmark_runner/data/patches/Animometer.patch: Copied from Tools/Scripts/webkitpy/benchmark_runner/data/patches/Animometer.patch.
+
+2017-01-10  Jonathan Bedard  <jbedard@apple.com>
+
+        svn-apply failed to apply a patch (deleting file with svn property)
+        https://bugs.webkit.org/show_bug.cgi?id=165953
+
+        Reviewed by Daniel Bates.
+
+        * Scripts/VCSUtils.pm:
+        (parseSvnPropertyValue): The beginning of a diff will cause an early exit in the case of no empty newlines.
+        * Scripts/webkitperl/VCSUtils_unittest/parseSvnProperty.pl: Add tests without break between diffs for properties.
+
+2017-01-10  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Update flakiness dashboard configuration.
+        https://bugs.webkit.org/show_bug.cgi?id=166869
+
+        Reviewed by Alexey Proskuryakov.
+
+        * TestResultServer/static-dashboards/builders.jsonp:
+        * TestResultServer/static-dashboards/flakiness_dashboard.js:
+
+2017-01-10  Carlos Alberto Lopez Perez  <clopez@igalia.com>
+
+        [GTK] Stop honoring the environment variable USE_NATIVE_XDISPLAY
+        https://bugs.webkit.org/show_bug.cgi?id=165232
+
+        Unreviewed follow-up patch after r210539 and r210523.
+
+        Instead of using that environment variable, the argument
+        --display-server=xorg should be passed now.
+
+        The GTK+ performance bot was the only bot using this, and is
+        already passing --display-server=xorg after r210539.
+
+        * Scripts/webkitpy/port/gtk.py:
+        (GtkPort._driver_class):
+
+2017-01-10  Carlos Alberto Lopez Perez  <clopez@igalia.com>
+
+        [GTK] Add a new release test bot for Wayland and pass --display-server=xorg to the GTK Perf bot.
+        https://bugs.webkit.org/show_bug.cgi?id=166872
+
+        Reviewed by Michael Catanzaro.
+
+        Add the new wayland release test bot as a test-only bot. It will download the built product from the release build-only bot.
+        Define the required "--display-server=driver" in the bot additionalArguments config entry.
+        Implement support for honoring additionalArguments on the RunGtkAPITests and RunAndUploadPerfTests steps.
+        The step RunWebKitTests already has support for it.
+
+        * BuildSlaveSupport/build.webkit.org-config/config.json:
+        * BuildSlaveSupport/build.webkit.org-config/master.cfg:
+        (RunGtkAPITests.start):
+        (RunAndUploadPerfTests.start):
+        * BuildSlaveSupport/build.webkit.org-config/mastercfg_unittest.py:
+
 2017-01-09  Ryan Haddad  <ryanhaddad@apple.com>
 
         Unreviewed, rolling out r210531.

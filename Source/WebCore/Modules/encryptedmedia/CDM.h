@@ -29,6 +29,7 @@
 
 #include "ContextDestructionObserver.h"
 #include "MediaKeySystemConfiguration.h"
+#include "SharedBuffer.h"
 #include <functional>
 #include <wtf/HashSet.h>
 #include <wtf/Ref.h>
@@ -43,6 +44,7 @@ class CDMInstance;
 class CDMPrivate;
 class Document;
 class ScriptExecutionContext;
+class SharedBuffer;
 
 struct MediaKeysRestrictions;
 
@@ -70,7 +72,13 @@ public:
     const String& keySystem() const { return m_keySystem; }
 
     void loadAndInitialize();
-    std::unique_ptr<CDMInstance> createInstance();
+    RefPtr<CDMInstance> createInstance();
+    bool supportsServerCertificates() const;
+    bool supportsSessions() const;
+    bool supportsInitDataType(const AtomicString&) const;
+
+    RefPtr<SharedBuffer> sanitizeInitData(const AtomicString& initDataType, const SharedBuffer&);
+    bool supportsInitData(const AtomicString& initDataType, const SharedBuffer&);
 
 private:
     CDM(Document&, const String& keySystem);

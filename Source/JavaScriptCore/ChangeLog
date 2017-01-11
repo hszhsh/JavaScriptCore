@@ -1,3 +1,237 @@
+2017-01-10  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r210052.
+        https://bugs.webkit.org/show_bug.cgi?id=166915
+
+        "breaks web compatability" (Requested by keith_miller on
+        #webkit).
+
+        Reverted changeset:
+
+        "Add support for global"
+        https://bugs.webkit.org/show_bug.cgi?id=165171
+        http://trac.webkit.org/changeset/210052
+
+2017-01-10  Sam Weinig  <sam@webkit.org>
+
+        [WebIDL] Remove most of the custom bindings for the WebGL code
+        https://bugs.webkit.org/show_bug.cgi?id=166834
+
+        Reviewed by Alex Christensen.
+
+        * runtime/ArrayPrototype.h:
+        * runtime/ObjectPrototype.h:
+        Export the ClassInfo so it can be used from WebCore.
+
+2017-01-09  Filip Pizlo  <fpizlo@apple.com>
+
+        Streamline the GC barrier slowpath
+        https://bugs.webkit.org/show_bug.cgi?id=166878
+
+        Reviewed by Geoffrey Garen and Saam Barati.
+        
+        This implements two optimizations to the barrier:
+        
+        - Removes the write barrier buffer. This was just overhead.
+        
+        - Teaches the slow path how to white an object that was black but unmarked, ensuring that
+          we don't take slow path for this object again.
+
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * dfg/DFGSpeculativeJIT.cpp:
+        (JSC::DFG::SpeculativeJIT::compileStoreBarrier):
+        * ftl/FTLLowerDFGToB3.cpp:
+        (JSC::FTL::DFG::LowerDFGToB3::emitStoreBarrier):
+        * heap/CellState.h:
+        * heap/Heap.cpp:
+        (JSC::Heap::Heap):
+        (JSC::Heap::markToFixpoint):
+        (JSC::Heap::addToRememberedSet):
+        (JSC::Heap::stopTheWorld):
+        (JSC::Heap::writeBarrierSlowPath):
+        (JSC::Heap::buildConstraintSet):
+        (JSC::Heap::flushWriteBarrierBuffer): Deleted.
+        * heap/Heap.h:
+        (JSC::Heap::writeBarrierBuffer): Deleted.
+        * heap/SlotVisitor.cpp:
+        (JSC::SlotVisitor::appendJSCellOrAuxiliary):
+        (JSC::SlotVisitor::setMarkedAndAppendToMarkStack):
+        (JSC::SlotVisitor::appendToMarkStack):
+        (JSC::SlotVisitor::visitChildren):
+        * heap/WriteBarrierBuffer.cpp: Removed.
+        * heap/WriteBarrierBuffer.h: Removed.
+        * jit/JITOperations.cpp:
+        * jit/JITOperations.h:
+        * runtime/JSCellInlines.h:
+        (JSC::JSCell::JSCell):
+        * runtime/StructureIDBlob.h:
+        (JSC::StructureIDBlob::StructureIDBlob):
+
+2017-01-10  Mark Lam  <mark.lam@apple.com>
+
+        Property setters should not be called for bound arguments list entries.
+        https://bugs.webkit.org/show_bug.cgi?id=165631
+
+        Reviewed by Filip Pizlo.
+
+        * builtins/FunctionPrototype.js:
+        (bind):
+        - use @putByValDirect to set the bound arguments so that we don't consult the
+          prototype chain for setters.
+
+        * runtime/IntlDateTimeFormatPrototype.cpp:
+        (JSC::IntlDateTimeFormatPrototypeGetterFormat):
+        * runtime/IntlNumberFormatPrototype.cpp:
+        (JSC::IntlNumberFormatPrototypeGetterFormat):
+        - no need to create a bound arguments array because these bound functions binds
+          no arguments according to the spec.
+
+2017-01-10  Skachkov Oleksandr  <gskachkov@gmail.com>
+
+        Calling async arrow function which is in a class's member function will cause error
+        https://bugs.webkit.org/show_bug.cgi?id=166879
+
+        Reviewed by Saam Barati.
+
+        Current patch fixed loading 'super' in async arrow function. Errored appear becuase 
+        super was loaded always nevertherless if it used in async arrow function or not, but bytecompiler
+        put to arrow function context only if it used within arrow function. So to fix this issue we need to 
+        check if super was used in arrow function. 
+
+        * bytecompiler/BytecodeGenerator.h:
+        * bytecompiler/NodesCodegen.cpp:
+        (JSC::FunctionNode::emitBytecode):
+
+2017-01-10  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r210537.
+        https://bugs.webkit.org/show_bug.cgi?id=166903
+
+        This change introduced JSC test failures (Requested by
+        ryanhaddad on #webkit).
+
+        Reverted changeset:
+
+        "Implement JSSourceCode to propagate SourceCode in module
+        pipeline"
+        https://bugs.webkit.org/show_bug.cgi?id=166861
+        http://trac.webkit.org/changeset/210537
+
+2017-01-10  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r210540.
+        https://bugs.webkit.org/show_bug.cgi?id=166896
+
+        too crude for non-WebCore clients (Requested by kling on
+        #webkit).
+
+        Reverted changeset:
+
+        "Crash when GC heap grows way too large."
+        https://bugs.webkit.org/show_bug.cgi?id=166875
+        http://trac.webkit.org/changeset/210540
+
+2017-01-09  Filip Pizlo  <fpizlo@apple.com>
+
+        JSArray has some object scanning races
+        https://bugs.webkit.org/show_bug.cgi?id=166874
+
+        Reviewed by Mark Lam.
+        
+        This fixes two separate bugs, both of which I detected by running
+        array-splice-contiguous.js in extreme anger:
+        
+        1) Some of the paths of shifting and unshifting were not grabbing the internal cell
+           lock. This was causing the array storage scan to crash, even though it was well
+           synchronized (the scan does hold the lock). The fix is just to hold the lock anywhere
+           that memmoves the innards of the butterfly.
+        
+        2) Out of line property scanning was synchronized using double collect snapshot. Array
+           storage scanning was synchronized using locks. But what if array storage
+           transformations messed up the out of line properties? It turns out that we actually
+           need to hoist the array storage scanner's locking up into the double collect
+           snapshot.
+        
+        I don't know how to write a test that does any better of a job of catching this than
+        array-splice-contiguous.js.
+
+        * heap/DeferGC.h: Make DisallowGC usable even if NDEBUG.
+        * runtime/JSArray.cpp:
+        (JSC::JSArray::unshiftCountSlowCase):
+        (JSC::JSArray::shiftCountWithArrayStorage):
+        (JSC::JSArray::unshiftCountWithArrayStorage):
+        * runtime/JSObject.cpp:
+        (JSC::JSObject::visitButterflyImpl):
+
+2017-01-10  Andreas Kling  <akling@apple.com>
+
+        Crash when GC heap grows way too large.
+        <https://webkit.org/b/166875>
+        <rdar://problem/27896585>
+
+        Reviewed by Mark Lam.
+
+        Hard cap the JavaScript heap at 4GB of live objects (determined post-GC.)
+        If we go past this limit, crash with a recognizable signature.
+
+        * heap/Heap.cpp:
+        (JSC::Heap::didExceedHeapSizeLimit):
+        (JSC::Heap::updateAllocationLimits):
+
+2017-01-09  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        Implement JSSourceCode to propagate SourceCode in module pipeline
+        https://bugs.webkit.org/show_bug.cgi?id=166861
+
+        Reviewed by Saam Barati.
+
+        Instead of propagating source code string, we propagate JSSourceCode
+        cell in the module pipeline. This allows us to attach a metadata
+        to the propagated source code string. In particular, it propagates
+        SourceOrigin through the module pipeline.
+
+        * CMakeLists.txt:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * builtins/ModuleLoaderPrototype.js:
+        (fulfillFetch):
+        (requestFetch):
+        * jsc.cpp:
+        (GlobalObject::moduleLoaderFetch):
+        * llint/LLIntData.cpp:
+        (JSC::LLInt::Data::performAssertions):
+        * llint/LowLevelInterpreter.asm:
+        * runtime/Completion.cpp:
+        (JSC::loadAndEvaluateModule):
+        (JSC::loadModule):
+        * runtime/JSModuleLoader.cpp:
+        (JSC::JSModuleLoader::provide):
+        * runtime/JSModuleLoader.h:
+        * runtime/JSSourceCode.cpp: Added.
+        (JSC::JSSourceCode::destroy):
+        * runtime/JSSourceCode.h: Added.
+        (JSC::JSSourceCode::createStructure):
+        (JSC::JSSourceCode::create):
+        (JSC::JSSourceCode::sourceCode):
+        (JSC::JSSourceCode::JSSourceCode):
+        * runtime/JSType.h:
+        * runtime/ModuleLoaderPrototype.cpp:
+        (JSC::moduleLoaderPrototypeParseModule):
+        * runtime/VM.cpp:
+        (JSC::VM::VM):
+        * runtime/VM.h:
+
+2017-01-09  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        REGRESSION (r210522): ASSERTION FAILED: divot.offset >= divotStart.offset seen with stress/import-basic.js and stress/import-from-eval.js
+        https://bugs.webkit.org/show_bug.cgi?id=166873
+
+        Reviewed by Saam Barati.
+
+        The divot should be the end of `import` token.
+
+        * parser/Parser.cpp:
+        (JSC::Parser<LexerType>::parseMemberExpression):
+
 2017-01-09  Filip Pizlo  <fpizlo@apple.com>
 
         Unreviewed, fix cloop.

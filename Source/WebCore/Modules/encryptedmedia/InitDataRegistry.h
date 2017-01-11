@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,47 +23,46 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "config.h"
-#include "WriteBarrierBuffer.h"
+#pragma once
 
-#include "GCAssertions.h"
-#include "Heap.h"
-#include "JSCell.h"
-#include "JSCInlines.h"
-#include "Structure.h"
+#if ENABLE(ENCRYPTED_MEDIA)
 
-namespace JSC {
+#include <wtf/Function.h>
+#include <wtf/HashMap.h>
+#include <wtf/Ref.h>
+#include <wtf/RefPtr.h>
+#include <wtf/Vector.h>
+#include <wtf/text/AtomicString.h>
+#include <wtf/text/AtomicStringHash.h>
 
-WriteBarrierBuffer::WriteBarrierBuffer(unsigned capacity)
-    : m_currentIndex(0)
-    , m_capacity(capacity)
-    , m_buffer(static_cast<JSCell**>(fastMalloc(sizeof(JSCell*) * capacity)))
-{
+namespace WebCore {
+
+class SharedBuffer;
+
+class InitDataRegistry {
+public:
+    WEBCORE_EXPORT static InitDataRegistry& shared();
+    friend class NeverDestroyed<InitDataRegistry>;
+
+    RefPtr<SharedBuffer> sanitizeInitData(const AtomicString& initDataType, const SharedBuffer&);
+    WEBCORE_EXPORT Vector<Ref<SharedBuffer>> extractKeyIDs(const AtomicString& initDataType, const SharedBuffer&);
+
+    struct InitDataTypeCallbacks {
+        using SanitizeInitDataCallback = Function<RefPtr<SharedBuffer>(const SharedBuffer&)>;
+        using ExtractKeyIDsCallback = Function<Vector<Ref<SharedBuffer>>(const SharedBuffer&)>;
+
+        SanitizeInitDataCallback sanitizeInitData;
+        ExtractKeyIDsCallback extractKeyIDs;
+    };
+    void registerInitDataType(const AtomicString& initDataType, InitDataTypeCallbacks&&);
+
+private:
+    InitDataRegistry();
+    ~InitDataRegistry();
+
+    HashMap<AtomicString, InitDataTypeCallbacks> m_types;
+};
+
 }
 
-WriteBarrierBuffer::~WriteBarrierBuffer()
-{
-    fastFree(m_buffer);
-}
-
-void WriteBarrierBuffer::flush(Heap& heap)
-{
-    ASSERT(m_currentIndex <= m_capacity);
-    for (size_t i = 0; i < m_currentIndex; ++i)
-        heap.writeBarrier(m_buffer[i]);
-    m_currentIndex = 0;
-}
-
-void WriteBarrierBuffer::reset()
-{
-    m_currentIndex = 0;
-}
-
-void WriteBarrierBuffer::add(JSCell* cell)
-{
-    ASSERT_GC_OBJECT_LOOKS_VALID(cell);
-    ASSERT(m_currentIndex < m_capacity);
-    m_buffer[m_currentIndex++] = cell;
-}
-
-} // namespace JSC
+#endif // ENABLE(ENCRYPTED_MEDIA)

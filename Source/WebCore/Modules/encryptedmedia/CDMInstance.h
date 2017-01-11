@@ -28,12 +28,14 @@
 #if ENABLE(ENCRYPTED_MEDIA)
 
 #include <wtf/Forward.h>
+#include <wtf/RefCounted.h>
 
 namespace WebCore {
 
 struct MediaKeySystemConfiguration;
+class SharedBuffer;
 
-class CDMInstance {
+class CDMInstance : public RefCounted<CDMInstance> {
 public:
     virtual ~CDMInstance() { }
 
@@ -45,6 +47,16 @@ public:
     virtual SuccessValue initializeWithConfiguration(const MediaKeySystemConfiguration&) = 0;
     virtual SuccessValue setDistinctiveIdentifiersAllowed(bool) = 0;
     virtual SuccessValue setPersistentStateAllowed(bool) = 0;
+    virtual SuccessValue setServerCertificate(Ref<SharedBuffer>&&) = 0;
+
+    enum class LicenseType {
+        Temporary,
+        Persistable,
+        UsageRecord,
+    };
+
+    using LicenseCallback = Function<void(Ref<SharedBuffer>&& message, const String& sessionId, bool needsIndividualization, SuccessValue succeeded)>;
+    virtual void requestLicense(LicenseType, const AtomicString& initDataType, Ref<SharedBuffer>&& initData, LicenseCallback) = 0;
 };
 
 }
