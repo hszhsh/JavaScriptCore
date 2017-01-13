@@ -1,0 +1,4 @@
+*.a filter=lfs diff=lfs merge=lfs -text
+iOS/simulator/JavaScriptCore.framework/JavaScriptCore filter=lfs diff=lfs merge=lfs -text
+iOS/device/JavaScriptCore.framework/JavaScriptCore filter=lfs diff=lfs merge=lfs -text
+Mac/JavaScriptCore.framework/Versions/A/JavaScriptCore filter=lfs diff=lfs merge=lfs -text
