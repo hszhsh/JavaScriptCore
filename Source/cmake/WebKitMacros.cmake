@@ -282,7 +282,11 @@ macro(WEBKIT_FRAMEWORK _target)
         ${${_target}_HEADERS}
         ${${_target}_SOURCES}
     )
-    target_include_directories(${_target} PUBLIC "$<BUILD_INTERFACE:${${_target}_INCLUDE_DIRECTORIES}>")
+    if (ANDROID)
+        include_directories(${${_target}_INCLUDE_DIRECTORIES})
+    else ()
+        target_include_directories(${_target} PUBLIC "$<BUILD_INTERFACE:${${_target}_INCLUDE_DIRECTORIES}>")
+    endif ()
     target_link_libraries(${_target} ${${_target}_LIBRARIES})
     set_target_properties(${_target} PROPERTIES COMPILE_DEFINITIONS "BUILDING_${_target}")
 
