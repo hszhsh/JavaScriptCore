@@ -784,9 +784,11 @@ set(JavaScriptCore_SOURCES
     runtime/JSPropertyNameIterator.cpp
     runtime/JSProxy.cpp
     runtime/JSScope.cpp
+    runtime/JSScriptFetcher.cpp
     runtime/JSSegmentedVariableObject.cpp
     runtime/JSSet.cpp
     runtime/JSSetIterator.cpp
+    runtime/JSSourceCode.cpp
     runtime/JSString.cpp
     runtime/JSStringIterator.cpp
     runtime/JSStringJoiner.cpp

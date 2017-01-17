@@ -152,6 +152,7 @@
 #import <WebCore/FileSystemIOS.h>
 #import <WebCore/NSFileManagerSPI.h>
 #import <WebCore/QuickLook.h>
+#import <WebCore/QuickLookHandleClient.h>
 #endif
 
 #if HAVE(APP_LINKS)
@@ -1849,7 +1850,7 @@ public:
 
     virtual void handleEvent(Event* event)
     {
-        Frame* frame = Frame::frameForWidget(this);
+        Frame* frame = Frame::frameForWidget(*this);
         if (!frame)
             return;
         
@@ -2283,7 +2284,7 @@ void WebFrameLoaderClient::didCreateQuickLookHandle(WebCore::QuickLookHandle& ha
             removeQLPreviewConverterForURL(m_firstRequestURL.get());
         }
     };
-    handle.setClient(adoptRef(new QuickLookDocumentWriter(handle)));
+    handle.setClient(adoptRef(*new QuickLookDocumentWriter(handle)));
 }
 #endif
 

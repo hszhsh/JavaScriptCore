@@ -38,10 +38,10 @@
 #include "HTMLNames.h"
 #include "HTMLParserIdioms.h"
 #include "IgnoreDestructiveWriteCountIncrementer.h"
+#include "InlineClassicScript.h"
 #include "LoadableClassicScript.h"
 #include "LoadableModuleScript.h"
 #include "MIMETypeRegistry.h"
-#include "Page.h"
 #include "PendingScript.h"
 #include "SVGNames.h"
 #include "SVGScriptElement.h"
@@ -275,7 +275,7 @@ bool ScriptElement::prepareScript(const TextPosition& scriptStartPosition, Legac
     } else {
         ASSERT(scriptType == ScriptType::Classic);
         TextPosition position = document.isInDocumentWrite() ? TextPosition() : scriptStartPosition;
-        executeClassicScript(ScriptSourceCode(scriptContent(), document.url(), position, JSC::SourceProviderSourceType::Program));
+        executeClassicScript(ScriptSourceCode(scriptContent(), document.url(), position, JSC::SourceProviderSourceType::Program, InlineClassicScript::create(*this)));
     }
 
     return true;
@@ -292,11 +292,14 @@ bool ScriptElement::requestClassicScript(const String& sourceURL)
 
     ASSERT(!m_loadableScript);
     if (!stripLeadingAndTrailingHTMLSpaces(sourceURL).isEmpty()) {
-        String nonceAttribute = m_element.attributeWithoutSynchronization(HTMLNames::nonceAttr);
-        String crossOriginMode = m_element.attributeWithoutSynchronization(HTMLNames::crossoriginAttr);
-        auto request = requestScriptWithCache(m_element.document().completeURL(sourceURL), nonceAttribute, crossOriginMode);
-        if (request) {
-            m_loadableScript = LoadableClassicScript::create(WTFMove(request));
+        auto script = LoadableClassicScript::create(
+            m_element.attributeWithoutSynchronization(HTMLNames::nonceAttr),
+            m_element.attributeWithoutSynchronization(HTMLNames::crossoriginAttr),
+            scriptCharset(),
+            m_element.localName(),
+            m_element.isInUserAgentShadowTree());
+        if (script->load(m_element.document(), m_element.document().completeURL(sourceURL))) {
+            m_loadableScript = WTFMove(script);
             m_isExternalScript = true;
         }
     }
@@ -339,14 +342,16 @@ bool ScriptElement::requestModuleScript(const TextPosition& scriptStartPosition)
         }
 
         m_isExternalScript = true;
-        auto moduleScript = CachedModuleScript::create(nonce, crossOriginMode);
-        m_loadableScript = LoadableModuleScript::create(moduleScript.get());
-        moduleScript->load(m_element, moduleScriptRootURL);
+        auto script = LoadableModuleScript::create(nonce, crossOriginMode, scriptCharset(), m_element.localName(), m_element.isInUserAgentShadowTree());
+        script->load(m_element.document(), moduleScriptRootURL);
+        m_loadableScript = WTFMove(script);
         return true;
     }
 
+    auto script = LoadableModuleScript::create(nonce, crossOriginMode, scriptCharset(), m_element.localName(), m_element.isInUserAgentShadowTree());
+
     TextPosition position = m_element.document().isInDocumentWrite() ? TextPosition() : scriptStartPosition;
-    ScriptSourceCode sourceCode(scriptContent(), m_element.document().url(), position, JSC::SourceProviderSourceType::Module);
+    ScriptSourceCode sourceCode(scriptContent(), m_element.document().url(), position, JSC::SourceProviderSourceType::Module, script.copyRef());
 
     ASSERT(m_element.document().contentSecurityPolicy());
     const auto& contentSecurityPolicy = *m_element.document().contentSecurityPolicy();
@@ -354,40 +359,9 @@ bool ScriptElement::requestModuleScript(const TextPosition& scriptStartPosition)
     if (!contentSecurityPolicy.allowInlineScript(m_element.document().url(), m_startLineNumber, sourceCode.source().toStringWithoutCopying(), hasKnownNonce))
         return false;
 
-    auto moduleScript = CachedModuleScript::create(nonce, crossOriginMode);
-    m_loadableScript = LoadableModuleScript::create(moduleScript.get());
-    moduleScript->load(m_element, sourceCode);
+    script->load(m_element.document(), sourceCode);
+    m_loadableScript = WTFMove(script);
     return true;
-}
-
-CachedResourceHandle<CachedScript> ScriptElement::requestScriptWithCacheForModuleScript(const URL& sourceURL)
-{
-    ASSERT(m_loadableScript);
-    ASSERT(is<LoadableModuleScript>(*m_loadableScript));
-    auto& moduleScript = downcast<LoadableModuleScript>(*m_loadableScript);
-    return requestScriptWithCache(sourceURL, moduleScript.moduleScript().nonce(), moduleScript.moduleScript().crossOriginMode());
-}
-
-CachedResourceHandle<CachedScript> ScriptElement::requestScriptWithCache(const URL& sourceURL, const String& nonceAttribute, const String& crossOriginMode)
-{
-    Document& document = m_element.document();
-    auto* settings = document.settings();
-    if (settings && !settings->isScriptEnabled())
-        return nullptr;
-
-    ASSERT(document.contentSecurityPolicy());
-    bool hasKnownNonce = document.contentSecurityPolicy()->allowScriptWithNonce(nonceAttribute, m_element.isInUserAgentShadowTree());
-    ResourceLoaderOptions options = CachedResourceLoader::defaultCachedResourceOptions();
-    options.contentSecurityPolicyImposition = hasKnownNonce ? ContentSecurityPolicyImposition::SkipPolicyCheck : ContentSecurityPolicyImposition::DoPolicyCheck;
-
-    CachedResourceRequest request(ResourceRequest(sourceURL), options);
-    request.setAsPotentiallyCrossOrigin(crossOriginMode, document);
-    request.upgradeInsecureRequestIfNeeded(document);
-
-    request.setCharset(scriptCharset());
-    request.setInitiator(&element());
-
-    return document.cachedResourceLoader().requestScript(WTFMove(request));
 }
 
 void ScriptElement::executeClassicScript(const ScriptSourceCode& sourceCode)
@@ -430,7 +404,7 @@ void ScriptElement::executeModuleScript(CachedModuleScript& moduleScript)
     IgnoreDestructiveWriteCountIncrementer ignoreDesctructiveWriteCountIncrementer(&document);
     CurrentScriptIncrementer currentScriptIncrementer(document, m_element);
 
-    frame->script().linkAndEvaluateModuleScript(moduleScript, element());
+    frame->script().linkAndEvaluateModuleScript(moduleScript);
 }
 
 void ScriptElement::executeScriptAndDispatchEvent(LoadableScript& loadableScript)
@@ -453,7 +427,7 @@ void ScriptElement::executePendingScript(PendingScript& pendingScript)
     else {
         ASSERT(!pendingScript.error());
         ASSERT_WITH_MESSAGE(scriptType() == ScriptType::Classic, "Module script always have a loadableScript pointer.");
-        executeClassicScript(ScriptSourceCode(scriptContent(), m_element.document().url(), pendingScript.startingPosition(), JSC::SourceProviderSourceType::Program));
+        executeClassicScript(ScriptSourceCode(scriptContent(), m_element.document().url(), pendingScript.startingPosition(), JSC::SourceProviderSourceType::Program, InlineClassicScript::create(*this)));
         dispatchLoadEvent();
     }
 }

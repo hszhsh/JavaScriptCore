@@ -425,11 +425,18 @@ HTMLOptionElement* HTMLSelectElement::item(unsigned index)
     return options()->item(index);
 }
 
-ExceptionOr<void> HTMLSelectElement::setOption(unsigned index, HTMLOptionElement& option)
+ExceptionOr<void> HTMLSelectElement::setItem(unsigned index, HTMLOptionElement* option)
 {
+    if (!option) {
+        remove(index);
+        return { };
+    }
+
     if (index > maxSelectItems - 1)
         index = maxSelectItems - 1;
+
     int diff = index - length();
+    
     RefPtr<HTMLOptionElement> before;
     // Out of array bounds? First insert empty dummies.
     if (diff > 0) {
@@ -441,19 +448,25 @@ ExceptionOr<void> HTMLSelectElement::setOption(unsigned index, HTMLOptionElement
         before = item(index + 1);
         remove(index);
     }
+
     // Finally add the new element.
-    auto result = add(&option, HTMLElementOrInt { before.get() });
+    auto result = add(option, HTMLElementOrInt { before.get() });
     if (result.hasException())
         return result;
-    if (diff >= 0 && option.selected())
-        optionSelectionStateChanged(option, true);
+
+    if (diff >= 0 && option->selected())
+        optionSelectionStateChanged(*option, true);
+
     return { };
 }
 
 ExceptionOr<void> HTMLSelectElement::setLength(unsigned newLength)
 {
-    if (newLength > maxSelectItems)
-        newLength = maxSelectItems;
+    if (newLength > length() && newLength > maxSelectItems) {
+        document().addConsoleMessage(MessageSource::Other, MessageLevel::Warning, String::format("Blocked attempt to expand the option list to %u items. The maximum number of items allowed is %u.", newLength, maxSelectItems));
+        return { };
+    }
+
     int diff = length() - newLength;
 
     if (diff < 0) { // Add dummy elements.

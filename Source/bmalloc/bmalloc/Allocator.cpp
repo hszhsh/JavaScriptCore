@@ -27,6 +27,7 @@
 #include "BAssert.h"
 #include "Chunk.h"
 #include "Deallocator.h"
+#include "DebugHeap.h"
 #include "Heap.h"
 #include "PerProcess.h"
 #include "Sizes.h"
@@ -38,7 +39,7 @@ using namespace std;
 namespace bmalloc {
 
 Allocator::Allocator(Heap* heap, Deallocator& deallocator)
-    : m_isBmallocEnabled(heap->environment().isBmallocEnabled())
+    : m_debugHeap(heap->debugHeap())
     , m_deallocator(deallocator)
 {
     for (size_t sizeClass = 0; sizeClass < sizeClassCount; ++sizeClass)
@@ -52,8 +53,8 @@ Allocator::~Allocator()
 
 void* Allocator::tryAllocate(size_t size)
 {
-    if (!m_isBmallocEnabled)
-        return malloc(size);
+    if (m_debugHeap)
+        return m_debugHeap->malloc(size);
 
     if (size <= smallMax)
         return allocate(size);
@@ -73,25 +74,13 @@ void* Allocator::tryAllocate(size_t alignment, size_t size)
     bool crashOnFailure = false;
     return allocateImpl(alignment, size, crashOnFailure);
 }
-    
+
 void* Allocator::allocateImpl(size_t alignment, size_t size, bool crashOnFailure)
 {
     BASSERT(isPowerOfTwo(alignment));
 
-    if (!m_isBmallocEnabled) {
-        void* result = nullptr;
-        
-#if !defined(ANDROID) || (ANDROID_NATIVE_API_LEVEL > 15)
-        if (posix_memalign(&result, alignment, size)) {
-            if (crashOnFailure)
-                BCRASH();
-            return nullptr;
-        }
-#else
-            return memalign(alignment, size);
-#endif
-        return result;
-    }
+    if (m_debugHeap)
+        return m_debugHeap->memalign(alignment, size, crashOnFailure);
 
     if (!size)
         size = alignment;
@@ -108,12 +97,8 @@ void* Allocator::allocateImpl(size_t alignment, size_t size, bool crashOnFailure
 
 void* Allocator::reallocate(void* object, size_t newSize)
 {
-    if (!m_isBmallocEnabled) {
-        void* result = realloc(object, newSize);
-        if (!result)
-            BCRASH();
-        return result;
-    }
+    if (m_debugHeap)
+        return m_debugHeap->realloc(object, newSize);
 
     size_t oldSize = 0;
     switch (objectType(object)) {
@@ -198,12 +183,8 @@ NO_INLINE void* Allocator::allocateLogSizeClass(size_t size)
 
 void* Allocator::allocateSlowCase(size_t size)
 {
-    if (!m_isBmallocEnabled) {
-        void* result = malloc(size);
-        if (!result)
-            BCRASH();
-        return result;
-    }
+    if (m_debugHeap)
+        return m_debugHeap->malloc(size);
 
     if (size <= maskSizeClassMax) {
         size_t sizeClass = bmalloc::maskSizeClass(size);

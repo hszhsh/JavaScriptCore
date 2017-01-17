@@ -32,6 +32,7 @@ namespace JSC {
 
 class JSInternalPromise;
 class JSModuleNamespaceObject;
+class SourceCode;
 
 class JSModuleLoader : public JSNonFinalObject {
 private:
@@ -62,19 +63,19 @@ public:
     }
 
     // APIs to control the module loader.
-    JSValue provide(ExecState*, JSValue key, Status, const String&);
-    JSInternalPromise* loadAndEvaluateModule(ExecState*, JSValue moduleName, JSValue referrer, JSValue initiator);
-    JSInternalPromise* loadModule(ExecState*, JSValue moduleName, JSValue referrer, JSValue initiator);
-    JSValue linkAndEvaluateModule(ExecState*, JSValue moduleKey, JSValue initiator);
+    JSValue provide(ExecState*, JSValue key, Status, const SourceCode&);
+    JSInternalPromise* loadAndEvaluateModule(ExecState*, JSValue moduleName, JSValue referrer, JSValue scriptFetcher);
+    JSInternalPromise* loadModule(ExecState*, JSValue moduleName, JSValue referrer, JSValue scriptFetcher);
+    JSValue linkAndEvaluateModule(ExecState*, JSValue moduleKey, JSValue scriptFetcher);
 
     // Platform dependent hooked APIs.
     JSInternalPromise* importModule(ExecState*, JSString* moduleName, const SourceOrigin& referrer);
-    JSInternalPromise* resolve(ExecState*, JSValue name, JSValue referrer, JSValue initiator);
-    JSInternalPromise* fetch(ExecState*, JSValue key, JSValue initiator);
-    JSInternalPromise* instantiate(ExecState*, JSValue key, JSValue source, JSValue initiator);
+    JSInternalPromise* resolve(ExecState*, JSValue name, JSValue referrer, JSValue scriptFetcher);
+    JSInternalPromise* fetch(ExecState*, JSValue key, JSValue scriptFetcher);
+    JSInternalPromise* instantiate(ExecState*, JSValue key, JSValue source, JSValue scriptFetcher);
 
     // Additional platform dependent hooked APIs.
-    JSValue evaluate(ExecState*, JSValue key, JSValue moduleRecord, JSValue initiator);
+    JSValue evaluate(ExecState*, JSValue key, JSValue moduleRecord, JSValue scriptFetcher);
 
     // Utility functions.
     JSModuleNamespaceObject* getModuleNamespaceObject(ExecState*, JSValue moduleRecord);

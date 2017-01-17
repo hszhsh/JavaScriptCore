@@ -1,3 +1,102 @@
+2017-01-16  Andy Estes  <aestes@apple.com>
+
+        [QuickLook] Do some cleanup in QuickLookHandle
+        https://bugs.webkit.org/show_bug.cgi?id=166864
+
+        Reviewed by Darin Adler.
+
+        * WebCoreSupport/WebFrameLoaderClient.mm:
+        (WebFrameLoaderClient::didCreateQuickLookHandle): Changed to pass a
+        Ref<QuickLookHandleClient>&& to QuickLookHandle::setClient().
+
+2017-01-15  Tim Horton  <timothy_horton@apple.com>
+
+        De-duplicate more (nearly) identical code in Editor(Mac|IOS).mm
+        https://bugs.webkit.org/show_bug.cgi?id=167063
+
+        Reviewed by Dan Bernstein.
+
+        * WebView/WebHTMLView.mm:
+        (-[WebHTMLView _selectionStartFontAttributesAsRTF]):
+        (-[WebHTMLView _updateFontPanel]):
+        * WebView/WebView.mm:
+        (-[WebView typingAttributes]):
+        Adjust to fontAttributesForSelectionStart returning a RetainPtr.
+
+2017-01-13  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Remove ENABLE(DETAILS_ELEMENT) guards
+        https://bugs.webkit.org/show_bug.cgi?id=167042
+
+        Reviewed by Alex Christensen.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2017-01-11  Darin Adler  <darin@apple.com>
+
+        Remove PassRefPtr from more of "platform"
+        https://bugs.webkit.org/show_bug.cgi?id=166809
+
+        Reviewed by Sam Weinig.
+
+        * WebCoreSupport/WebFrameLoaderClient.mm:
+        (NetscapePluginWidget::handleEvent): Pass a reference.
+        * WebView/WebView.mm:
+        (-[WebView _addScrollerDashboardRegionsForFrameView:dashboardRegions:]):
+        Updated since the children set now contains Ref instead of RefPtr.
+
+2017-01-13  Sam Weinig  <sam@webkit.org>
+
+        [WebIDL] Remove custom bindings for DeviceMotionEvent and DeviceOrientationEvent
+        https://bugs.webkit.org/show_bug.cgi?id=167006
+
+        Reviewed by Geoffrey Garen.
+
+        * WebView/WebDeviceOrientation.mm:
+        (convert):
+        (-[WebDeviceOrientation initWithCanProvideAlpha:alpha:canProvideBeta:beta:canProvideGamma:gamma:]):
+        Update for new use of std::optional.
+
+2017-01-12  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Remove unnecessary includes of Page.h
+        https://bugs.webkit.org/show_bug.cgi?id=166996
+
+        Reviewed by Yusuke Suzuki.
+
+        * DOM/DOMHTML.mm:
+        * History/WebBackForwardList.mm:
+        * Plugins/WebPluginController.mm:
+        * WebCoreSupport/WebNotificationClient.mm:
+        * WebCoreSupport/WebPlatformStrategies.mm:
+        * WebCoreSupport/WebUserMediaClient.mm:
+        * WebView/WebFullScreenController.mm:
+
+2017-01-12  Chris Dumez  <cdumez@apple.com>
+
+        Add KEYBOARD_KEY_ATTRIBUTE / KEYBOARD_CODE_ATTRIBUTE to FeatureDefines.xcconfig
+        https://bugs.webkit.org/show_bug.cgi?id=166995
+
+        Reviewed by Jer Noble.
+
+        Add KEYBOARD_KEY_ATTRIBUTE / KEYBOARD_CODE_ATTRIBUTE to FeatureDefines.xcconfig
+        as some people are having trouble building without it.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2017-01-12  Chris Dumez  <cdumez@apple.com>
+
+        HTML form validation popover sometimes does not go away
+        https://bugs.webkit.org/show_bug.cgi?id=166990
+        <rdar://problem/29985957>
+
+        Reviewed by Tim Horton.
+
+        Update code using ValidationBubble now that it is RefCounted.
+
+        * WebView/WebView.mm:
+        (-[WebView showFormValidationMessage:withAnchorRect:]):
+
 2017-01-10  Ryosuke Niwa  <rniwa@webkit.org>
 
         Remove pointerLockElement from DOMDocumentPrivate.h

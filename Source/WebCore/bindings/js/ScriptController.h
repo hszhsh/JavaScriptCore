@@ -52,6 +52,7 @@ class RootObject;
 namespace WebCore {
 
 class CachedModuleScript;
+class CachedScriptFetcher;
 class Frame;
 class HTMLDocument;
 class HTMLPlugInElement;
@@ -113,13 +114,13 @@ public:
     JSC::JSValue evaluate(const ScriptSourceCode&, ExceptionDetails* = nullptr);
     JSC::JSValue evaluateInWorld(const ScriptSourceCode&, DOMWrapperWorld&, ExceptionDetails* = nullptr);
 
-    void loadModuleScriptInWorld(CachedModuleScript&, const String& moduleName, DOMWrapperWorld&, Element&);
-    void loadModuleScript(CachedModuleScript&, const String& moduleName, Element&);
-    void loadModuleScriptInWorld(CachedModuleScript&, const ScriptSourceCode&, DOMWrapperWorld&, Element&);
-    void loadModuleScript(CachedModuleScript&, const ScriptSourceCode&, Element&);
+    void loadModuleScriptInWorld(CachedModuleScript&, const String& moduleName, CachedScriptFetcher&, DOMWrapperWorld&);
+    void loadModuleScript(CachedModuleScript&, const String& moduleName, CachedScriptFetcher&);
+    void loadModuleScriptInWorld(CachedModuleScript&, const ScriptSourceCode&, CachedScriptFetcher&, DOMWrapperWorld&);
+    void loadModuleScript(CachedModuleScript&, const ScriptSourceCode&, CachedScriptFetcher&);
 
-    JSC::JSValue linkAndEvaluateModuleScriptInWorld(CachedModuleScript& , DOMWrapperWorld&, Element&);
-    JSC::JSValue linkAndEvaluateModuleScript(CachedModuleScript&, Element&);
+    JSC::JSValue linkAndEvaluateModuleScriptInWorld(CachedModuleScript& , DOMWrapperWorld&);
+    JSC::JSValue linkAndEvaluateModuleScript(CachedModuleScript&);
 
     JSC::JSValue evaluateModule(const URL&, JSC::JSModuleRecord&, DOMWrapperWorld&);
     JSC::JSValue evaluateModule(const URL&, JSC::JSModuleRecord&);

@@ -569,7 +569,10 @@ HTMLMediaElement::~HTMLMediaElement()
 
     m_completelyLoaded = true;
 
-    m_player = nullptr;
+    if (m_player) {
+        m_player->invalidate();
+        m_player = nullptr;
+    }
     updatePlaybackControlsManager();
 }
 
@@ -5051,7 +5054,10 @@ void HTMLMediaElement::clearMediaPlayer(DelayedActionType flags)
         document().removeMediaCanStartListener(this);
     }
 
-    m_player = nullptr;
+    if (m_player) {
+        m_player->invalidate();
+        m_player = nullptr;
+    }
     updatePlaybackControlsManager();
 
     stopPeriodicTimers();
@@ -5992,7 +5998,7 @@ void HTMLMediaElement::createMediaPlayer()
 #if ENABLE(VIDEO_TRACK)
     forgetResourceSpecificTracks();
 #endif
-    m_player = std::make_unique<MediaPlayer>(static_cast<MediaPlayerClient&>(*this));
+    m_player = MediaPlayer::create(*this);
     scheduleUpdatePlaybackControlsManager();
 
 #if ENABLE(WEB_AUDIO)
@@ -6092,6 +6098,15 @@ void HTMLMediaElement::setController(RefPtr<MediaController>&& controller)
 
     if (hasMediaControls())
         mediaControls()->setMediaController(m_mediaController ? m_mediaController.get() : static_cast<MediaControllerInterface*>(this));
+}
+
+void HTMLMediaElement::setControllerForBindings(MediaController* controller)
+{
+    // 4.8.10.11.2 Media controllers: controller attribute.
+    // On setting, it must first remove the element's mediagroup attribute, if any, 
+    setMediaGroup({ });
+    // and then set the current media controller to the given value.
+    setController(controller);
 }
 
 void HTMLMediaElement::updateMediaController()

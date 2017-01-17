@@ -1,3 +1,441 @@
+2017-01-16  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [SOUP] Accept-language could be set twice in a row for the default context
+        https://bugs.webkit.org/show_bug.cgi?id=167089
+
+        Reviewed by Žan Doberšek.
+
+        * NetworkProcess/CustomProtocols/soup/CustomProtocolManagerSoup.cpp:
+        (WebKit::CustomProtocolManager::registerScheme): Use NetworkStorageSession::getOrCreateSoupNetworkSession().
+        * NetworkProcess/efl/NetworkProcessMainEfl.cpp:
+        * NetworkProcess/soup/NetworkProcessSoup.cpp:
+        (WebKit::NetworkProcess::userPreferredLanguagesChanged): Only set the languages if NetworkStorageSession has a
+        SoupNetworkSession.
+        * NetworkProcess/soup/NetworkSessionSoup.cpp:
+        (WebKit::NetworkSessionSoup::soupSession): Use NetworkStorageSession::getOrCreateSoupNetworkSession().
+        * WebProcess/Cookies/soup/WebCookieManagerSoup.cpp:
+        (WebKit::WebCookieManager::setCookiePersistentStorage): Ditto.
+        * WebProcess/efl/WebProcessMainEfl.cpp:
+
+2017-01-16  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [SOUP] Fix handling of accept language property
+        https://bugs.webkit.org/show_bug.cgi?id=166969
+
+        Reviewed by Michael Catanzaro.
+
+        * NetworkProcess/soup/NetworkProcessSoup.cpp:
+        (WebKit::buildAcceptLanguages): Moved from WebCore.
+        (WebKit::NetworkProcess::userPreferredLanguagesChanged): Build the accept language string from the vector and
+        pass set it to SoupNetworkSession to be used for new sessions, and also to all other existing sessions.
+
+2017-01-14  Tim Horton  <timothy_horton@apple.com>
+
+        Remove unused WKView initializer parameter
+        https://bugs.webkit.org/show_bug.cgi?id=167046
+
+        Reviewed by Dan Bernstein.
+
+        * UIProcess/API/mac/WKView.mm:
+        (-[WKView initWithFrame:processPool:configuration:]):
+        (-[WKView initWithFrame:contextRef:pageGroupRef:relatedToPage:]):
+        (-[WKView initWithFrame:configurationRef:]):
+        (-[WKView initWithFrame:processPool:configuration:webView:]): Deleted.
+        * UIProcess/API/mac/WKViewInternal.h:
+        Ever since WKWebView stopped having WKView inside it, this parameter
+        has never been used. Now, it only leads to confusion.
+
+2017-01-13  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Remove ENABLE(DETAILS_ELEMENT) guards
+        https://bugs.webkit.org/show_bug.cgi?id=167042
+
+        Reviewed by Alex Christensen.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2017-01-13  Brady Eidson  <beidson@apple.com>
+
+        Crash when visiting a webpage that uses Gamepads in a new WebProcess after a previous page has used gamepads..
+        https://bugs.webkit.org/show_bug.cgi?id=167033
+
+        Reviewed by Alex Christensen.
+
+        * UIProcess/Gamepad/UIGamepadProvider.cpp:
+        (WebKit::UIGamepadProvider::processPoolStartedUsingGamepads): Don't schedule a state update here.
+        (WebKit::UIGamepadProvider::processPoolStoppedUsingGamepads): Ditto.
+        * UIProcess/Gamepad/UIGamepadProvider.h:
+        
+        * UIProcess/WebProcessPool.cpp:
+        (WebKit::WebProcessPool::startedUsingGamepads): Populate the WebProcess with initial gamepads.
+
+2017-01-11  Darin Adler  <darin@apple.com>
+
+        Remove PassRefPtr from more of "platform"
+        https://bugs.webkit.org/show_bug.cgi?id=166809
+
+        Reviewed by Sam Weinig.
+
+        * Shared/CoordinatedGraphics/CoordinatedGraphicsArgumentCoders.cpp:
+        (IPC::ArgumentCoder<TextureMapperAnimation>::encode): Updated since timing function
+        returns a raw pointer.
+        (IPC::ArgumentCoder<TextureMapperAnimation>::decode): Updated since timing function
+        setters now takes an rvalue reference.
+
+        * WebProcess/Plugins/PDF/DeprecatedPDFPlugin.mm:
+        (WebKit::PDFPlugin::createScrollbar): Updated since addChild now takes a reference.
+
+2017-01-13  Chris Dumez  <cdumez@apple.com>
+
+        [WK2] Add diagnostic logging to measure WebGL usage
+        https://bugs.webkit.org/show_bug.cgi?id=166730
+        <rdar://problem/29883469>
+
+        Reviewed by Alex Christensen.
+
+        Add diagnostic logging to measure high performance WebGL usage. We report
+        at regular intervals in which WebGL state Safari is:
+        - Inactive
+        - ActiveInForegroundTab
+        - ActiveInBackgroundTabOnly
+
+        This should give us an estimate of:
+        - What % of the time is Safari using high performance graphics
+        - What % of this time is only due to background tabs
+
+        * UIProcess/HighPerformanceGraphicsUsageSampler.cpp: Added.
+        (WebKit::HighPerformanceGraphicsUsageSampler::HighPerformanceGraphicsUsageSampler):
+        (WebKit::HighPerformanceGraphicsUsageSampler::timerFired):
+        * UIProcess/HighPerformanceGraphicsUsageSampler.h: Copied from Source/WebCore/platform/graphics/GraphicsContext3DAttributes.h.
+        * UIProcess/WebPageProxy.h:
+        (WebKit::WebPageProxy::setIsUsingHighPerformanceWebGL):
+        (WebKit::WebPageProxy::isUsingHighPerformanceWebGL):
+        * UIProcess/WebPageProxy.messages.in:
+        * UIProcess/WebProcessPool.cpp:
+        (WebKit::m_highPerformanceGraphicsUsageSampler):
+        * UIProcess/WebProcessPool.h:
+        * WebKit2.xcodeproj/project.pbxproj:
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::m_userInterfaceLayoutDirection):
+
+2017-01-13  Matt Rajca  <mrajca@apple.com>
+
+        Defer use of autoplay heuristics to clients
+        https://bugs.webkit.org/show_bug.cgi?id=167010
+
+        Reviewed by Alex Christensen.
+
+        Switch the autoplay policy tristate to an on/off option since clients should run any
+        heuristics and simply send their final decision to WebKit.
+
+        * Shared/WebsitePolicies.h:
+        (WebKit::WebsitePolicies::encode):
+        (WebKit::WebsitePolicies::decode):
+        * UIProcess/API/APIWebsitePolicies.h:
+        * UIProcess/API/C/WKWebsitePolicies.cpp:
+        (WKWebsitePoliciesGetAutoplayEnabled):
+        (WKWebsitePoliciesSetAutoplayEnabled):
+        (WKWebsitePoliciesGetAutoplayPolicy): Replaced.
+        (WKWebsitePoliciesSetAutoplayPolicy): Replaced.
+        * UIProcess/API/C/WKWebsitePolicies.h:
+        * UIProcess/API/Cocoa/_WKWebsitePolicies.h:
+        * UIProcess/API/Cocoa/_WKWebsitePolicies.mm:
+        (-[_WKWebsitePolicies setAutoplayEnabled:]):
+        (-[_WKWebsitePolicies autoplayEnabled]):
+        (-[_WKWebsitePolicies setAutoplayPolicy:]): Replaced.
+        (-[_WKWebsitePolicies autoplayPolicy]): Replaced.
+
+2017-01-13  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [SOUP] Simplify cookie storage handling
+        https://bugs.webkit.org/show_bug.cgi?id=166967
+
+        Reviewed by Sergio Villar Senin.
+
+        Get the SoupSession from NetworkStorageSession::defaultStorageSession().
+
+        * NetworkProcess/CustomProtocols/soup/CustomProtocolManagerSoup.cpp:
+        (WebKit::CustomProtocolManager::registerScheme): Get the SoupSession from NetworkStorageSession::defaultStorageSession().
+        * NetworkProcess/efl/NetworkProcessMainEfl.cpp: Ditto.
+        * NetworkProcess/soup/NetworkProcessSoup.cpp:
+        (WebKit::NetworkProcess::userPreferredLanguagesChanged): Ditto.
+        (WebKit::NetworkProcess::platformInitializeNetworkProcess): SoupNetworkSession::clearOldSoupCache is static.
+        * WebProcess/Cookies/soup/WebCookieManagerSoup.cpp:
+        (WebKit::WebCookieManager::platformGetHTTPCookieAcceptPolicy): Use the cookie storage from NetworkStorageSession::defaultStorageSession().
+        (WebKit::WebCookieManager::setCookiePersistentStorage): Ditto.
+        * WebProcess/WebCoreSupport/soup/WebFrameNetworkingContext.cpp:
+        (WebKit::WebFrameNetworkingContext::setCookieAcceptPolicyForAllContexts): Ditto.
+        * WebProcess/efl/WebProcessMainEfl.cpp:
+
+2017-01-12  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [SOUP] Do not use the legacy session ID in WebFrameNetworkingContext::storageSession()
+        https://bugs.webkit.org/show_bug.cgi?id=166970
+
+        Reviewed by Sergio Villar Senin.
+
+        Get the session for the current page instead.
+
+        * WebProcess/WebCoreSupport/soup/WebFrameNetworkingContext.cpp:
+        (WebKit::WebFrameNetworkingContext::storageSession):
+
+2017-01-12  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Remove unnecessary includes of Page.h
+        https://bugs.webkit.org/show_bug.cgi?id=166996
+
+        Reviewed by Yusuke Suzuki.
+
+        * WebProcess/Plugins/Netscape/NPRuntimeObjectMap.cpp:
+
+2017-01-12  Chris Dumez  <cdumez@apple.com>
+
+        Add KEYBOARD_KEY_ATTRIBUTE / KEYBOARD_CODE_ATTRIBUTE to FeatureDefines.xcconfig
+        https://bugs.webkit.org/show_bug.cgi?id=166995
+
+        Reviewed by Jer Noble.
+
+        Add KEYBOARD_KEY_ATTRIBUTE / KEYBOARD_CODE_ATTRIBUTE to FeatureDefines.xcconfig
+        as some people are having trouble building without it.
+
+        * Configurations/FeatureDefines.xcconfig:
+        * Shared/WebKeyboardEvent.cpp:
+        (WebKit::WebKeyboardEvent::WebKeyboardEvent):
+
+2017-01-12  Chris Dumez  <cdumez@apple.com>
+
+        [iOS] HTML form validation popover sometimes does not go away
+        https://bugs.webkit.org/show_bug.cgi?id=166990
+        <rdar://problem/29985957>
+
+        Reviewed by Tim Horton.
+
+        Update code using ValidationBubble now that it is RefCounted.
+
+        * UIProcess/PageClient.h:
+        * UIProcess/WebPageProxy.h:
+        * UIProcess/ios/PageClientImplIOS.h:
+        * UIProcess/ios/PageClientImplIOS.mm:
+        (WebKit::PageClientImpl::createValidationBubble):
+        * UIProcess/mac/PageClientImpl.h:
+        * UIProcess/mac/PageClientImpl.mm:
+        (WebKit::PageClientImpl::createValidationBubble):
+
+2017-01-12  Enrica Casucci  <enrica@apple.com>
+
+        Do not allow selection of editable content when not editing.
+        https://bugs.webkit.org/show_bug.cgi?id=166897
+        <rdar://problem/29388806>
+
+        Reviewed by Tim Horton.
+
+        Test: fast/events/touch/ios/long-press-on-editable.html
+
+        When retrieving the position information, we should not consider
+        as candidates for selection editable elements, since this is only
+        used for non editable selections.
+
+        * WebProcess/WebPage/ios/WebPageIOS.mm:
+        (WebKit::isAssistableElement): Moved within the file.
+        (WebKit::WebPage::getPositionInformation):
+
+2017-01-12  Megan Gardner  <megan_gardner@apple.com>
+
+        Double Check URLs on UI side before putting in pasteboard
+        https://bugs.webkit.org/show_bug.cgi?id=166945
+        <rdar://problem/11187315>
+
+        Reviewed by Tim Horton.
+
+        Check URLs sent from the web process before putting the on pasteboard.
+
+        * UIProcess/Cocoa/WebPasteboardProxyCocoa.mm:
+        (WebKit::WebPasteboardProxy::setPasteboardPathnamesForType):
+        Add a check to make sure the URLs we've received are valid and not compromising to the user's system.
+
+        * UIProcess/WebPasteboardProxy.cpp:
+        (WebKit::WebPasteboardProxy::addWebProcessProxy):
+        Keep track of the webProcesses associated with the pasteboard proxies specifically, so that we can
+        use it to check the URLs before putting them on pasteboard.
+        (WebKit::WebPasteboardProxy::removeWebProcessProxy):
+        Remove dead webProcesses.
+
+        * UIProcess/WebPasteboardProxy.h:
+        * UIProcess/WebPasteboardProxy.messages.in:
+        Allow for the connection to be passed in, so that we can determine which webProcess we need to
+        check the URLs of.
+
+        * UIProcess/WebProcessProxy.cpp:
+        (WebKit::WebProcessProxy::~WebProcessProxy):
+        Make sure to remove WebProcessProxys from the list stored in WebPasteboardProxy
+
+2017-01-12  Chris Dumez  <cdumez@apple.com>
+
+        [iOS] Implement support for KeyboardEvent.code
+        https://bugs.webkit.org/show_bug.cgi?id=166932
+        <rdar://problem/29972518>
+
+        Reviewed by Darin Adler.
+
+        Make sure KeyboardEvent.code is properly initialized on
+        iOS WK2.
+
+        * Shared/WebEvent.h:
+        * Shared/WebKeyboardEvent.cpp:
+        (WebKit::WebKeyboardEvent::WebKeyboardEvent):
+        * Shared/ios/WebIOSEventFactory.mm:
+        (WebIOSEventFactory::createWebKeyboardEvent):
+
+2017-01-12  Andreas Kling  <akling@apple.com>
+
+        WebBackForwardListProxy should remove restored session history items from PageCache on close.
+        <https://webkit.org/b/166972>
+        <rdar://problem/28904157>
+
+        Reviewed by Brady Eidson.
+
+        Register history item ID's from the UIProcess with the associated-items map
+        so that we can remove any PageCache entries associated with them immediately
+        when closing a WebPage.
+
+        Otherwise they might not get removed until the next PageCache pruning happens.
+        This patch is a speculative fix for what looks like it might be weirdness
+        related to a PageCache entry outliving its originating Page.
+
+        * WebProcess/WebPage/WebBackForwardListProxy.cpp:
+        (WebKit::WebBackForwardListProxy::addItemFromUIProcess):
+        * WebProcess/WebPage/WebBackForwardListProxy.h:
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::restoreSessionInternal):
+
+2017-01-12  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [GTK] Correct license on WebKitSecurityOrigin headers
+
+        These ought to be LGPLv2+, because the rest of the GTK+ API is LPGLv2+.
+
+        * UIProcess/API/gtk/WebKitSecurityOrigin.cpp:
+        * UIProcess/API/gtk/WebKitSecurityOrigin.h:
+        * UIProcess/API/gtk/WebKitSecurityOriginPrivate.h:
+
+2017-01-12  Eric Carlson  <eric.carlson@apple.com>
+
+        [MediaStream, Mac] Render media stream audio buffers
+        https://bugs.webkit.org/show_bug.cgi?id=159836
+        <rdar://problem/27380390>
+
+        Unreviewed, revert accidental change.
+
+        * WebProcess/com.apple.WebProcess.sb.in:
+
+2017-01-11  Brady Eidson  <beidson@apple.com>
+
+        Add IconLoadingDelegate functionality to WKView.
+        https://bugs.webkit.org/show_bug.cgi?id=166951
+
+        Reviewed by Tim Horton.
+        
+        * UIProcess/API/mac/WKView.mm:
+        (-[WKView dealloc]):
+        (-[WKView maybeInstallIconLoadingClient]): If the subclass implements the delegate method, install the
+          icon loading client. Otherwise, maintain the normal IconDatabase loading behavior.
+        (-[WKView initWithFrame:processPool:configuration:webView:]):
+
+2017-01-11  Brent Fulgham  <bfulgham@apple.com>
+
+        [WK2][Cocoa] Avoid null dereference in FullScreen code.
+        https://bugs.webkit.org/show_bug.cgi?id=166957
+        <rdar://problem/27745004>
+
+        Reviewed by Eric Carlson.
+
+        * WebProcess/cocoa/WebVideoFullscreenManager.mm:
+        (WebKit::WebVideoFullscreenManager::didSetupFullscreen): Use protected reference to 'this', and check for valid
+        page before attempting to use it.
+
+2017-01-11  Anders Carlsson  <andersca@apple.com>
+
+        navigator.plugins.refresh and WKContextRefreshPlugIns doesn't pick up changes to already-present plug-ins
+        https://bugs.webkit.org/show_bug.cgi?id=166942
+        rdar://problem/29839194
+
+        Reviewed by Sam Weinig.
+
+        Use _CFBundleCreateUnique so the resulting bundle won't be cached.
+
+        * Shared/Plugins/Netscape/mac/NetscapePluginModuleMac.mm:
+        (WebKit::NetscapePluginModule::getPluginInfo):
+
+2017-01-11  Anders Carlsson  <andersca@apple.com>
+
+        REGRESSION: Crash in com.apple.WebKit: IPC::Connection::sendMessage(std::__1::unique_ptr<IPC::MachMessage, std::__1::default_delete<IPC::MachMessage> >) + 27
+        https://bugs.webkit.org/show_bug.cgi?id=165854
+        rdar://problem/29757269
+
+        Reviewed by Tim Horton.
+
+        * Platform/IPC/mac/ConnectionMac.mm:
+        (IPC::Connection::sendMessage):
+        Add assertion.
+
+        (IPC::Connection::initializeSendSource):
+        Turns out the event handler can be called spuriously, so guard against that.
+
+2017-01-11  Chris Dumez  <cdumez@apple.com>
+
+        [iOS][WK2] KeyboardEvent.key always returns an empty string
+        https://bugs.webkit.org/show_bug.cgi?id=166918
+        <rdar://problem/29861147>
+
+        Reviewed by Wenson Hsieh.
+
+        Make sure that KeyboardEvent.key gets properly initialized on iOS / WK2.
+
+        * Shared/WebEvent.h:
+        * Shared/WebKeyboardEvent.cpp:
+        (WebKit::WebKeyboardEvent::WebKeyboardEvent):
+        * Shared/ios/WebIOSEventFactory.mm:
+        (WebIOSEventFactory::createWebKeyboardEvent):
+
+2017-01-10  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [GTK] No way for applications to set notification permissions without waiting for permission request
+        https://bugs.webkit.org/show_bug.cgi?id=163366
+
+        Reviewed by Carlos Garcia Campos.
+
+        Websites can check the Notification.permission DOM property to check if they have permission
+        to show notifications *without triggering a permission request*. But the WebKitGTK+ API has
+        no way to affirmatively indicate notifications are allowed without a permission request. The
+        only way is via the permission request API, which is too late. It's a problem for Epiphany.
+        For example, open the Riot Matrix client in a web app; you will immediately see an info bar
+        informing the user that Riot does not have permission to send desktop notifications, even
+        though Epiphany automatically grants notification permission in web app mode when requested.
+        This problem is not exclusive to web apps; there is simply no way for notification
+        permission to be set correctly prior to a permission request for it. Fix this by introducing
+        a webkit_web_context_initialize_notification_permissions() API, and add a signal
+        WebKitWebContext::initialize-notification-permissions to indicate when it should be called.
+
+        * UIProcess/API/gtk/WebKitNotificationProvider.cpp:
+        (notificationPermissionsCallback):
+        (WebKitNotificationProvider::create):
+        (WebKitNotificationProvider::WebKitNotificationProvider):
+        (WebKitNotificationProvider::notificationPermissions):
+        (WebKitNotificationProvider::setNotificationPermissions):
+        * UIProcess/API/gtk/WebKitNotificationProvider.h:
+        * UIProcess/API/gtk/WebKitSecurityOrigin.cpp:
+        (webkitSecurityOriginGetSecurityOrigin):
+        * UIProcess/API/gtk/WebKitSecurityOriginPrivate.h:
+        * UIProcess/API/gtk/WebKitWebContext.cpp:
+        (webkitWebContextConstructed):
+        (webkit_web_context_class_init):
+        (addOriginToMap):
+        (webkit_web_context_initialize_notification_permissions):
+        (webkitWebContextInitializeNotificationPermissions):
+        * UIProcess/API/gtk/WebKitWebContext.h:
+        * UIProcess/API/gtk/WebKitWebContextPrivate.h:
+        * UIProcess/API/gtk/docs/webkit2gtk-4.0-sections.txt:
+
 2017-01-10  Keith Rollin  <krollin@apple.com>
 
         Record/replay: fix range used for fuzzy matching

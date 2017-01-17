@@ -1,3 +1,321 @@
+2017-01-16  Javier Fernandez  <jfernandez@igalia.com>
+
+        [css-grid] Implementing baseline positioning for grid containers
+        https://bugs.webkit.org/show_bug.cgi?id=165063
+
+        Reviewed by Darin Adler and Sergio Villar Senin.
+
+        Tests to verify the baseline positioning of grid and inline-grid blocks.
+        Note that two of these new tests are expected to fail because of a Flexbox
+        bug, since we use Flexbox as reference test.
+
+        * TestExpectations:
+        * fast/css-grid-layout/grid-baseline-expected.html: Added.
+        * fast/css-grid-layout/grid-baseline-margins-expected.html: Added.
+        * fast/css-grid-layout/grid-baseline-margins.html: Added.
+        * fast/css-grid-layout/grid-baseline-must-respect-grid-order-expected.txt: Added.
+        * fast/css-grid-layout/grid-baseline-must-respect-grid-order.html: Added.
+        * fast/css-grid-layout/grid-baseline.html: Added.
+        * fast/css-grid-layout/resources/grid-alignment.css:
+        (.alignSelfBaseline):
+        (.selfBaseline):
+
+2017-01-15  Sam Weinig  <sam@webkit.org>
+
+        [WebIDL] Remove custom bindings for HTMLInputElement, HTMLFrameElement, HTMLMediaElement and HTMLOptionsCollection
+        https://bugs.webkit.org/show_bug.cgi?id=167039
+
+        Reviewed by Darin Adler.
+
+        * fast/dom/HTMLSelectElement/select-selectedIndex-expected.txt:
+        * fast/dom/HTMLSelectElement/select-selectedIndex-multiple-expected.txt:
+        * fast/dom/HTMLSelectElement/select-selectedIndex-multiple.html:
+        * fast/dom/HTMLSelectElement/select-selectedIndex.html:
+        Update tests / results now that negative lengths don't throw, but do log due to be converted
+        to a large number.
+
+        * fast/forms/select-max-length-expected.txt:
+        Update result now that a large length is not clamped, but rather, ignored.
+
+2017-01-14  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        Annotate large string tests with largeHeap
+        https://bugs.webkit.org/show_bug.cgi?id=167054
+
+        Reviewed by Filip Pizlo.
+
+        * js/script-tests/stringimpl-to-jsstring-on-large-strings-1.js:
+        * js/script-tests/stringimpl-to-jsstring-on-large-strings-2.js:
+        * js/script-tests/stringimpl-to-jsstring-on-large-strings-3.js:
+
+2017-01-14  Chris Dumez  <cdumez@apple.com>
+
+        Align the innerText setter with the HTML spec and Gecko
+        https://bugs.webkit.org/show_bug.cgi?id=160971
+
+        Reviewed by Alex Christensen.
+
+        Add test coverage for outerText, which is non-standard.
+
+        * fast/dom/br-set-outerText-expected.txt: Added.
+        * fast/dom/br-set-outerText.html: Added.
+
+2017-01-13  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking inspector/worker/debugger-scripts.html as flaky on macOS.
+        https://trac.webkit.org/changeset/209517
+
+        Unreviewed test gardening.
+
+        * platform/mac-wk2/TestExpectations:
+        * platform/mac/TestExpectations:
+
+2017-01-13  Eric Carlson  <eric.carlson@apple.com>
+
+        [MediaStream, Mac] Add mock audio source
+        https://bugs.webkit.org/show_bug.cgi?id=166974
+
+        Reviewed by Jer Noble.
+
+        * webaudio/mediastreamaudiosourcenode-expected.txt:
+        * webaudio/mediastreamaudiosourcenode.html:
+
+2017-01-13  Sam Weinig  <sam@webkit.org>
+
+        [WebIDL] Remove custom bindings for DeviceMotionEvent and DeviceOrientationEvent
+        https://bugs.webkit.org/show_bug.cgi?id=167006
+
+        Reviewed by Geoffrey Garen.
+
+        * fast/dom/DeviceMotion/optional-event-properties-expected.txt:
+        * fast/dom/DeviceMotion/script-tests/optional-event-properties.js:
+        Update test to account for slightly stricter, but more consistent IDL conversion rules.
+
+2017-01-13  Eric Carlson  <eric.carlson@apple.com>
+
+        REGRESSION (r210621): [mac-wk2] LayoutTest fast/mediastream/MediaStream-video-element-video-tracks-disabled-then-enabled.html timing out
+        https://bugs.webkit.org/show_bug.cgi?id=166980
+        
+        Unreviewed, fix test broken by r210621.
+
+        * fast/mediastream/MediaStream-video-element-video-tracks-disabled-then-enabled-expected.txt:
+        * fast/mediastream/MediaStream-video-element-video-tracks-disabled-then-enabled.html:
+        * platform/mac-wk2/TestExpectations: Un-skip fixed test.
+
+2017-01-12  Gyuyoung Kim  <gyuyoung.kim@webkit.org>
+
+        [EFL] Skip to test imported/w3c/web-platform-tests
+
+        Unreviewed EFL gardening. There are too many timeout and crash.
+
+        * platform/efl/TestExpectations:
+
+2017-01-12  Enrica Casucci  <enrica@apple.com>
+
+        Do not allow selection of editable content when not editing.
+        https://bugs.webkit.org/show_bug.cgi?id=166897
+        <rdar://problem/29388806>
+
+        Reviewed by Tim Horton.
+
+        * fast/events/touch/ios/long-press-on-editable-expected.txt: Added.
+        * fast/events/touch/ios/long-press-on-editable.html: Added.
+
+2017-01-12  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking fast/mediastream/MediaStream-video-element-video-tracks-disabled-then-enabled.html as a timeout on mac-wk2.
+        https://bugs.webkit.org/show_bug.cgi?id=166980
+
+        Unreviewed test gardening.
+
+        * platform/mac-wk2/TestExpectations:
+
+2017-01-12  Javier Fernandez  <jfernandez@igalia.com>
+
+        [css-grid] Make the grid sizing data persistent through layouts
+        https://bugs.webkit.org/show_bug.cgi?id=166883
+
+        Reviewed by Darin Adler and Manuel Rego Casasnovas.
+
+        The tests added are now needed to verify we perform correctly the
+        data validation after certain style changes.
+
+        * fast/css-grid-layout/grid-add-item-with-positioned-items-expected.txt: Added.
+        * fast/css-grid-layout/grid-add-item-with-positioned-items.html: Added.
+        * fast/css-grid-layout/grid-add-positioned-block-item-after-inline-item-expected.txt: Added.
+        * fast/css-grid-layout/grid-add-positioned-block-item-after-inline-item.html: Added.
+        * fast/css-grid-layout/grid-container-change-explicit-grid-recompute-child-expected.txt: Added.
+        * fast/css-grid-layout/grid-container-change-explicit-grid-recompute-child.html: Added.
+        * fast/css-grid-layout/grid-item-change-order-auto-flow-expected.txt: Added.
+        * fast/css-grid-layout/grid-item-change-order-auto-flow.html: Added.
+
+2017-01-12  Chris Dumez  <cdumez@apple.com>
+
+        [iOS] Implement support for KeyboardEvent.code
+        https://bugs.webkit.org/show_bug.cgi?id=166932
+        <rdar://problem/29972518>
+
+        Reviewed by Darin Adler.
+
+        Extend layout test coverage and rebaseline a couple of existing tests
+        now that more checks are passing.
+
+        * fast/events/ios/keyboard-event-key-attribute-expected.txt:
+        * fast/events/ios/keyboard-event-key-attribute.html:
+        * platform/ios-simulator/fast/events/constructors/keyboard-event-constructor-expected.txt:
+        * platform/ios-simulator/imported/w3c/web-platform-tests/dom/events/Event-subclasses-constructors-expected.txt:
+
+2017-01-12  Sam Weinig  <sam@webkit.org>
+
+        [WebIDL] Autogenerate named getters
+        https://bugs.webkit.org/show_bug.cgi?id=166835
+
+        Reviewed by Alex Christensen.
+
+        * fast/dom/HTMLSelectElement/select-selectedIndex-expected.txt:
+        * fast/dom/HTMLSelectElement/select-selectedIndex-multiple-expected.txt:
+        * js/dom/reflect-set-onto-dom-expected.txt:
+        Update exception text.
+
+2017-01-12  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Rebaseline inspector/dom/getAccessibilityPropertiesForNode.html after r210605.
+
+        Unreviewed test gardening.
+
+        * inspector/dom/getAccessibilityPropertiesForNode-expected.txt:
+
+2017-01-12  Gyuyoung Kim  <gyuyoung.kim@webkit.org>
+
+        [EFL] Gardening on 13th Jan.
+
+        Unreviewed EFL Gardening. Update crash and timeout tests after bumping Ubuntu version.
+
+        * platform/efl/TestExpectations:
+
+2017-01-12  Gyuyoung Kim  <gyuyoung.kim@webkit.org>
+
+        [EFL] Second update TestExpectation file for Ubuntu 16.04.
+
+        Unreviewed EFL gardening.
+
+        * platform/efl/TestExpectations: Need to update this file for EFL bot again.
+
+2017-01-11  Joseph Pecoraro  <pecoraro@apple.com>
+
+        REGRESSION(r206133): LayoutTest inspector/css/manager-preferredInspectorStyleSheetForFrame.html is a flaky failure
+        https://bugs.webkit.org/show_bug.cgi?id=162305
+        <rdar://problem/28389364>
+
+        Reviewed by Timothy Hatcher.
+
+        * inspector/css/manager-preferredInspectorStyleSheetForFrame-expected.txt:
+        * inspector/css/manager-preferredInspectorStyleSheetForFrame.html:
+        Revert the change that broke this and move to more deterministic callbacks
+        that don't include the extra variance in producing output.
+
+2017-01-11  Joseph Pecoraro  <pecoraro@apple.com>
+
+        REGRESSION: [mac-wk2] LayoutTest inspector/debugger/breakpoint-columns.html is a flaky failure
+        https://bugs.webkit.org/show_bug.cgi?id=161774
+        <rdar://problem/28217256>
+
+        Reviewed by Mark Lam.
+
+        * platform/mac-wk2/TestExpectations:
+        Remove flaky expectations for a test that hasn't failed in a month.
+
+2017-01-11  Joseph Pecoraro  <pecoraro@apple.com>
+
+        REGRESSION: LayoutTest inspector/debugger/csp-exceptions.html is a flaky failure
+        https://bugs.webkit.org/show_bug.cgi?id=165292
+        <rdar://problem/29471892>
+
+        Reviewed by Geoffrey Garen.
+
+        * inspector/debugger/csp-exceptions-expected.txt:
+        * inspector/debugger/csp-exceptions.html:
+        * inspector/debugger/resources/csp-exception-iframe.html:
+        Improve the test to handle all console messages more carefully,
+        including outputing the console messages to test them as well.
+
+        * platform/mac-wk2/TestExpectations:
+        Unskip the test, it should no longer be flakey.
+
+2017-01-11  Brent Fulgham  <bfulgham@apple.com>
+
+        Rebaseline two tests after r210599.
+
+        * fast/xmlhttprequest/xmlhttprequest-nonexistent-file-expected.txt:
+        * storage/domstorage/sessionstorage/blocked-file-access-expected.txt:
+
+2017-01-11  Nan Wang  <n_wang@apple.com>
+
+        AX: role=treeitem accessible name not spoken to VoiceOver macOS when using string contained inside element
+        https://bugs.webkit.org/show_bug.cgi?id=164950
+        <rdar://problem/29337573>
+
+        Reviewed by Chris Fleizach.
+
+        * accessibility/mac/aria-tree-item-name-expected.txt: Added.
+        * accessibility/mac/aria-tree-item-name.html: Added.
+
+2017-01-11  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        ASSERTION FAILED: run->m_stop > 0 in *WebCore::RenderBlockFlow::computeInlineDirectionPositionsForSegment
+        https://bugs.webkit.org/show_bug.cgi?id=166030
+
+        Reviewed by Ryosuke Niwa.
+
+        * fast/text/bidi-isolate-empty-run-expected.txt: Added.
+        * fast/text/bidi-isolate-empty-run.html: Added.
+
+2017-01-11  Chris Dumez  <cdumez@apple.com>
+
+        Iterating over URLSearchParams does not work
+        https://bugs.webkit.org/show_bug.cgi?id=166921
+        <rdar://problem/29970907>
+
+        Reviewed by Alex Christensen.
+
+        Add layout test coverage.
+
+        * fast/dom/DOMURL/searchparams-iterable-expected.txt: Added.
+        * fast/dom/DOMURL/searchparams-iterable.html: Added.
+
+2017-01-11  Chris Dumez  <cdumez@apple.com>
+
+        [iOS][WK2] KeyboardEvent.key always returns an empty string
+        https://bugs.webkit.org/show_bug.cgi?id=166918
+        <rdar://problem/29861147>
+
+        Reviewed by Wenson Hsieh.
+
+        Add layout test coverage.
+
+        * fast/events/ios/keyboard-event-key-attribute-expected.txt: Added.
+        * fast/events/ios/keyboard-event-key-attribute.html: Added.
+
+2017-01-11  Gyuyoung Kim  <gyuyoung.kim@webkit.org>
+
+        [EFL] Update TestExpectation file for Ubuntu 16.04.
+
+        Unreviewed EFL gardening.
+
+        After bumping Ubuntu version to 16.04, there are many tests are failed.
+        This gardening is to update all failure tests on Ubuntu 16.04.
+
+        * platform/efl/TestExpectations:
+
+2017-01-10  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        Implement JSSourceCode to propagate SourceCode in module pipeline
+        https://bugs.webkit.org/show_bug.cgi?id=166861
+
+        Reviewed by Saam Barati.
+
+        * http/tests/security/contentSecurityPolicy/module-eval-blocked-expected.txt:
+
 2017-01-10  Commit Queue  <commit-queue@webkit.org>
 
         Unreviewed, rolling out r210052.

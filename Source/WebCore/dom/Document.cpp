@@ -2072,7 +2072,7 @@ bool Document::isPageBoxVisible(int pageIndex)
 void Document::pageSizeAndMarginsInPixels(int pageIndex, IntSize& pageSize, int& marginTop, int& marginRight, int& marginBottom, int& marginLeft)
 {
     updateStyleIfNeeded();
-    std::unique_ptr<RenderStyle> style = styleScope().resolver().styleForPage(pageIndex);
+    auto style = styleScope().resolver().styleForPage(pageIndex);
 
     int width = pageSize.width();
     int height = pageSize.height();
@@ -2088,11 +2088,11 @@ void Document::pageSizeAndMarginsInPixels(int pageIndex, IntSize& pageSize, int&
             std::swap(width, height);
         break;
     case PAGE_SIZE_RESOLVED: {
-        LengthSize size = style->pageSize();
-        ASSERT(size.width().isFixed());
-        ASSERT(size.height().isFixed());
-        width = valueForLength(size.width(), 0);
-        height = valueForLength(size.height(), 0);
+        auto& size = style->pageSize();
+        ASSERT(size.width.isFixed());
+        ASSERT(size.height.isFixed());
+        width = valueForLength(size.width, 0);
+        height = valueForLength(size.height, 0);
         break;
     }
     default:
@@ -2199,7 +2199,10 @@ void Document::destroyRenderTree()
 {
     ASSERT(hasLivingRenderTree());
     ASSERT(frame());
+    ASSERT(frame()->view());
     ASSERT(page());
+
+    FrameView& frameView = *frame()->view();
 
     // Prevent Widget tree changes from committing until the RenderView is dead and gone.
     WidgetHierarchyUpdatesSuspensionScope suspendWidgetHierarchyUpdates;
@@ -2211,8 +2214,7 @@ void Document::destroyRenderTree()
 
     documentWillBecomeInactive();
 
-    if (FrameView* frameView = view())
-        frameView->detachCustomScrollbars();
+    frameView.willDestroyRenderTree();
 
 #if ENABLE(FULLSCREEN_API)
     if (m_fullScreenRenderer)
@@ -2238,6 +2240,8 @@ void Document::destroyRenderTree()
     // Do this before the arena is cleared, which is needed to deref the RenderStyle on TextAutoSizingKey.
     m_textAutoSizedNodes.clear();
 #endif
+
+    frameView.didDestroyRenderTree();
 }
 
 void Document::prepareForDestruction()

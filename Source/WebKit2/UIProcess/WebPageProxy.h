@@ -378,6 +378,9 @@ public:
     bool tryClose();
     bool isClosed() const { return m_isClosed; }
 
+    void setIsUsingHighPerformanceWebGL(bool value) { m_isUsingHighPerformanceWebGL = value; }
+    bool isUsingHighPerformanceWebGL() const { return m_isUsingHighPerformanceWebGL; }
+
     void closePage(bool stopResponsivenessTimer);
 
     void addPlatformLoadParameters(LoadParameters&);
@@ -1826,7 +1829,7 @@ private:
     RefPtr<WebColorPicker> m_colorPicker;
 #endif
 #if PLATFORM(COCOA)
-    std::unique_ptr<WebCore::ValidationBubble> m_validationBubble;
+    RefPtr<WebCore::ValidationBubble> m_validationBubble;
 #endif
 
     const uint64_t m_pageID;
@@ -1973,6 +1976,8 @@ private:
 #if ENABLE(DOWNLOAD_ATTRIBUTE)
     bool m_syncNavigationActionHasDownloadAttribute { false };
 #endif
+
+    bool m_isUsingHighPerformanceWebGL { false };
         
     WeakPtrFactory<WebPageProxy> m_weakPtrFactory;
 };

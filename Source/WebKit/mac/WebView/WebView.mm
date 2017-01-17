@@ -3470,8 +3470,8 @@ static inline IMP getMethod(id o, SEL s)
     NSView *documentView = [[kit(&frameView->frame()) frameView] documentView];
 
     for (const auto& widget: frameView->children()) {
-        if (is<FrameView>(*widget)) {
-            [self _addScrollerDashboardRegionsForFrameView:downcast<FrameView>(widget.get()) dashboardRegions:regions];
+        if (is<FrameView>(widget)) {
+            [self _addScrollerDashboardRegionsForFrameView:&downcast<FrameView>(widget.get()) dashboardRegions:regions];
             continue;
         }
 
@@ -8282,11 +8282,10 @@ FORWARD(toggleUnderline)
 {
     Frame* coreFrame = core([self _selectedOrMainFrame]);
     if (coreFrame)
-        return coreFrame->editor().fontAttributesForSelectionStart();
+        return coreFrame->editor().fontAttributesForSelectionStart().autorelease();
     
     return nil;
 }
-
 
 @end
 
@@ -9309,7 +9308,7 @@ bool LayerFlushController::flushLayers()
 {
     // FIXME: We should enable this on iOS as well.
 #if PLATFORM(MAC)
-    _private->formValidationBubble = std::make_unique<ValidationBubble>(self, message);
+    _private->formValidationBubble = ValidationBubble::create(self, message);
     _private->formValidationBubble->showRelativeTo(enclosingIntRect([self _convertRectFromRootView:anchorRect]));
 #else
     UNUSED_PARAM(message);

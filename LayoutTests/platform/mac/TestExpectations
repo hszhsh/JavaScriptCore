@@ -1203,14 +1203,13 @@ webkit.org/b/157999 inspector/unit-tests/heap-snapshot-collection-event.html [ P
 webkit.org/b/161361 inspector/unit-tests/yieldable-task.html [ Pass Failure ]
 webkit.org/b/164872 inspector/worker/debugger-multiple-targets-pause.html [ Pass Failure Timeout ]
 webkit.org/b/164833 inspector/worker/debugger-pause.html [ Pass Failure ]
+webkit.org/b/165582 inspector/worker/debugger-scripts.html [ Pass Failure ]
 webkit.org/b/155607 inspector/heap/snapshot.html [ Pass Timeout ]
 webkit.org/b/143719 inspector/console/console-api.html [ Pass Timeout ]
 webkit.org/b/156078 inspector/console/heapSnapshot.html [ Pass Timeout ]
 webkit.org/b/158006 inspector/console/console-time.html [ Pass Timeout ]
 webkit.org/b/156634 inspector/formatting/formatting-javascript.html [ Pass Timeout ]
 webkit.org/b/158948 inspector/timeline [ Pass Timeout ]
-
-webkit.org/b/162305 inspector/css/manager-preferredInspectorStyleSheetForFrame.html [ Pass Failure ]
 
 # Colorspaces on CA OpenGL layers not available in Yosemite
 [ Yosemite ] fast/canvas/webgl/match-page-color-space.html [ Skip ]

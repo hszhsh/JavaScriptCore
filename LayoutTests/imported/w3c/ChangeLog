@@ -1,3 +1,82 @@
+2017-01-14  Chris Dumez  <cdumez@apple.com>
+
+        Align the innerText setter with the HTML spec and Gecko
+        https://bugs.webkit.org/show_bug.cgi?id=160971
+
+        Reviewed by Alex Christensen.
+
+        Rebaseline several W3C tests now that more checks are passing.
+
+        * web-platform-tests/domparsing/createContextualFragment-expected.txt:
+        * web-platform-tests/innerText/setter-expected.txt:
+
+2017-01-13  Chris Dumez  <cdumez@apple.com>
+
+        Import innerText/ w3c web-platform-tests
+        https://bugs.webkit.org/show_bug.cgi?id=167024
+
+        Reviewed by Alex Christensen.
+
+        Import innerText/ w3c web-platform-tests from upstream 4b4b2eeb.
+
+        * web-platform-tests/innerText/getter-expected.txt: Added.
+        * web-platform-tests/innerText/getter-tests.js: Added.
+        (CSS.supports):
+        * web-platform-tests/innerText/getter.html: Added.
+        * web-platform-tests/innerText/setter-expected.txt: Added.
+        * web-platform-tests/innerText/setter-tests.js: Added.
+        (string_appeared_here.forEach):
+        * web-platform-tests/innerText/setter.html: Added.
+        * web-platform-tests/innerText/w3c-import.log: Added.
+
+2017-01-13  Chris Dumez  <cdumez@apple.com>
+
+        Resync domparsing/ web-platform-tests from upstream
+        https://bugs.webkit.org/show_bug.cgi?id=167023
+
+        Reviewed by Alex Christensen.
+
+        Resync domparsing/ web-platform-tests from upstream 4b4b2eeb.
+
+        * web-platform-tests/domparsing/DOMParser-parseFromString-xml-doctype-expected.txt: Added.
+        * web-platform-tests/domparsing/DOMParser-parseFromString-xml-doctype.html: Added.
+        * web-platform-tests/domparsing/DOMParser-parseFromString-xml-expected.txt: Added.
+        * web-platform-tests/domparsing/DOMParser-parseFromString-xml.html: Added.
+        * web-platform-tests/domparsing/XMLSerializer-serializeToString-expected.txt: Added.
+        * web-platform-tests/domparsing/XMLSerializer-serializeToString.html: Added.
+        * web-platform-tests/domparsing/createContextualFragment-expected.txt:
+        * web-platform-tests/domparsing/createContextualFragment.html:
+        * web-platform-tests/domparsing/insert_adjacent_html-xhtml-expected.txt: Added.
+        * web-platform-tests/domparsing/insert_adjacent_html-xhtml.xhtml: Added.
+        * web-platform-tests/domparsing/style_attribute_html-expected.txt: Added.
+        * web-platform-tests/domparsing/style_attribute_html.html: Added.
+        * web-platform-tests/domparsing/w3c-import.log:
+
+2017-01-11  Youenn Fablet  <youenn@apple.com>
+
+        Remove request.formData property until it gets implemented
+        https://bugs.webkit.org/show_bug.cgi?id=166920
+        <rdar://problem/29971105>
+
+        Reviewed by Chris Dumez.
+
+        * web-platform-tests/fetch/api/request/request-consume-empty-expected.txt:
+        * web-platform-tests/fetch/api/request/request-consume-expected.txt:
+        * web-platform-tests/fetch/api/request/request-idl-expected.txt:
+        * web-platform-tests/fetch/api/request/request-structure-expected.txt:
+
+2017-01-11  Chris Dumez  <cdumez@apple.com>
+
+        Iterating over URLSearchParams does not work
+        https://bugs.webkit.org/show_bug.cgi?id=166921
+        <rdar://problem/29970907>
+
+        Reviewed by Alex Christensen.
+
+        Rebaseline W3C test now that more checks are passing.
+
+        * web-platform-tests/url/urlsearchparams-foreach-expected.txt:
+
 2017-01-10  Chris Dumez  <cdumez@apple.com>
 
         Make Event.initEvent()'s first parameter mandatory
