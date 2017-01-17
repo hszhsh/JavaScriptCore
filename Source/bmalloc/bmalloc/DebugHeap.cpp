@@ -27,6 +27,7 @@
 #include "BAssert.h"
 #include "BPlatform.h"
 #include <thread>
+#include <cstdlib>
 
 namespace bmalloc {
     
