@@ -217,6 +217,16 @@ public:
     virtual void layersForNode(long callId, int in_nodeId) = 0;
     virtual void reasonsForCompositingLayer(long callId, const String& in_layerId) = 0;
 };
+#if ENABLE(RESOURCE_USAGE)
+class AlternateMemoryBackendDispatcher : public AlternateBackendDispatcher {
+public:
+    virtual ~AlternateMemoryBackendDispatcher() { }
+    virtual void enable(long callId) = 0;
+    virtual void disable(long callId) = 0;
+    virtual void startTracking(long callId) = 0;
+    virtual void stopTracking(long callId) = 0;
+};
+#endif // ENABLE(RESOURCE_USAGE)
 class AlternateNetworkBackendDispatcher : public AlternateBackendDispatcher {
 public:
     virtual ~AlternateNetworkBackendDispatcher() { }

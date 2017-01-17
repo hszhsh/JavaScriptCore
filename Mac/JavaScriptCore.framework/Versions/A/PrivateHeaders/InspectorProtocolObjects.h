@@ -141,6 +141,13 @@ class Layer;
 class CompositingReasons;
 } // LayerTree
 
+#if ENABLE(RESOURCE_USAGE)
+namespace Memory {
+class Event;
+class CategoryData;
+} // Memory
+#endif // ENABLE(RESOURCE_USAGE)
+
 namespace Network {
 class Headers;
 class ResourceTiming;
@@ -176,6 +183,18 @@ class Cookie;
 enum class ResourceType;
 enum class CoordinateSystem;
 } // Page
+
+#if ENABLE(WEB_REPLAY)
+namespace Replay {
+class ReplayPosition;
+class ReplayInput;
+class ReplayInputQueue;
+class SessionSegment;
+class ReplaySession;
+enum class SessionState;
+enum class SegmentState;
+} // Replay
+#endif // ENABLE(WEB_REPLAY)
 
 namespace Runtime {
 class RemoteObject;
@@ -282,6 +301,15 @@ namespace Page {
 /* Unique script identifier. */
 typedef String ScriptIdentifier;
 } // Page
+
+#if ENABLE(WEB_REPLAY)
+namespace Replay {
+/* Unique replay session identifier. */
+typedef int SessionIdentifier;
+/* Unique session segment identifier. */
+typedef int SegmentIdentifier;
+} // Replay
+#endif // ENABLE(WEB_REPLAY)
 
 namespace Runtime {
 /* Unique object identifier. */
@@ -5195,6 +5223,148 @@ public:
 
 } // LayerTree
 
+#if ENABLE(RESOURCE_USAGE)
+namespace Memory {
+class Event : public Inspector::InspectorObjectBase {
+public:
+    enum {
+        NoFieldsSet = 0,
+        TimestampSet = 1 << 0,
+        CategoriesSet = 1 << 1,
+        AllFieldsSet = (TimestampSet | CategoriesSet)
+    };
+
+    template<int STATE>
+    class Builder {
+    private:
+        RefPtr<InspectorObject> m_result;
+
+        template<int STEP> Builder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<Builder<STATE | STEP>*>(this);
+        }
+
+        Builder(Ref</*Event*/InspectorObject>&& object)
+            : m_result(WTFMove(object))
+        {
+            COMPILE_ASSERT(STATE == NoFieldsSet, builder_created_in_non_init_state);
+        }
+        friend class Event;
+    public:
+
+        Builder<STATE | TimestampSet>& setTimestamp(double value)
+        {
+            COMPILE_ASSERT(!(STATE & TimestampSet), property_timestamp_already_set);
+            m_result->setDouble(ASCIILiteral("timestamp"), value);
+            return castState<TimestampSet>();
+        }
+
+        Builder<STATE | CategoriesSet>& setCategories(RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Memory::CategoryData>> value)
+        {
+            COMPILE_ASSERT(!(STATE & CategoriesSet), property_categories_already_set);
+            m_result->setArray(ASCIILiteral("categories"), value);
+            return castState<CategoriesSet>();
+        }
+
+        Ref<Event> release()
+        {
+            COMPILE_ASSERT(STATE == AllFieldsSet, result_is_not_ready);
+            COMPILE_ASSERT(sizeof(Event) == sizeof(InspectorObject), cannot_cast);
+
+            Ref<InspectorObject> result = m_result.releaseNonNull();
+            return WTFMove(*reinterpret_cast<Ref<Event>*>(&result));
+        }
+    };
+
+    /*
+     * Synthetic constructor:
+     * Ref<Event> result = Event::create()
+     *     .setTimestamp(...)
+     *     .setCategories(...)
+     *     .release();
+     */
+    static Builder<NoFieldsSet> create()
+    {
+        return Builder<NoFieldsSet>(InspectorObject::create());
+    }
+};
+
+class CategoryData : public Inspector::InspectorObjectBase {
+public:
+    // Named after property name 'type' while generating CategoryData.
+    enum class Type {
+        Javascript = 16,
+        JIT = 86,
+        Images = 87,
+        Layers = 88,
+        Page = 57,
+        Other = 25,
+    }; // enum class Type
+    enum {
+        NoFieldsSet = 0,
+        TypeSet = 1 << 0,
+        SizeSet = 1 << 1,
+        AllFieldsSet = (TypeSet | SizeSet)
+    };
+
+    template<int STATE>
+    class Builder {
+    private:
+        RefPtr<InspectorObject> m_result;
+
+        template<int STEP> Builder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<Builder<STATE | STEP>*>(this);
+        }
+
+        Builder(Ref</*CategoryData*/InspectorObject>&& object)
+            : m_result(WTFMove(object))
+        {
+            COMPILE_ASSERT(STATE == NoFieldsSet, builder_created_in_non_init_state);
+        }
+        friend class CategoryData;
+    public:
+
+        Builder<STATE | TypeSet>& setType(Type value)
+        {
+            COMPILE_ASSERT(!(STATE & TypeSet), property_type_already_set);
+            m_result->setString(ASCIILiteral("type"), Inspector::Protocol::InspectorHelpers::getEnumConstantValue(value));
+            return castState<TypeSet>();
+        }
+
+        Builder<STATE | SizeSet>& setSize(double value)
+        {
+            COMPILE_ASSERT(!(STATE & SizeSet), property_size_already_set);
+            m_result->setDouble(ASCIILiteral("size"), value);
+            return castState<SizeSet>();
+        }
+
+        Ref<CategoryData> release()
+        {
+            COMPILE_ASSERT(STATE == AllFieldsSet, result_is_not_ready);
+            COMPILE_ASSERT(sizeof(CategoryData) == sizeof(InspectorObject), cannot_cast);
+
+            Ref<InspectorObject> result = m_result.releaseNonNull();
+            return WTFMove(*reinterpret_cast<Ref<CategoryData>*>(&result));
+        }
+    };
+
+    /*
+     * Synthetic constructor:
+     * Ref<CategoryData> result = CategoryData::create()
+     *     .setType(...)
+     *     .setSize(...)
+     *     .release();
+     */
+    static Builder<NoFieldsSet> create()
+    {
+        return Builder<NoFieldsSet>(InspectorObject::create());
+    }
+};
+
+} // Memory
+#endif // ENABLE(RESOURCE_USAGE)
+
 namespace Network {
 /* Timing information for the request. */
 class ResourceTiming : public Inspector::InspectorObjectBase {
@@ -5816,8 +5986,8 @@ class Initiator : public Inspector::InspectorObjectBase {
 public:
     // Named after property name 'type' while generating Initiator.
     enum class Type {
-        Parser = 95,
-        Script = 96,
+        Parser = 98,
+        Script = 99,
         Other = 25,
     }; // enum class Type
     enum {
@@ -6720,20 +6890,20 @@ public:
 namespace Page {
 /* Resource type as it was perceived by the rendering engine. */
 enum class ResourceType {
-    Document = 86,
-    Stylesheet = 87,
-    Image = 88,
-    Font = 89,
-    Script = 90,
-    XHR = 91,
-    Fetch = 92,
-    WebSocket = 93,
-    Other = 94,
+    Document = 89,
+    Stylesheet = 90,
+    Image = 91,
+    Font = 92,
+    Script = 93,
+    XHR = 94,
+    Fetch = 95,
+    WebSocket = 96,
+    Other = 97,
 }; // enum class ResourceType
 /* Coordinate system used by supplied coordinates. */
 enum class CoordinateSystem {
-    Viewport = 97,
-    Page = 98,
+    Viewport = 100,
+    Page = 101,
 }; // enum class CoordinateSystem
 /* Information about the Frame on the page. */
 class Frame : public Inspector::InspectorObjectBase {
@@ -7209,35 +7379,402 @@ public:
 
 } // Page
 
+#if ENABLE(WEB_REPLAY)
+namespace Replay {
+/* State machine's state for the session. */
+enum class SessionState {
+    Capturing = 102,
+    Inactive = 103,
+    Replaying = 104,
+}; // enum class SessionState
+/* State machine's state for the session segment. */
+enum class SegmentState {
+    Appending = 105,
+    Unloaded = 106,
+    Loaded = 107,
+    Dispatching = 108,
+}; // enum class SegmentState
+class ReplayPosition : public Inspector::InspectorObjectBase {
+public:
+    enum {
+        NoFieldsSet = 0,
+        SegmentOffsetSet = 1 << 0,
+        InputOffsetSet = 1 << 1,
+        AllFieldsSet = (SegmentOffsetSet | InputOffsetSet)
+    };
+
+    template<int STATE>
+    class Builder {
+    private:
+        RefPtr<InspectorObject> m_result;
+
+        template<int STEP> Builder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<Builder<STATE | STEP>*>(this);
+        }
+
+        Builder(Ref</*ReplayPosition*/InspectorObject>&& object)
+            : m_result(WTFMove(object))
+        {
+            COMPILE_ASSERT(STATE == NoFieldsSet, builder_created_in_non_init_state);
+        }
+        friend class ReplayPosition;
+    public:
+
+        Builder<STATE | SegmentOffsetSet>& setSegmentOffset(int value)
+        {
+            COMPILE_ASSERT(!(STATE & SegmentOffsetSet), property_segmentOffset_already_set);
+            m_result->setInteger(ASCIILiteral("segmentOffset"), value);
+            return castState<SegmentOffsetSet>();
+        }
+
+        Builder<STATE | InputOffsetSet>& setInputOffset(int value)
+        {
+            COMPILE_ASSERT(!(STATE & InputOffsetSet), property_inputOffset_already_set);
+            m_result->setInteger(ASCIILiteral("inputOffset"), value);
+            return castState<InputOffsetSet>();
+        }
+
+        Ref<ReplayPosition> release()
+        {
+            COMPILE_ASSERT(STATE == AllFieldsSet, result_is_not_ready);
+            COMPILE_ASSERT(sizeof(ReplayPosition) == sizeof(InspectorObject), cannot_cast);
+
+            Ref<InspectorObject> result = m_result.releaseNonNull();
+            return WTFMove(*reinterpret_cast<Ref<ReplayPosition>*>(&result));
+        }
+    };
+
+    /*
+     * Synthetic constructor:
+     * Ref<ReplayPosition> result = ReplayPosition::create()
+     *     .setSegmentOffset(...)
+     *     .setInputOffset(...)
+     *     .release();
+     */
+    static Builder<NoFieldsSet> create()
+    {
+        return Builder<NoFieldsSet>(InspectorObject::create());
+    }
+};
+
+class ReplayInput : public Inspector::InspectorObjectBase {
+public:
+    enum {
+        NoFieldsSet = 0,
+        TypeSet = 1 << 0,
+        OffsetSet = 1 << 1,
+        DataSet = 1 << 2,
+        AllFieldsSet = (TypeSet | OffsetSet | DataSet)
+    };
+
+    template<int STATE>
+    class Builder {
+    private:
+        RefPtr<InspectorObject> m_result;
+
+        template<int STEP> Builder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<Builder<STATE | STEP>*>(this);
+        }
+
+        Builder(Ref</*ReplayInput*/InspectorObject>&& object)
+            : m_result(WTFMove(object))
+        {
+            COMPILE_ASSERT(STATE == NoFieldsSet, builder_created_in_non_init_state);
+        }
+        friend class ReplayInput;
+    public:
+
+        Builder<STATE | TypeSet>& setType(const String& value)
+        {
+            COMPILE_ASSERT(!(STATE & TypeSet), property_type_already_set);
+            m_result->setString(ASCIILiteral("type"), value);
+            return castState<TypeSet>();
+        }
+
+        Builder<STATE | OffsetSet>& setOffset(int value)
+        {
+            COMPILE_ASSERT(!(STATE & OffsetSet), property_offset_already_set);
+            m_result->setInteger(ASCIILiteral("offset"), value);
+            return castState<OffsetSet>();
+        }
+
+        Builder<STATE | DataSet>& setData(RefPtr<Inspector::InspectorObject> value)
+        {
+            COMPILE_ASSERT(!(STATE & DataSet), property_data_already_set);
+            m_result->setObject(ASCIILiteral("data"), value);
+            return castState<DataSet>();
+        }
+
+        Ref<ReplayInput> release()
+        {
+            COMPILE_ASSERT(STATE == AllFieldsSet, result_is_not_ready);
+            COMPILE_ASSERT(sizeof(ReplayInput) == sizeof(InspectorObject), cannot_cast);
+
+            Ref<InspectorObject> result = m_result.releaseNonNull();
+            return WTFMove(*reinterpret_cast<Ref<ReplayInput>*>(&result));
+        }
+    };
+
+    /*
+     * Synthetic constructor:
+     * Ref<ReplayInput> result = ReplayInput::create()
+     *     .setType(...)
+     *     .setOffset(...)
+     *     .setData(...)
+     *     .release();
+     */
+    static Builder<NoFieldsSet> create()
+    {
+        return Builder<NoFieldsSet>(InspectorObject::create());
+    }
+};
+
+class ReplayInputQueue : public Inspector::InspectorObjectBase {
+public:
+    enum {
+        NoFieldsSet = 0,
+        TypeSet = 1 << 0,
+        InputsSet = 1 << 1,
+        AllFieldsSet = (TypeSet | InputsSet)
+    };
+
+    template<int STATE>
+    class Builder {
+    private:
+        RefPtr<InspectorObject> m_result;
+
+        template<int STEP> Builder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<Builder<STATE | STEP>*>(this);
+        }
+
+        Builder(Ref</*ReplayInputQueue*/InspectorObject>&& object)
+            : m_result(WTFMove(object))
+        {
+            COMPILE_ASSERT(STATE == NoFieldsSet, builder_created_in_non_init_state);
+        }
+        friend class ReplayInputQueue;
+    public:
+
+        Builder<STATE | TypeSet>& setType(const String& value)
+        {
+            COMPILE_ASSERT(!(STATE & TypeSet), property_type_already_set);
+            m_result->setString(ASCIILiteral("type"), value);
+            return castState<TypeSet>();
+        }
+
+        Builder<STATE | InputsSet>& setInputs(RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Replay::ReplayInput>> value)
+        {
+            COMPILE_ASSERT(!(STATE & InputsSet), property_inputs_already_set);
+            m_result->setArray(ASCIILiteral("inputs"), value);
+            return castState<InputsSet>();
+        }
+
+        Ref<ReplayInputQueue> release()
+        {
+            COMPILE_ASSERT(STATE == AllFieldsSet, result_is_not_ready);
+            COMPILE_ASSERT(sizeof(ReplayInputQueue) == sizeof(InspectorObject), cannot_cast);
+
+            Ref<InspectorObject> result = m_result.releaseNonNull();
+            return WTFMove(*reinterpret_cast<Ref<ReplayInputQueue>*>(&result));
+        }
+    };
+
+    /*
+     * Synthetic constructor:
+     * Ref<ReplayInputQueue> result = ReplayInputQueue::create()
+     *     .setType(...)
+     *     .setInputs(...)
+     *     .release();
+     */
+    static Builder<NoFieldsSet> create()
+    {
+        return Builder<NoFieldsSet>(InspectorObject::create());
+    }
+};
+
+/* A standalone segment of a replay session that corresponds to a single main frame navigation and execution. */
+class SessionSegment : public Inspector::InspectorObjectBase {
+public:
+    enum {
+        NoFieldsSet = 0,
+        IdSet = 1 << 0,
+        TimestampSet = 1 << 1,
+        QueuesSet = 1 << 2,
+        AllFieldsSet = (IdSet | TimestampSet | QueuesSet)
+    };
+
+    template<int STATE>
+    class Builder {
+    private:
+        RefPtr<InspectorObject> m_result;
+
+        template<int STEP> Builder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<Builder<STATE | STEP>*>(this);
+        }
+
+        Builder(Ref</*SessionSegment*/InspectorObject>&& object)
+            : m_result(WTFMove(object))
+        {
+            COMPILE_ASSERT(STATE == NoFieldsSet, builder_created_in_non_init_state);
+        }
+        friend class SessionSegment;
+    public:
+
+        Builder<STATE | IdSet>& setId(int value)
+        {
+            COMPILE_ASSERT(!(STATE & IdSet), property_id_already_set);
+            m_result->setInteger(ASCIILiteral("id"), value);
+            return castState<IdSet>();
+        }
+
+        Builder<STATE | TimestampSet>& setTimestamp(double value)
+        {
+            COMPILE_ASSERT(!(STATE & TimestampSet), property_timestamp_already_set);
+            m_result->setDouble(ASCIILiteral("timestamp"), value);
+            return castState<TimestampSet>();
+        }
+
+        Builder<STATE | QueuesSet>& setQueues(RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Replay::ReplayInputQueue>> value)
+        {
+            COMPILE_ASSERT(!(STATE & QueuesSet), property_queues_already_set);
+            m_result->setArray(ASCIILiteral("queues"), value);
+            return castState<QueuesSet>();
+        }
+
+        Ref<SessionSegment> release()
+        {
+            COMPILE_ASSERT(STATE == AllFieldsSet, result_is_not_ready);
+            COMPILE_ASSERT(sizeof(SessionSegment) == sizeof(InspectorObject), cannot_cast);
+
+            Ref<InspectorObject> result = m_result.releaseNonNull();
+            return WTFMove(*reinterpret_cast<Ref<SessionSegment>*>(&result));
+        }
+    };
+
+    /*
+     * Synthetic constructor:
+     * Ref<SessionSegment> result = SessionSegment::create()
+     *     .setId(...)
+     *     .setTimestamp(...)
+     *     .setQueues(...)
+     *     .release();
+     */
+    static Builder<NoFieldsSet> create()
+    {
+        return Builder<NoFieldsSet>(InspectorObject::create());
+    }
+};
+
+/* An ordered collection of replay session segments. */
+class ReplaySession : public Inspector::InspectorObjectBase {
+public:
+    enum {
+        NoFieldsSet = 0,
+        IdSet = 1 << 0,
+        TimestampSet = 1 << 1,
+        SegmentsSet = 1 << 2,
+        AllFieldsSet = (IdSet | TimestampSet | SegmentsSet)
+    };
+
+    template<int STATE>
+    class Builder {
+    private:
+        RefPtr<InspectorObject> m_result;
+
+        template<int STEP> Builder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<Builder<STATE | STEP>*>(this);
+        }
+
+        Builder(Ref</*ReplaySession*/InspectorObject>&& object)
+            : m_result(WTFMove(object))
+        {
+            COMPILE_ASSERT(STATE == NoFieldsSet, builder_created_in_non_init_state);
+        }
+        friend class ReplaySession;
+    public:
+
+        Builder<STATE | IdSet>& setId(int value)
+        {
+            COMPILE_ASSERT(!(STATE & IdSet), property_id_already_set);
+            m_result->setInteger(ASCIILiteral("id"), value);
+            return castState<IdSet>();
+        }
+
+        Builder<STATE | TimestampSet>& setTimestamp(double value)
+        {
+            COMPILE_ASSERT(!(STATE & TimestampSet), property_timestamp_already_set);
+            m_result->setDouble(ASCIILiteral("timestamp"), value);
+            return castState<TimestampSet>();
+        }
+
+        Builder<STATE | SegmentsSet>& setSegments(RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Replay::SegmentIdentifier>> value)
+        {
+            COMPILE_ASSERT(!(STATE & SegmentsSet), property_segments_already_set);
+            m_result->setArray(ASCIILiteral("segments"), value);
+            return castState<SegmentsSet>();
+        }
+
+        Ref<ReplaySession> release()
+        {
+            COMPILE_ASSERT(STATE == AllFieldsSet, result_is_not_ready);
+            COMPILE_ASSERT(sizeof(ReplaySession) == sizeof(InspectorObject), cannot_cast);
+
+            Ref<InspectorObject> result = m_result.releaseNonNull();
+            return WTFMove(*reinterpret_cast<Ref<ReplaySession>*>(&result));
+        }
+    };
+
+    /*
+     * Synthetic constructor:
+     * Ref<ReplaySession> result = ReplaySession::create()
+     *     .setId(...)
+     *     .setTimestamp(...)
+     *     .setSegments(...)
+     *     .release();
+     */
+    static Builder<NoFieldsSet> create()
+    {
+        return Builder<NoFieldsSet>(InspectorObject::create());
+    }
+};
+
+} // Replay
+#endif // ENABLE(WEB_REPLAY)
+
 namespace Runtime {
 /* Mirror object referencing original JavaScript object. */
 class RemoteObject : public Inspector::InspectorObjectBase {
 public:
     // Named after property name 'type' while generating RemoteObject.
     enum class Type {
-        Object = 99,
-        Function = 100,
-        Undefined = 101,
+        Object = 109,
+        Function = 110,
+        Undefined = 111,
         String = 83,
         Number = 82,
-        Boolean = 102,
-        Symbol = 103,
+        Boolean = 112,
+        Symbol = 113,
     }; // enum class Type
     // Named after property name 'subtype' while generating RemoteObject.
     enum class Subtype {
         Array = 84,
         Null = 85,
-        Node = 104,
-        Regexp = 105,
+        Node = 114,
+        Regexp = 115,
         Date = 60,
         Error = 29,
-        Map = 106,
-        Set = 107,
-        Weakmap = 108,
-        Weakset = 109,
-        Iterator = 110,
-        Class = 111,
-        Proxy = 112,
+        Map = 116,
+        Set = 117,
+        Weakmap = 118,
+        Weakset = 119,
+        Iterator = 120,
+        Class = 121,
+        Proxy = 122,
     }; // enum class Subtype
     enum {
         NoFieldsSet = 0,
@@ -7337,29 +7874,29 @@ class ObjectPreview : public Inspector::InspectorObjectBase {
 public:
     // Named after property name 'type' while generating ObjectPreview.
     enum class Type {
-        Object = 99,
-        Function = 100,
-        Undefined = 101,
+        Object = 109,
+        Function = 110,
+        Undefined = 111,
         String = 83,
         Number = 82,
-        Boolean = 102,
-        Symbol = 103,
+        Boolean = 112,
+        Symbol = 113,
     }; // enum class Type
     // Named after property name 'subtype' while generating ObjectPreview.
     enum class Subtype {
         Array = 84,
         Null = 85,
-        Node = 104,
-        Regexp = 105,
+        Node = 114,
+        Regexp = 115,
         Date = 60,
         Error = 29,
-        Map = 106,
-        Set = 107,
-        Weakmap = 108,
-        Weakset = 109,
-        Iterator = 110,
-        Class = 111,
-        Proxy = 112,
+        Map = 116,
+        Set = 117,
+        Weakmap = 118,
+        Weakset = 119,
+        Iterator = 120,
+        Class = 121,
+        Proxy = 122,
     }; // enum class Subtype
     enum {
         NoFieldsSet = 0,
@@ -7457,30 +7994,30 @@ class PropertyPreview : public Inspector::InspectorObjectBase {
 public:
     // Named after property name 'type' while generating PropertyPreview.
     enum class Type {
-        Object = 99,
-        Function = 100,
-        Undefined = 101,
+        Object = 109,
+        Function = 110,
+        Undefined = 111,
         String = 83,
         Number = 82,
-        Boolean = 102,
-        Symbol = 103,
-        Accessor = 113,
+        Boolean = 112,
+        Symbol = 113,
+        Accessor = 123,
     }; // enum class Type
     // Named after property name 'subtype' while generating PropertyPreview.
     enum class Subtype {
         Array = 84,
         Null = 85,
-        Node = 104,
-        Regexp = 105,
+        Node = 114,
+        Regexp = 115,
         Date = 60,
         Error = 29,
-        Map = 106,
-        Set = 107,
-        Weakmap = 108,
-        Weakset = 109,
-        Iterator = 110,
-        Class = 111,
-        Proxy = 112,
+        Map = 116,
+        Set = 117,
+        Weakmap = 118,
+        Weakset = 119,
+        Iterator = 120,
+        Class = 121,
+        Proxy = 122,
     }; // enum class Subtype
     enum {
         NoFieldsSet = 0,
@@ -8001,10 +8538,10 @@ public:
 
 /* Syntax error type: "none" for no error, "irrecoverable" for unrecoverable errors, "unterminated-literal" for when there is an unterminated literal, "recoverable" for when the expression is unfinished but valid so far. */
 enum class SyntaxErrorType {
-    None = 114,
-    Irrecoverable = 115,
-    UnterminatedLiteral = 116,
-    Recoverable = 117,
+    None = 124,
+    Irrecoverable = 125,
+    UnterminatedLiteral = 126,
+    Recoverable = 127,
 }; // enum class SyntaxErrorType
 /* Range of an error in source code. */
 class ErrorRange : public Inspector::InspectorObjectBase {
@@ -8507,9 +9044,9 @@ public:
 namespace ScriptProfiler {
 /*  */
 enum class EventType {
-    API = 118,
-    Microtask = 119,
-    Other = 94,
+    API = 128,
+    Microtask = 129,
+    Other = 97,
 }; // enum class EventType
 class Event : public Inspector::InspectorObjectBase {
 public:
@@ -8868,34 +9405,34 @@ public:
 namespace Timeline {
 /* Timeline record type. */
 enum class EventType {
-    EventDispatch = 120,
-    ScheduleStyleRecalculation = 121,
-    RecalculateStyles = 122,
-    InvalidateLayout = 123,
-    Layout = 124,
-    Paint = 125,
-    Composite = 126,
-    RenderingFrame = 127,
-    TimerInstall = 128,
-    TimerRemove = 129,
-    TimerFire = 130,
-    EvaluateScript = 131,
-    TimeStamp = 132,
-    Time = 133,
-    TimeEnd = 134,
-    FunctionCall = 135,
-    ProbeSample = 136,
-    ConsoleProfile = 137,
-    RequestAnimationFrame = 138,
-    CancelAnimationFrame = 139,
-    FireAnimationFrame = 140,
+    EventDispatch = 130,
+    ScheduleStyleRecalculation = 131,
+    RecalculateStyles = 132,
+    InvalidateLayout = 133,
+    Layout = 134,
+    Paint = 135,
+    Composite = 136,
+    RenderingFrame = 137,
+    TimerInstall = 138,
+    TimerRemove = 139,
+    TimerFire = 140,
+    EvaluateScript = 141,
+    TimeStamp = 142,
+    Time = 143,
+    TimeEnd = 144,
+    FunctionCall = 145,
+    ProbeSample = 146,
+    ConsoleProfile = 147,
+    RequestAnimationFrame = 148,
+    CancelAnimationFrame = 149,
+    FireAnimationFrame = 150,
 }; // enum class EventType
 /* Instrument types. */
 enum class Instrument {
-    ScriptProfiler = 141,
-    Timeline = 142,
-    Memory = 143,
-    Heap = 144,
+    ScriptProfiler = 151,
+    Timeline = 152,
+    Memory = 153,
+    Heap = 154,
 }; // enum class Instrument
 /* Timeline record contains information about the recorded activity. */
 class TimelineEvent : public Inspector::InspectorObject {
@@ -9146,6 +9683,12 @@ template<>
 JS_EXPORT_PRIVATE std::optional<Inspector::Protocol::IndexedDB::KeyPath::Type> parseEnumValueFromString<Inspector::Protocol::IndexedDB::KeyPath::Type>(const String&);
 #endif // ENABLE(INDEXED_DATABASE)
 
+#if ENABLE(RESOURCE_USAGE)
+// Enums in the 'Memory' Domain
+template<>
+JS_EXPORT_PRIVATE std::optional<Inspector::Protocol::Memory::CategoryData::Type> parseEnumValueFromString<Inspector::Protocol::Memory::CategoryData::Type>(const String&);
+#endif // ENABLE(RESOURCE_USAGE)
+
 // Enums in the 'Network' Domain
 template<>
 JS_EXPORT_PRIVATE std::optional<Inspector::Protocol::Network::Initiator::Type> parseEnumValueFromString<Inspector::Protocol::Network::Initiator::Type>(const String&);
@@ -9155,6 +9698,14 @@ template<>
 JS_EXPORT_PRIVATE std::optional<Inspector::Protocol::Page::ResourceType> parseEnumValueFromString<Inspector::Protocol::Page::ResourceType>(const String&);
 template<>
 JS_EXPORT_PRIVATE std::optional<Inspector::Protocol::Page::CoordinateSystem> parseEnumValueFromString<Inspector::Protocol::Page::CoordinateSystem>(const String&);
+
+#if ENABLE(WEB_REPLAY)
+// Enums in the 'Replay' Domain
+template<>
+JS_EXPORT_PRIVATE std::optional<Inspector::Protocol::Replay::SessionState> parseEnumValueFromString<Inspector::Protocol::Replay::SessionState>(const String&);
+template<>
+JS_EXPORT_PRIVATE std::optional<Inspector::Protocol::Replay::SegmentState> parseEnumValueFromString<Inspector::Protocol::Replay::SegmentState>(const String&);
+#endif // ENABLE(WEB_REPLAY)
 
 // Enums in the 'Runtime' Domain
 template<>

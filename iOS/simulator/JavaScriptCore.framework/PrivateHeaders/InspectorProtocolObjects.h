@@ -141,6 +141,13 @@ class Layer;
 class CompositingReasons;
 } // LayerTree
 
+#if ENABLE(RESOURCE_USAGE)
+namespace Memory {
+class Event;
+class CategoryData;
+} // Memory
+#endif // ENABLE(RESOURCE_USAGE)
+
 namespace Network {
 class Headers;
 class ResourceTiming;
@@ -5195,6 +5202,148 @@ public:
 
 } // LayerTree
 
+#if ENABLE(RESOURCE_USAGE)
+namespace Memory {
+class Event : public Inspector::InspectorObjectBase {
+public:
+    enum {
+        NoFieldsSet = 0,
+        TimestampSet = 1 << 0,
+        CategoriesSet = 1 << 1,
+        AllFieldsSet = (TimestampSet | CategoriesSet)
+    };
+
+    template<int STATE>
+    class Builder {
+    private:
+        RefPtr<InspectorObject> m_result;
+
+        template<int STEP> Builder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<Builder<STATE | STEP>*>(this);
+        }
+
+        Builder(Ref</*Event*/InspectorObject>&& object)
+            : m_result(WTFMove(object))
+        {
+            COMPILE_ASSERT(STATE == NoFieldsSet, builder_created_in_non_init_state);
+        }
+        friend class Event;
+    public:
+
+        Builder<STATE | TimestampSet>& setTimestamp(double value)
+        {
+            COMPILE_ASSERT(!(STATE & TimestampSet), property_timestamp_already_set);
+            m_result->setDouble(ASCIILiteral("timestamp"), value);
+            return castState<TimestampSet>();
+        }
+
+        Builder<STATE | CategoriesSet>& setCategories(RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Memory::CategoryData>> value)
+        {
+            COMPILE_ASSERT(!(STATE & CategoriesSet), property_categories_already_set);
+            m_result->setArray(ASCIILiteral("categories"), value);
+            return castState<CategoriesSet>();
+        }
+
+        Ref<Event> release()
+        {
+            COMPILE_ASSERT(STATE == AllFieldsSet, result_is_not_ready);
+            COMPILE_ASSERT(sizeof(Event) == sizeof(InspectorObject), cannot_cast);
+
+            Ref<InspectorObject> result = m_result.releaseNonNull();
+            return WTFMove(*reinterpret_cast<Ref<Event>*>(&result));
+        }
+    };
+
+    /*
+     * Synthetic constructor:
+     * Ref<Event> result = Event::create()
+     *     .setTimestamp(...)
+     *     .setCategories(...)
+     *     .release();
+     */
+    static Builder<NoFieldsSet> create()
+    {
+        return Builder<NoFieldsSet>(InspectorObject::create());
+    }
+};
+
+class CategoryData : public Inspector::InspectorObjectBase {
+public:
+    // Named after property name 'type' while generating CategoryData.
+    enum class Type {
+        Javascript = 16,
+        JIT = 86,
+        Images = 87,
+        Layers = 88,
+        Page = 57,
+        Other = 25,
+    }; // enum class Type
+    enum {
+        NoFieldsSet = 0,
+        TypeSet = 1 << 0,
+        SizeSet = 1 << 1,
+        AllFieldsSet = (TypeSet | SizeSet)
+    };
+
+    template<int STATE>
+    class Builder {
+    private:
+        RefPtr<InspectorObject> m_result;
+
+        template<int STEP> Builder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<Builder<STATE | STEP>*>(this);
+        }
+
+        Builder(Ref</*CategoryData*/InspectorObject>&& object)
+            : m_result(WTFMove(object))
+        {
+            COMPILE_ASSERT(STATE == NoFieldsSet, builder_created_in_non_init_state);
+        }
+        friend class CategoryData;
+    public:
+
+        Builder<STATE | TypeSet>& setType(Type value)
+        {
+            COMPILE_ASSERT(!(STATE & TypeSet), property_type_already_set);
+            m_result->setString(ASCIILiteral("type"), Inspector::Protocol::InspectorHelpers::getEnumConstantValue(value));
+            return castState<TypeSet>();
+        }
+
+        Builder<STATE | SizeSet>& setSize(double value)
+        {
+            COMPILE_ASSERT(!(STATE & SizeSet), property_size_already_set);
+            m_result->setDouble(ASCIILiteral("size"), value);
+            return castState<SizeSet>();
+        }
+
+        Ref<CategoryData> release()
+        {
+            COMPILE_ASSERT(STATE == AllFieldsSet, result_is_not_ready);
+            COMPILE_ASSERT(sizeof(CategoryData) == sizeof(InspectorObject), cannot_cast);
+
+            Ref<InspectorObject> result = m_result.releaseNonNull();
+            return WTFMove(*reinterpret_cast<Ref<CategoryData>*>(&result));
+        }
+    };
+
+    /*
+     * Synthetic constructor:
+     * Ref<CategoryData> result = CategoryData::create()
+     *     .setType(...)
+     *     .setSize(...)
+     *     .release();
+     */
+    static Builder<NoFieldsSet> create()
+    {
+        return Builder<NoFieldsSet>(InspectorObject::create());
+    }
+};
+
+} // Memory
+#endif // ENABLE(RESOURCE_USAGE)
+
 namespace Network {
 /* Timing information for the request. */
 class ResourceTiming : public Inspector::InspectorObjectBase {
@@ -5816,8 +5965,8 @@ class Initiator : public Inspector::InspectorObjectBase {
 public:
     // Named after property name 'type' while generating Initiator.
     enum class Type {
-        Parser = 95,
-        Script = 96,
+        Parser = 98,
+        Script = 99,
         Other = 25,
     }; // enum class Type
     enum {
@@ -6720,20 +6869,20 @@ public:
 namespace Page {
 /* Resource type as it was perceived by the rendering engine. */
 enum class ResourceType {
-    Document = 86,
-    Stylesheet = 87,
-    Image = 88,
-    Font = 89,
-    Script = 90,
-    XHR = 91,
-    Fetch = 92,
-    WebSocket = 93,
-    Other = 94,
+    Document = 89,
+    Stylesheet = 90,
+    Image = 91,
+    Font = 92,
+    Script = 93,
+    XHR = 94,
+    Fetch = 95,
+    WebSocket = 96,
+    Other = 97,
 }; // enum class ResourceType
 /* Coordinate system used by supplied coordinates. */
 enum class CoordinateSystem {
-    Viewport = 97,
-    Page = 98,
+    Viewport = 100,
+    Page = 101,
 }; // enum class CoordinateSystem
 /* Information about the Frame on the page. */
 class Frame : public Inspector::InspectorObjectBase {
@@ -7215,29 +7364,29 @@ class RemoteObject : public Inspector::InspectorObjectBase {
 public:
     // Named after property name 'type' while generating RemoteObject.
     enum class Type {
-        Object = 99,
-        Function = 100,
-        Undefined = 101,
+        Object = 102,
+        Function = 103,
+        Undefined = 104,
         String = 83,
         Number = 82,
-        Boolean = 102,
-        Symbol = 103,
+        Boolean = 105,
+        Symbol = 106,
     }; // enum class Type
     // Named after property name 'subtype' while generating RemoteObject.
     enum class Subtype {
         Array = 84,
         Null = 85,
-        Node = 104,
-        Regexp = 105,
+        Node = 107,
+        Regexp = 108,
         Date = 60,
         Error = 29,
-        Map = 106,
-        Set = 107,
-        Weakmap = 108,
-        Weakset = 109,
-        Iterator = 110,
-        Class = 111,
-        Proxy = 112,
+        Map = 109,
+        Set = 110,
+        Weakmap = 111,
+        Weakset = 112,
+        Iterator = 113,
+        Class = 114,
+        Proxy = 115,
     }; // enum class Subtype
     enum {
         NoFieldsSet = 0,
@@ -7337,29 +7486,29 @@ class ObjectPreview : public Inspector::InspectorObjectBase {
 public:
     // Named after property name 'type' while generating ObjectPreview.
     enum class Type {
-        Object = 99,
-        Function = 100,
-        Undefined = 101,
+        Object = 102,
+        Function = 103,
+        Undefined = 104,
         String = 83,
         Number = 82,
-        Boolean = 102,
-        Symbol = 103,
+        Boolean = 105,
+        Symbol = 106,
     }; // enum class Type
     // Named after property name 'subtype' while generating ObjectPreview.
     enum class Subtype {
         Array = 84,
         Null = 85,
-        Node = 104,
-        Regexp = 105,
+        Node = 107,
+        Regexp = 108,
         Date = 60,
         Error = 29,
-        Map = 106,
-        Set = 107,
-        Weakmap = 108,
-        Weakset = 109,
-        Iterator = 110,
-        Class = 111,
-        Proxy = 112,
+        Map = 109,
+        Set = 110,
+        Weakmap = 111,
+        Weakset = 112,
+        Iterator = 113,
+        Class = 114,
+        Proxy = 115,
     }; // enum class Subtype
     enum {
         NoFieldsSet = 0,
@@ -7457,30 +7606,30 @@ class PropertyPreview : public Inspector::InspectorObjectBase {
 public:
     // Named after property name 'type' while generating PropertyPreview.
     enum class Type {
-        Object = 99,
-        Function = 100,
-        Undefined = 101,
+        Object = 102,
+        Function = 103,
+        Undefined = 104,
         String = 83,
         Number = 82,
-        Boolean = 102,
-        Symbol = 103,
-        Accessor = 113,
+        Boolean = 105,
+        Symbol = 106,
+        Accessor = 116,
     }; // enum class Type
     // Named after property name 'subtype' while generating PropertyPreview.
     enum class Subtype {
         Array = 84,
         Null = 85,
-        Node = 104,
-        Regexp = 105,
+        Node = 107,
+        Regexp = 108,
         Date = 60,
         Error = 29,
-        Map = 106,
-        Set = 107,
-        Weakmap = 108,
-        Weakset = 109,
-        Iterator = 110,
-        Class = 111,
-        Proxy = 112,
+        Map = 109,
+        Set = 110,
+        Weakmap = 111,
+        Weakset = 112,
+        Iterator = 113,
+        Class = 114,
+        Proxy = 115,
     }; // enum class Subtype
     enum {
         NoFieldsSet = 0,
@@ -8001,10 +8150,10 @@ public:
 
 /* Syntax error type: "none" for no error, "irrecoverable" for unrecoverable errors, "unterminated-literal" for when there is an unterminated literal, "recoverable" for when the expression is unfinished but valid so far. */
 enum class SyntaxErrorType {
-    None = 114,
-    Irrecoverable = 115,
-    UnterminatedLiteral = 116,
-    Recoverable = 117,
+    None = 117,
+    Irrecoverable = 118,
+    UnterminatedLiteral = 119,
+    Recoverable = 120,
 }; // enum class SyntaxErrorType
 /* Range of an error in source code. */
 class ErrorRange : public Inspector::InspectorObjectBase {
@@ -8507,9 +8656,9 @@ public:
 namespace ScriptProfiler {
 /*  */
 enum class EventType {
-    API = 118,
-    Microtask = 119,
-    Other = 94,
+    API = 121,
+    Microtask = 122,
+    Other = 97,
 }; // enum class EventType
 class Event : public Inspector::InspectorObjectBase {
 public:
@@ -8868,34 +9017,34 @@ public:
 namespace Timeline {
 /* Timeline record type. */
 enum class EventType {
-    EventDispatch = 120,
-    ScheduleStyleRecalculation = 121,
-    RecalculateStyles = 122,
-    InvalidateLayout = 123,
-    Layout = 124,
-    Paint = 125,
-    Composite = 126,
-    RenderingFrame = 127,
-    TimerInstall = 128,
-    TimerRemove = 129,
-    TimerFire = 130,
-    EvaluateScript = 131,
-    TimeStamp = 132,
-    Time = 133,
-    TimeEnd = 134,
-    FunctionCall = 135,
-    ProbeSample = 136,
-    ConsoleProfile = 137,
-    RequestAnimationFrame = 138,
-    CancelAnimationFrame = 139,
-    FireAnimationFrame = 140,
+    EventDispatch = 123,
+    ScheduleStyleRecalculation = 124,
+    RecalculateStyles = 125,
+    InvalidateLayout = 126,
+    Layout = 127,
+    Paint = 128,
+    Composite = 129,
+    RenderingFrame = 130,
+    TimerInstall = 131,
+    TimerRemove = 132,
+    TimerFire = 133,
+    EvaluateScript = 134,
+    TimeStamp = 135,
+    Time = 136,
+    TimeEnd = 137,
+    FunctionCall = 138,
+    ProbeSample = 139,
+    ConsoleProfile = 140,
+    RequestAnimationFrame = 141,
+    CancelAnimationFrame = 142,
+    FireAnimationFrame = 143,
 }; // enum class EventType
 /* Instrument types. */
 enum class Instrument {
-    ScriptProfiler = 141,
-    Timeline = 142,
-    Memory = 143,
-    Heap = 144,
+    ScriptProfiler = 144,
+    Timeline = 145,
+    Memory = 146,
+    Heap = 147,
 }; // enum class Instrument
 /* Timeline record contains information about the recorded activity. */
 class TimelineEvent : public Inspector::InspectorObject {
@@ -9145,6 +9294,12 @@ JS_EXPORT_PRIVATE std::optional<Inspector::Protocol::IndexedDB::Key::Type> parse
 template<>
 JS_EXPORT_PRIVATE std::optional<Inspector::Protocol::IndexedDB::KeyPath::Type> parseEnumValueFromString<Inspector::Protocol::IndexedDB::KeyPath::Type>(const String&);
 #endif // ENABLE(INDEXED_DATABASE)
+
+#if ENABLE(RESOURCE_USAGE)
+// Enums in the 'Memory' Domain
+template<>
+JS_EXPORT_PRIVATE std::optional<Inspector::Protocol::Memory::CategoryData::Type> parseEnumValueFromString<Inspector::Protocol::Memory::CategoryData::Type>(const String&);
+#endif // ENABLE(RESOURCE_USAGE)
 
 // Enums in the 'Network' Domain
 template<>

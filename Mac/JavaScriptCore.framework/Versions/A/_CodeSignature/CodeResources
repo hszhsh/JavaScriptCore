@@ -6,7 +6,7 @@
 	<dict>
 		<key>Resources/Info.plist</key>
 		<data>
-		SJSGOp8xW4WKPHxkIQ9e90DVJ/I=
+		sk3ORXdnsQAcpBu4460ZApoABCA=
 		</data>
 		<key>Resources/framework.sb</key>
 		<data>
@@ -459,11 +459,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			czy7uL5HJnoTPd1JzpuCf0VKtAQ=
+			i5ryINtpfxC9HKodyXqfGWQnnZ0=
 			</data>
 			<key>hash2</key>
 			<data>
-			JeLT0u3c6jack2oyiBI7woMQbnSbPmU0QlJmNvFOCJs=
+			U2nBrFdelL17IGx3GtcdV+370kwqVxDSLQXj0csHN2I=
 			</data>
 		</dict>
 		<key>PrivateHeaders/ArrayStorage.h</key>
@@ -1174,11 +1174,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			Wdla6NvTSRgiGewOgOc620BF+oc=
+			YoWwkW3DbMKqzpuMJxkMt3ocziw=
 			</data>
 			<key>hash2</key>
 			<data>
-			IIaxufdjrwsD45LiuqFQqvtJsXu6gdPxdqzFmevP5Jo=
+			u73g1Z7j0hmEo3J2VayoXi3t/4/06EbU4sKbh6VOkgg=
 			</data>
 		</dict>
 		<key>PrivateHeaders/CommonIdentifiers.h</key>
@@ -1229,11 +1229,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			xZyItwoEM0+TBrs6ATIt2UzPE3k=
+			i9xRDOXiKt2GyuRZ0LALZTwK27w=
 			</data>
 			<key>hash2</key>
 			<data>
-			t0vxBcbGfV0snfAVyQ6fxICL1bK6nGb1m4nGYwVjM9o=
+			N4YlQ+2SBiEJAHDO3ZUd021ZIVdTRfpm95JhUI8NNcM=
 			</data>
 		</dict>
 		<key>PrivateHeaders/ComplexGetStatus.h</key>
@@ -2065,11 +2065,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			zOwD/73gmZR6qqQ3PwW9003ykGA=
+			vjk6g+iP5vRNBm80x9c84Es4Vdw=
 			</data>
 			<key>hash2</key>
 			<data>
-			HbnPJG2eBgHt1hux581EaAR7Ynm5XxZsKhltav8eXXQ=
+			2+TnBhaNYCUXbqCHMIkh22j/JcL6XnOzqDx3szZ0zHw=
 			</data>
 		</dict>
 		<key>PrivateHeaders/FTLAvailableRecovery.h</key>
@@ -2923,11 +2923,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			hpI+2MPnnUoYg8cO4eXV5qK6alY=
+			7kp/2Ibz5+KqrDgnr2uN1USu3j8=
 			</data>
 			<key>hash2</key>
 			<data>
-			z72l55F8y5JRU/1t2+Skm7phaWifR0Gz1E2Rrdz4Uzg=
+			bBx7DvSb4HBokS4XRY0d0/R+yLB8wCjOAey+omV06dg=
 			</data>
 		</dict>
 		<key>PrivateHeaders/HeapCell.h</key>
@@ -3308,22 +3308,22 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			1+f9Rm6bU7BftrLFBqzHaN3rp4o=
+			/88ySWGBRY0cLA9BDvCDfjiY0r0=
 			</data>
 			<key>hash2</key>
 			<data>
-			esaDcYlyaCMW/ywy9X+ke4DpPAWyT3vctwbLmEyuctE=
+			se4aiF2HuyKK4tFCiDf2HSHsoQXNIs1kpU+5S4kIHwM=
 			</data>
 		</dict>
 		<key>PrivateHeaders/InspectorBackendCommands.js</key>
 		<dict>
 			<key>hash</key>
 			<data>
-			KBhyVBocVOGg+MbvzjZKVzpEdEQ=
+			g1EnZmXCBs7gASQlz9tOH5mHgPQ=
 			</data>
 			<key>hash2</key>
 			<data>
-			WbD03JZIxi4ThY+1bOoMsQPL+uiilddu0hw06r4qBHg=
+			sPqRXm73UzCIz2y2kY/A84vajs06yfyE5kMsSf2wEZc=
 			</data>
 		</dict>
 		<key>PrivateHeaders/InspectorBackendDispatcher.h</key>
@@ -3341,11 +3341,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			uJDkeLzG/2RcFwP0RpTXSN22kG8=
+			/1tqyHA0xBOGebySMAydecGVdWY=
 			</data>
 			<key>hash2</key>
 			<data>
-			N7X8R1WUbtsy33udPFW5+PkOjlS1ygNvY52G/IUdaGQ=
+			N71tb3ja+gsFZqKiZtcBApciImDwjmQAwhGYXN9+NJs=
 			</data>
 		</dict>
 		<key>PrivateHeaders/InspectorConsoleAgent.h</key>
@@ -3396,11 +3396,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			VrmmuDOh4xNq+9mNDYlIJ9vRUO8=
+			+PkuEV+e3XuQDR+1WWuVIX2Qm20=
 			</data>
 			<key>hash2</key>
 			<data>
-			mrwdxjCzp/yZRdR8MBe+5HPaQmipO6k6KFgO0CE73e0=
+			cASpU1AanJ6zEeRf/gGA0ZL8haF+xPuuDfG0ei8hr2o=
 			</data>
 		</dict>
 		<key>PrivateHeaders/InspectorFrontendRouter.h</key>
@@ -3440,11 +3440,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			UOx33z9f9ybOgO206rybBGoBriA=
+			hP48y87phdVbolE9Z4Dr5tdReoo=
 			</data>
 			<key>hash2</key>
 			<data>
-			MU27t2jcv/HwxOWiwMtYKqzXYXqtOD/mJLw1h7/wYA8=
+			1rxHkmd0Fh7VCl2iIiBUmU6tmvxC0fZT/Exzx4B8EHU=
 			</data>
 		</dict>
 		<key>PrivateHeaders/InspectorProtocolTypes.h</key>
@@ -3572,11 +3572,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			xpixKMMAOigjGaBJRSWNAQaTfsw=
+			07qIwxiib9VHu3900BCotM3Yr4o=
 			</data>
 			<key>hash2</key>
 			<data>
-			MaOJroaKE05p922RoyY6zy2p4jkStCDlgqLrLvrNRRQ=
+			OJqZtuf4KLfF+EK/3NuyUQk2qkrFSEtSYownePPPCsc=
 			</data>
 		</dict>
 		<key>PrivateHeaders/IterationKind.h</key>
@@ -4221,11 +4221,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			zQWscuhznrP4haUwjQIfQ5501vE=
+			RYnWOUl6etrbOoNmbbWjJm0gZGI=
 			</data>
 			<key>hash2</key>
 			<data>
-			7ou2ZBV+sz8uKc0kdEG5FU3OyxYbrJSnIivNb2ECuzk=
+			aTP7pBRX4O5EDM8Cxk4VN9Naj+cNo0KEp244TXuwjqM=
 			</data>
 		</dict>
 		<key>PrivateHeaders/JSGlobalObjectInlines.h</key>
@@ -4452,11 +4452,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			ymui1ySgOIpD/apui9AEZtN7EnY=
+			GLh6T3Q2ZSkPVs9EdjBzwacaTyw=
 			</data>
 			<key>hash2</key>
 			<data>
-			ZwFotsLrstSeMKOHnW9Lo3becKpg7iWJ8x/vNuF5mQQ=
+			Z8KYvp+MH4lUhN6fQsY/3im0QMi0gFafO7N3VfTQGwY=
 			</data>
 		</dict>
 		<key>PrivateHeaders/JSObjectRefPrivate.h</key>
@@ -4569,6 +4569,17 @@
 			i69Jzz9UPJKJPWsC503xVGorInL6w2Zi2s50dNOsbHc=
 			</data>
 		</dict>
+		<key>PrivateHeaders/JSScriptFetcher.h</key>
+		<dict>
+			<key>hash</key>
+			<data>
+			GFMPG/yFUt6fB40g0s1c8OVKs6E=
+			</data>
+			<key>hash2</key>
+			<data>
+			/K2XdA95monSwv3ni/u+H45xBRVMnAEkrB8Y6Nh0/9E=
+			</data>
+		</dict>
 		<key>PrivateHeaders/JSScriptRefPrivate.h</key>
 		<dict>
 			<key>hash</key>
@@ -4611,6 +4622,17 @@
 			<key>hash2</key>
 			<data>
 			8YPx4a+x+0JYUhgACq23cHHUVZIq0pZ+YXLEAPase54=
+			</data>
+		</dict>
+		<key>PrivateHeaders/JSSourceCode.h</key>
+		<dict>
+			<key>hash</key>
+			<data>
+			lQjc0iigtObfotvFtJG3g1rbr9Q=
+			</data>
+			<key>hash2</key>
+			<data>
+			Zekh+YFG6iZQqby5S9aEdsJXsAs5OAwWzqH2pH1VRQw=
 			</data>
 		</dict>
 		<key>PrivateHeaders/JSString.h</key>
@@ -4683,11 +4705,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			k/Bgf1F00pKy/Dn1ed26LDCTiRw=
+			zZDdqDaruCKDicWIMDpT9U4cqCM=
 			</data>
 			<key>hash2</key>
 			<data>
-			0mnFW68dUxP2sxrQKibDzNCHCtbazQqNWJqpmizT24E=
+			+EfHSqi4hztsfo8ChVPiXk7GPgCjFThNV+rfhMtJdaM=
 			</data>
 		</dict>
 		<key>PrivateHeaders/JSTypeInfo.h</key>
@@ -5805,11 +5827,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			Dw5C6hS3XgzPXzntZCpysCB9BNc=
+			YRHaVTDEdUvYcVR2MiPNJEC7Gcc=
 			</data>
 			<key>hash2</key>
 			<data>
-			7Qr38Dxn+yp/CkHc7wvGPA33YSMDMyqNa4zF6KfYUzY=
+			ZIErlxt+f98OUlX96e5wGKM1d5wUrU3k98c++9LOpus=
 			</data>
 		</dict>
 		<key>PrivateHeaders/ProfilerBytecode.h</key>
@@ -6615,6 +6637,17 @@
 			U/dOMcQGu4Q3hKuvmVceVnKCADYGSB325E7+88f3ubA=
 			</data>
 		</dict>
+		<key>PrivateHeaders/ScriptFetcher.h</key>
+		<dict>
+			<key>hash</key>
+			<data>
+			aEzC3yUu6zHD/BGeCym4mzqTSyE=
+			</data>
+			<key>hash2</key>
+			<data>
+			oN6nueCY07GYae+BscuzUMK/H1/b7JF8/aazNp0WMfI=
+			</data>
+		</dict>
 		<key>PrivateHeaders/ScriptFunctionCall.h</key>
 		<dict>
 			<key>hash</key>
@@ -6696,22 +6729,22 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			WDiG9vWPxxsi0O4skGWpQTyk3lY=
+			GZNEsdhtybMaq/vcG4rAyXcgMyg=
 			</data>
 			<key>hash2</key>
 			<data>
-			1CS7IiegLx4PiTvyjs/SzBS5LLcycLF7L1AnHIbGq+w=
+			L14B6aO4uj9KKxg5aE79dH0Iyn6dpcCLcPiEXgW2jsg=
 			</data>
 		</dict>
 		<key>PrivateHeaders/SlotVisitorInlines.h</key>
 		<dict>
 			<key>hash</key>
 			<data>
-			5v+uJ8Titx8ZFuVYvBGFGpEy3wQ=
+			LR4mhcKafyVlnzs+eETXP3GUHN0=
 			</data>
 			<key>hash2</key>
 			<data>
-			OOlJKtZWP0kKq+yaqDW6txmbpwhH1MRXkyvwqjw1HDU=
+			3vVHhsp55nEyVDiwJely7xN4GB6SFNzk/9HYSUaPOOE=
 			</data>
 		</dict>
 		<key>PrivateHeaders/SlowPathCall.h</key>
@@ -6773,11 +6806,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			QvAOsxaeoRFyYiZJ/0M/obagHLU=
+			v1QNLgbsuWEqXjZLu4rn7RIPz1g=
 			</data>
 			<key>hash2</key>
 			<data>
-			S5uq+hWg4dYxT4lZtJM1K7H9ah/OAkdEg6jZndmzjjU=
+			VoP50rnZAIm56TdV4Bu7EohgE+WU03t82oz4HM6i01Q=
 			</data>
 		</dict>
 		<key>PrivateHeaders/SourceProvider.h</key>
@@ -6971,11 +7004,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			X0EkJtND6lR2gP1Zsvi/aU2BpNQ=
+			ztnpOdX+KT3BWacfA9thRRee8b4=
 			</data>
 			<key>hash2</key>
 			<data>
-			qV10CEwIgSI/Jl9LZ3wL16qqzKuNNacsOzIiP2BS3zA=
+			6rA+KNeT+/vh2FhCqJJK0C7yD2he/+q96MAT686hal8=
 			</data>
 		</dict>
 		<key>PrivateHeaders/StructureChain.h</key>
@@ -7620,11 +7653,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			3Oed3IVVOCjSJM2AhqNHvNHF4s4=
+			CHiiB3FT9tHVk5ZwzPn4F37dqKo=
 			</data>
 			<key>hash2</key>
 			<data>
-			McPbdTe7LAENNyKYFqEtCogRWtgV5Ni0t/tZRpjHiwo=
+			yO1BchNX3AaFPOoT9v5Yllacyb6vvlLguZySek03IGs=
 			</data>
 		</dict>
 		<key>PrivateHeaders/VMEntryRecord.h</key>
@@ -7785,11 +7818,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			OSYnveSqt5qNyhT/iED4trf3tDE=
+			J0ERiPfw4vIZoUtqPCDx7QWI30E=
 			</data>
 			<key>hash2</key>
 			<data>
-			4/3geVugu0ztl2Uy6hugO6k+8l45TRR/Bvj8HUmTDxY=
+			9mZk85/hcajtOzyVON6T/RYQ1boc5zif1XlVXEeQlAc=
 			</data>
 		</dict>
 		<key>PrivateHeaders/WasmSignature.h</key>
@@ -8588,11 +8621,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			SJSGOp8xW4WKPHxkIQ9e90DVJ/I=
+			sk3ORXdnsQAcpBu4460ZApoABCA=
 			</data>
 			<key>hash2</key>
 			<data>
-			TVUzWyOTkTBkEfKgS1LKWuHW4Ujio2HkRsaAAvn8f8Q=
+			R9N9xe8rT2JgtcS7qAzFIpnnA4TO8udcwSOV8vdKFhI=
 			</data>
 		</dict>
 		<key>Resources/framework.sb</key>

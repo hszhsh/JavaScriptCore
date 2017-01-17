@@ -268,6 +268,20 @@ InspectorBackend.registerCommand("LayerTree.layersForNode", [{"name": "nodeId", 
 InspectorBackend.registerCommand("LayerTree.reasonsForCompositingLayer", [{"name": "layerId", "type": "string", "optional": false}], ["compositingReasons"]);
 InspectorBackend.activateDomain("LayerTree", "web");
 
+// Memory.
+InspectorBackend.registerMemoryDispatcher = InspectorBackend.registerDomainDispatcher.bind(InspectorBackend, "Memory");
+InspectorBackend.registerEnum("Memory.CategoryDataType", {Javascript: "javascript", JIT: "jit", Images: "images", Layers: "layers", Page: "page", Other: "other"});
+InspectorBackend.registerEnum("Memory.MemoryPressureSeverity", {Critical: "critical", NonCritical: "non-critical"});
+InspectorBackend.registerEvent("Memory.memoryPressure", ["timestamp", "severity"]);
+InspectorBackend.registerEvent("Memory.trackingStart", ["timestamp"]);
+InspectorBackend.registerEvent("Memory.trackingUpdate", ["event"]);
+InspectorBackend.registerEvent("Memory.trackingComplete", []);
+InspectorBackend.registerCommand("Memory.enable", [], []);
+InspectorBackend.registerCommand("Memory.disable", [], []);
+InspectorBackend.registerCommand("Memory.startTracking", [], []);
+InspectorBackend.registerCommand("Memory.stopTracking", [], []);
+InspectorBackend.activateDomain("Memory", "web");
+
 // Network.
 InspectorBackend.registerNetworkDispatcher = InspectorBackend.registerDomainDispatcher.bind(InspectorBackend, "Network");
 InspectorBackend.registerEnum("Network.InitiatorType", {Parser: "parser", Script: "script", Other: "other"});
@@ -325,6 +339,41 @@ InspectorBackend.registerCommand("Page.snapshotNode", [{"name": "nodeId", "type"
 InspectorBackend.registerCommand("Page.snapshotRect", [{"name": "x", "type": "number", "optional": false}, {"name": "y", "type": "number", "optional": false}, {"name": "width", "type": "number", "optional": false}, {"name": "height", "type": "number", "optional": false}, {"name": "coordinateSystem", "type": "string", "optional": false}], ["dataURL"]);
 InspectorBackend.registerCommand("Page.archive", [], ["data"]);
 InspectorBackend.activateDomain("Page", "web");
+
+// Replay.
+InspectorBackend.registerReplayDispatcher = InspectorBackend.registerDomainDispatcher.bind(InspectorBackend, "Replay");
+InspectorBackend.registerEnum("Replay.SessionState", {Capturing: "Capturing", Inactive: "Inactive", Replaying: "Replaying"});
+InspectorBackend.registerEnum("Replay.SegmentState", {Appending: "Appending", Unloaded: "Unloaded", Loaded: "Loaded", Dispatching: "Dispatching"});
+InspectorBackend.registerEvent("Replay.captureStarted", []);
+InspectorBackend.registerEvent("Replay.captureStopped", []);
+InspectorBackend.registerEvent("Replay.playbackHitPosition", ["position", "timestamp"]);
+InspectorBackend.registerEvent("Replay.playbackStarted", []);
+InspectorBackend.registerEvent("Replay.playbackPaused", ["position"]);
+InspectorBackend.registerEvent("Replay.playbackFinished", []);
+InspectorBackend.registerEvent("Replay.inputSuppressionChanged", ["willSuppress"]);
+InspectorBackend.registerEvent("Replay.sessionCreated", ["id"]);
+InspectorBackend.registerEvent("Replay.sessionModified", ["id"]);
+InspectorBackend.registerEvent("Replay.sessionRemoved", ["id"]);
+InspectorBackend.registerEvent("Replay.sessionLoaded", ["id"]);
+InspectorBackend.registerEvent("Replay.segmentCreated", ["id"]);
+InspectorBackend.registerEvent("Replay.segmentRemoved", ["id"]);
+InspectorBackend.registerEvent("Replay.segmentCompleted", ["id"]);
+InspectorBackend.registerEvent("Replay.segmentLoaded", ["segmentIdentifier"]);
+InspectorBackend.registerEvent("Replay.segmentUnloaded", []);
+InspectorBackend.registerCommand("Replay.startCapturing", [], []);
+InspectorBackend.registerCommand("Replay.stopCapturing", [], []);
+InspectorBackend.registerCommand("Replay.replayToPosition", [{"name": "position", "type": "object", "optional": false}, {"name": "shouldFastForward", "type": "boolean", "optional": false}], []);
+InspectorBackend.registerCommand("Replay.replayToCompletion", [{"name": "shouldFastForward", "type": "boolean", "optional": false}], []);
+InspectorBackend.registerCommand("Replay.pausePlayback", [], []);
+InspectorBackend.registerCommand("Replay.cancelPlayback", [], []);
+InspectorBackend.registerCommand("Replay.switchSession", [{"name": "sessionIdentifier", "type": "number", "optional": false}], []);
+InspectorBackend.registerCommand("Replay.insertSessionSegment", [{"name": "sessionIdentifier", "type": "number", "optional": false}, {"name": "segmentIdentifier", "type": "number", "optional": false}, {"name": "segmentIndex", "type": "number", "optional": false}], []);
+InspectorBackend.registerCommand("Replay.removeSessionSegment", [{"name": "sessionIdentifier", "type": "number", "optional": false}, {"name": "segmentIndex", "type": "number", "optional": false}], []);
+InspectorBackend.registerCommand("Replay.currentReplayState", [], ["sessionIdentifier", "segmentIdentifier", "sessionState", "segmentState", "replayPosition"]);
+InspectorBackend.registerCommand("Replay.getAvailableSessions", [], ["ids"]);
+InspectorBackend.registerCommand("Replay.getSessionData", [{"name": "sessionIdentifier", "type": "number", "optional": false}], ["session"]);
+InspectorBackend.registerCommand("Replay.getSegmentData", [{"name": "id", "type": "number", "optional": false}], ["segment"]);
+InspectorBackend.activateDomain("Replay", "web");
 
 // Runtime.
 InspectorBackend.registerRuntimeDispatcher = InspectorBackend.registerDomainDispatcher.bind(InspectorBackend, "Runtime");

@@ -131,12 +131,14 @@ public:
     void lastChanceToFinalize();
     void releaseDelayedReleasedObjects();
 
+    // Set a hard limit where JSC will crash if live heap size exceeds it.
+    void setMaxLiveSize(size_t size) { m_maxLiveSize = size; }
+
     VM* vm() const { return m_vm; }
     MarkedSpace& objectSpace() { return m_objectSpace; }
     MachineThreads& machineThreads() { return m_machineThreads; }
 
     SlotVisitor& collectorSlotVisitor() { return *m_collectorSlotVisitor; }
-    MarkStackArray& mutatorMarkStack() { return *m_mutatorMarkStack; }
 
     JS_EXPORT_PRIVATE GCActivityCallback* fullActivityCallback();
     JS_EXPORT_PRIVATE GCActivityCallback* edenActivityCallback();
@@ -537,7 +539,10 @@ private:
     
     std::unique_ptr<SlotVisitor> m_collectorSlotVisitor;
     std::unique_ptr<MarkStackArray> m_mutatorMarkStack;
-    
+
+    Lock m_raceMarkStackLock;
+    std::unique_ptr<MarkStackArray> m_raceMarkStack;
+
     std::unique_ptr<MarkingConstraintSet> m_constraintSet;
 
     // We pool the slot visitors used by parallel marking threads. It's useful to be able to
@@ -594,7 +599,6 @@ private:
 
     HashMap<void*, std::function<void()>> m_weakGCMaps;
     
-    HashSet<VisitRaceKey> m_visitRaces;
     Lock m_visitRaceLock;
 
     Lock m_markingMutex;
@@ -619,6 +623,9 @@ private:
     size_t m_blockBytesAllocated { 0 };
     size_t m_externalMemorySize { 0 };
 #endif
+
+    NO_RETURN_DUE_TO_CRASH void didExceedMaxLiveSize();
+    size_t m_maxLiveSize { 0 };
     
     std::unique_ptr<MutatorScheduler> m_scheduler;
     

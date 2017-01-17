@@ -53,6 +53,9 @@ class AlternateIndexedDBBackendDispatcher;
 #endif // ENABLE(INDEXED_DATABASE)
 class AlternateInspectorBackendDispatcher;
 class AlternateLayerTreeBackendDispatcher;
+#if ENABLE(RESOURCE_USAGE)
+class AlternateMemoryBackendDispatcher;
+#endif // ENABLE(RESOURCE_USAGE)
 class AlternateNetworkBackendDispatcher;
 class AlternatePageBackendDispatcher;
 class AlternateRuntimeBackendDispatcher;
@@ -207,9 +210,9 @@ public:
     virtual void getFunctionDetails(ErrorString&, const String& in_functionId, RefPtr<Inspector::Protocol::Debugger::FunctionDetails>& out_details) = 0;
     // Named after parameter 'state' while generating command/event setPauseOnExceptions.
     enum class State {
-        None = 114,
-        Uncaught = 152,
-        All = 153,
+        None = 117,
+        Uncaught = 157,
+        All = 158,
     }; // enum class State
     virtual void setPauseOnExceptions(ErrorString&, const String& in_state) = 0;
     virtual void setPauseOnAssertions(ErrorString&, bool in_enabled) = 0;
@@ -285,6 +288,18 @@ public:
 protected:
     virtual ~LayerTreeBackendDispatcherHandler();
 };
+
+#if ENABLE(RESOURCE_USAGE)
+class JS_EXPORT_PRIVATE MemoryBackendDispatcherHandler {
+public:
+    virtual void enable(ErrorString&) = 0;
+    virtual void disable(ErrorString&) = 0;
+    virtual void startTracking(ErrorString&) = 0;
+    virtual void stopTracking(ErrorString&) = 0;
+protected:
+    virtual ~MemoryBackendDispatcherHandler();
+};
+#endif // ENABLE(RESOURCE_USAGE)
 
 class JS_EXPORT_PRIVATE NetworkBackendDispatcherHandler {
 public:
@@ -692,6 +707,28 @@ private:
     LayerTreeBackendDispatcher(BackendDispatcher&, LayerTreeBackendDispatcherHandler*);
     LayerTreeBackendDispatcherHandler* m_agent { nullptr };
 };
+
+#if ENABLE(RESOURCE_USAGE)
+class JS_EXPORT_PRIVATE MemoryBackendDispatcher final : public SupplementalBackendDispatcher {
+public:
+    static Ref<MemoryBackendDispatcher> create(BackendDispatcher&, MemoryBackendDispatcherHandler*);
+    void dispatch(long requestId, const String& method, Ref<InspectorObject>&& message) override;
+private:
+    void enable(long requestId, RefPtr<InspectorObject>&& parameters);
+    void disable(long requestId, RefPtr<InspectorObject>&& parameters);
+    void startTracking(long requestId, RefPtr<InspectorObject>&& parameters);
+    void stopTracking(long requestId, RefPtr<InspectorObject>&& parameters);
+#if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
+public:
+    void setAlternateDispatcher(AlternateMemoryBackendDispatcher* alternateDispatcher) { m_alternateDispatcher = alternateDispatcher; }
+private:
+    AlternateMemoryBackendDispatcher* m_alternateDispatcher { nullptr };
+#endif
+private:
+    MemoryBackendDispatcher(BackendDispatcher&, MemoryBackendDispatcherHandler*);
+    MemoryBackendDispatcherHandler* m_agent { nullptr };
+};
+#endif // ENABLE(RESOURCE_USAGE)
 
 class JS_EXPORT_PRIVATE NetworkBackendDispatcher final : public SupplementalBackendDispatcher {
 public:

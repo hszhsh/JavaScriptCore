@@ -268,6 +268,20 @@ InspectorBackend.registerCommand("LayerTree.layersForNode", [{"name": "nodeId", 
 InspectorBackend.registerCommand("LayerTree.reasonsForCompositingLayer", [{"name": "layerId", "type": "string", "optional": false}], ["compositingReasons"]);
 InspectorBackend.activateDomain("LayerTree", "web");
 
+// Memory.
+InspectorBackend.registerMemoryDispatcher = InspectorBackend.registerDomainDispatcher.bind(InspectorBackend, "Memory");
+InspectorBackend.registerEnum("Memory.CategoryDataType", {Javascript: "javascript", JIT: "jit", Images: "images", Layers: "layers", Page: "page", Other: "other"});
+InspectorBackend.registerEnum("Memory.MemoryPressureSeverity", {Critical: "critical", NonCritical: "non-critical"});
+InspectorBackend.registerEvent("Memory.memoryPressure", ["timestamp", "severity"]);
+InspectorBackend.registerEvent("Memory.trackingStart", ["timestamp"]);
+InspectorBackend.registerEvent("Memory.trackingUpdate", ["event"]);
+InspectorBackend.registerEvent("Memory.trackingComplete", []);
+InspectorBackend.registerCommand("Memory.enable", [], []);
+InspectorBackend.registerCommand("Memory.disable", [], []);
+InspectorBackend.registerCommand("Memory.startTracking", [], []);
+InspectorBackend.registerCommand("Memory.stopTracking", [], []);
+InspectorBackend.activateDomain("Memory", "web");
+
 // Network.
 InspectorBackend.registerNetworkDispatcher = InspectorBackend.registerDomainDispatcher.bind(InspectorBackend, "Network");
 InspectorBackend.registerEnum("Network.InitiatorType", {Parser: "parser", Script: "script", Other: "other"});

@@ -130,15 +130,15 @@ public:
     void breakpointResolved(const Inspector::Protocol::Debugger::BreakpointId& breakpointId, RefPtr<Inspector::Protocol::Debugger::Location> location);
         // Named after parameter 'reason' while generating command/event paused.
         enum class Reason {
-            XHR = 91,
-            DOM = 145,
-            EventListener = 146,
-            Exception = 147,
+            XHR = 94,
+            DOM = 155,
+            EventListener = 156,
+            Exception = 157,
             Assert = 39,
-            CSPViolation = 148,
-            DebuggerStatement = 149,
-            Breakpoint = 150,
-            PauseOnNextStatement = 151,
+            CSPViolation = 158,
+            DebuggerStatement = 159,
+            Breakpoint = 160,
+            PauseOnNextStatement = 161,
             Other = 25,
         }; // enum class Reason
     void paused(RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Debugger::CallFrame>> callFrames, Reason reason, RefPtr<Inspector::InspectorObject> data, RefPtr<Inspector::Protocol::Console::StackTrace> asyncStackTrace);
@@ -179,20 +179,38 @@ private:
     FrontendRouter& m_frontendRouter;
 };
 
+#if ENABLE(RESOURCE_USAGE)
+class JS_EXPORT_PRIVATE MemoryFrontendDispatcher {
+public:
+    MemoryFrontendDispatcher(FrontendRouter& frontendRouter) : m_frontendRouter(frontendRouter) { }
+        // Named after parameter 'severity' while generating command/event memoryPressure.
+        enum class Severity {
+            Critical = 162,
+            NonCritical = 163,
+        }; // enum class Severity
+    void memoryPressure(double timestamp, Severity severity);
+    void trackingStart(double timestamp);
+    void trackingUpdate(RefPtr<Inspector::Protocol::Memory::Event> event);
+    void trackingComplete();
+private:
+    FrontendRouter& m_frontendRouter;
+};
+#endif // ENABLE(RESOURCE_USAGE)
+
 class JS_EXPORT_PRIVATE NetworkFrontendDispatcher {
 public:
     NetworkFrontendDispatcher(FrontendRouter& frontendRouter) : m_frontendRouter(frontendRouter) { }
         // Named after parameter 'type' while generating command/event requestWillBeSent.
         enum class Type {
-            Document = 86,
-            Stylesheet = 87,
-            Image = 88,
-            Font = 89,
-            Script = 90,
-            XHR = 91,
-            Fetch = 92,
-            WebSocket = 93,
-            Other = 94,
+            Document = 89,
+            Stylesheet = 90,
+            Image = 91,
+            Font = 92,
+            Script = 93,
+            XHR = 94,
+            Fetch = 95,
+            WebSocket = 96,
+            Other = 97,
         }; // enum class Type
     void requestWillBeSent(const Inspector::Protocol::Network::RequestId& requestId, const Inspector::Protocol::Network::FrameId& frameId, const Inspector::Protocol::Network::LoaderId& loaderId, const String& documentURL, RefPtr<Inspector::Protocol::Network::Request> request, double timestamp, RefPtr<Inspector::Protocol::Network::Initiator> initiator, RefPtr<Inspector::Protocol::Network::Response> redirectResponse, Inspector::Protocol::Page::ResourceType* type, const String* const targetId);
     void requestServedFromCache(const Inspector::Protocol::Network::RequestId& requestId);
@@ -226,6 +244,31 @@ public:
 private:
     FrontendRouter& m_frontendRouter;
 };
+
+#if ENABLE(WEB_REPLAY)
+class JS_EXPORT_PRIVATE ReplayFrontendDispatcher {
+public:
+    ReplayFrontendDispatcher(FrontendRouter& frontendRouter) : m_frontendRouter(frontendRouter) { }
+    void captureStarted();
+    void captureStopped();
+    void playbackHitPosition(RefPtr<Inspector::Protocol::Replay::ReplayPosition> position, double timestamp);
+    void playbackStarted();
+    void playbackPaused(RefPtr<Inspector::Protocol::Replay::ReplayPosition> position);
+    void playbackFinished();
+    void inputSuppressionChanged(bool willSuppress);
+    void sessionCreated(int id);
+    void sessionModified(int id);
+    void sessionRemoved(int id);
+    void sessionLoaded(int id);
+    void segmentCreated(int id);
+    void segmentRemoved(int id);
+    void segmentCompleted(int id);
+    void segmentLoaded(int segmentIdentifier);
+    void segmentUnloaded();
+private:
+    FrontendRouter& m_frontendRouter;
+};
+#endif // ENABLE(WEB_REPLAY)
 
 class JS_EXPORT_PRIVATE RuntimeFrontendDispatcher {
 public:

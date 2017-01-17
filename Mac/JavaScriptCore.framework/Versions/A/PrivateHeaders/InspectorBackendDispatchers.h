@@ -53,8 +53,14 @@ class AlternateIndexedDBBackendDispatcher;
 #endif // ENABLE(INDEXED_DATABASE)
 class AlternateInspectorBackendDispatcher;
 class AlternateLayerTreeBackendDispatcher;
+#if ENABLE(RESOURCE_USAGE)
+class AlternateMemoryBackendDispatcher;
+#endif // ENABLE(RESOURCE_USAGE)
 class AlternateNetworkBackendDispatcher;
 class AlternatePageBackendDispatcher;
+#if ENABLE(WEB_REPLAY)
+class AlternateReplayBackendDispatcher;
+#endif // ENABLE(WEB_REPLAY)
 class AlternateRuntimeBackendDispatcher;
 class AlternateScriptProfilerBackendDispatcher;
 class AlternateTimelineBackendDispatcher;
@@ -207,9 +213,9 @@ public:
     virtual void getFunctionDetails(ErrorString&, const String& in_functionId, RefPtr<Inspector::Protocol::Debugger::FunctionDetails>& out_details) = 0;
     // Named after parameter 'state' while generating command/event setPauseOnExceptions.
     enum class State {
-        None = 114,
-        Uncaught = 152,
-        All = 153,
+        None = 124,
+        Uncaught = 164,
+        All = 165,
     }; // enum class State
     virtual void setPauseOnExceptions(ErrorString&, const String& in_state) = 0;
     virtual void setPauseOnAssertions(ErrorString&, bool in_enabled) = 0;
@@ -286,6 +292,18 @@ protected:
     virtual ~LayerTreeBackendDispatcherHandler();
 };
 
+#if ENABLE(RESOURCE_USAGE)
+class JS_EXPORT_PRIVATE MemoryBackendDispatcherHandler {
+public:
+    virtual void enable(ErrorString&) = 0;
+    virtual void disable(ErrorString&) = 0;
+    virtual void startTracking(ErrorString&) = 0;
+    virtual void stopTracking(ErrorString&) = 0;
+protected:
+    virtual ~MemoryBackendDispatcherHandler();
+};
+#endif // ENABLE(RESOURCE_USAGE)
+
 class JS_EXPORT_PRIVATE NetworkBackendDispatcherHandler {
 public:
     virtual void enable(ErrorString&) = 0;
@@ -327,6 +345,27 @@ public:
 protected:
     virtual ~PageBackendDispatcherHandler();
 };
+
+#if ENABLE(WEB_REPLAY)
+class JS_EXPORT_PRIVATE ReplayBackendDispatcherHandler {
+public:
+    virtual void startCapturing(ErrorString&) = 0;
+    virtual void stopCapturing(ErrorString&) = 0;
+    virtual void replayToPosition(ErrorString&, const Inspector::InspectorObject& in_position, bool in_shouldFastForward) = 0;
+    virtual void replayToCompletion(ErrorString&, bool in_shouldFastForward) = 0;
+    virtual void pausePlayback(ErrorString&) = 0;
+    virtual void cancelPlayback(ErrorString&) = 0;
+    virtual void switchSession(ErrorString&, int in_sessionIdentifier) = 0;
+    virtual void insertSessionSegment(ErrorString&, int in_sessionIdentifier, int in_segmentIdentifier, int in_segmentIndex) = 0;
+    virtual void removeSessionSegment(ErrorString&, int in_sessionIdentifier, int in_segmentIndex) = 0;
+    virtual void currentReplayState(ErrorString&, int* out_sessionIdentifier, Inspector::Protocol::OptOutput<int>* opt_out_segmentIdentifier, Inspector::Protocol::Replay::SessionState* out_sessionState, Inspector::Protocol::Replay::SegmentState* out_segmentState, RefPtr<Inspector::Protocol::Replay::ReplayPosition>& out_replayPosition) = 0;
+    virtual void getAvailableSessions(ErrorString&, RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Replay::SessionIdentifier>>& out_ids) = 0;
+    virtual void getSessionData(ErrorString&, int in_sessionIdentifier, RefPtr<Inspector::Protocol::Replay::ReplaySession>& opt_out_session) = 0;
+    virtual void getSegmentData(ErrorString&, int in_id, RefPtr<Inspector::Protocol::Replay::SessionSegment>& opt_out_segment) = 0;
+protected:
+    virtual ~ReplayBackendDispatcherHandler();
+};
+#endif // ENABLE(WEB_REPLAY)
 
 class JS_EXPORT_PRIVATE RuntimeBackendDispatcherHandler {
 public:
@@ -693,6 +732,28 @@ private:
     LayerTreeBackendDispatcherHandler* m_agent { nullptr };
 };
 
+#if ENABLE(RESOURCE_USAGE)
+class JS_EXPORT_PRIVATE MemoryBackendDispatcher final : public SupplementalBackendDispatcher {
+public:
+    static Ref<MemoryBackendDispatcher> create(BackendDispatcher&, MemoryBackendDispatcherHandler*);
+    void dispatch(long requestId, const String& method, Ref<InspectorObject>&& message) override;
+private:
+    void enable(long requestId, RefPtr<InspectorObject>&& parameters);
+    void disable(long requestId, RefPtr<InspectorObject>&& parameters);
+    void startTracking(long requestId, RefPtr<InspectorObject>&& parameters);
+    void stopTracking(long requestId, RefPtr<InspectorObject>&& parameters);
+#if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
+public:
+    void setAlternateDispatcher(AlternateMemoryBackendDispatcher* alternateDispatcher) { m_alternateDispatcher = alternateDispatcher; }
+private:
+    AlternateMemoryBackendDispatcher* m_alternateDispatcher { nullptr };
+#endif
+private:
+    MemoryBackendDispatcher(BackendDispatcher&, MemoryBackendDispatcherHandler*);
+    MemoryBackendDispatcherHandler* m_agent { nullptr };
+};
+#endif // ENABLE(RESOURCE_USAGE)
+
 class JS_EXPORT_PRIVATE NetworkBackendDispatcher final : public SupplementalBackendDispatcher {
 public:
     static Ref<NetworkBackendDispatcher> create(BackendDispatcher&, NetworkBackendDispatcherHandler*);
@@ -749,6 +810,37 @@ private:
     PageBackendDispatcher(BackendDispatcher&, PageBackendDispatcherHandler*);
     PageBackendDispatcherHandler* m_agent { nullptr };
 };
+
+#if ENABLE(WEB_REPLAY)
+class JS_EXPORT_PRIVATE ReplayBackendDispatcher final : public SupplementalBackendDispatcher {
+public:
+    static Ref<ReplayBackendDispatcher> create(BackendDispatcher&, ReplayBackendDispatcherHandler*);
+    void dispatch(long requestId, const String& method, Ref<InspectorObject>&& message) override;
+private:
+    void startCapturing(long requestId, RefPtr<InspectorObject>&& parameters);
+    void stopCapturing(long requestId, RefPtr<InspectorObject>&& parameters);
+    void replayToPosition(long requestId, RefPtr<InspectorObject>&& parameters);
+    void replayToCompletion(long requestId, RefPtr<InspectorObject>&& parameters);
+    void pausePlayback(long requestId, RefPtr<InspectorObject>&& parameters);
+    void cancelPlayback(long requestId, RefPtr<InspectorObject>&& parameters);
+    void switchSession(long requestId, RefPtr<InspectorObject>&& parameters);
+    void insertSessionSegment(long requestId, RefPtr<InspectorObject>&& parameters);
+    void removeSessionSegment(long requestId, RefPtr<InspectorObject>&& parameters);
+    void currentReplayState(long requestId, RefPtr<InspectorObject>&& parameters);
+    void getAvailableSessions(long requestId, RefPtr<InspectorObject>&& parameters);
+    void getSessionData(long requestId, RefPtr<InspectorObject>&& parameters);
+    void getSegmentData(long requestId, RefPtr<InspectorObject>&& parameters);
+#if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
+public:
+    void setAlternateDispatcher(AlternateReplayBackendDispatcher* alternateDispatcher) { m_alternateDispatcher = alternateDispatcher; }
+private:
+    AlternateReplayBackendDispatcher* m_alternateDispatcher { nullptr };
+#endif
+private:
+    ReplayBackendDispatcher(BackendDispatcher&, ReplayBackendDispatcherHandler*);
+    ReplayBackendDispatcherHandler* m_agent { nullptr };
+};
+#endif // ENABLE(WEB_REPLAY)
 
 class JS_EXPORT_PRIVATE RuntimeBackendDispatcher final : public SupplementalBackendDispatcher {
 public:
