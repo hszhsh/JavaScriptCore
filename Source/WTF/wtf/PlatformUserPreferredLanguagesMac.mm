@@ -54,7 +54,7 @@ static Vector<String>& preferredLanguages()
 }
 
 }
-
+#if PLATFORM(MAC)
 @interface WTFLanguageChangeObserver : NSObject
 @end
 
@@ -74,6 +74,7 @@ static Vector<String>& preferredLanguages()
 }
 
 @end
+#endif
 
 namespace WTF {
 

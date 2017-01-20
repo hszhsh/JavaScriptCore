@@ -576,6 +576,8 @@ void* MachineThreads::Thread::Registers::stackPointer() const
     return reinterpret_cast<void*>((uintptr_t) regs.machineContext.sp);
 #elif CPU(X86)
     return reinterpret_cast<void*>((uintptr_t) regs.machineContext.gregs[REG_ESP]);
+#else
+#error Unimplemented Architecture
 #endif
     
 #else
