@@ -3,7 +3,7 @@
 # Copyright (C) 2006 Anders Carlsson <andersca@mac.com>
 # Copyright (C) 2006, 2007 Samuel Weinig <sam@webkit.org>
 # Copyright (C) 2006 Alexey Proskuryakov <ap@webkit.org>
-# Copyright (C) 2006-2010, 2013-2016 Apple Inc. All rights reserved.
+# Copyright (C) 2006-2017 Apple Inc. All rights reserved.
 # Copyright (C) 2009 Cameron McCormack <cam@mcc.id.au>
 # Copyright (C) Research In Motion Limited 2010. All rights reserved.
 # Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies)
@@ -297,7 +297,7 @@ sub AddToIncludesForIDLType
     }
 
     if ($codeGenerator->IsRecordType($type)) {
-        AddToIncludes("<wtf/HashMap.h>", $includesRef, $conditional);
+        AddToIncludes("<wtf/Vector.h>", $includesRef, $conditional);
         AddToIncludesForIDLType(@{$type->subtypes}[0], $includesRef, $conditional);
         AddToIncludesForIDLType(@{$type->subtypes}[1], $includesRef, $conditional);
         return;
@@ -1751,7 +1751,6 @@ sub GenerateHeader
         push(@headerContent, "    {\n");
         push(@headerContent, "        $className* ptr = new (NotNull, JSC::allocateCell<$className>(vm.heap)) ${className}(vm, structure, WTFMove(impl), windowShell);\n");
         push(@headerContent, "        ptr->finishCreation(vm, windowShell);\n");
-        push(@headerContent, "        vm.heap.addFinalizer(ptr, destroy);\n");
         push(@headerContent, "        return ptr;\n");
         push(@headerContent, "    }\n\n");
     } elsif ($codeGenerator->InheritsInterface($interface, "WorkerGlobalScope")) {
@@ -1759,7 +1758,6 @@ sub GenerateHeader
         push(@headerContent, "    {\n");
         push(@headerContent, "        $className* ptr = new (NotNull, JSC::allocateCell<$className>(vm.heap)) ${className}(vm, structure, WTFMove(impl));\n");
         push(@headerContent, "        ptr->finishCreation(vm, proxy);\n");
-        push(@headerContent, "        vm.heap.addFinalizer(ptr, destroy);\n");
         push(@headerContent, "        return ptr;\n");
         push(@headerContent, "    }\n\n");
     } elsif ($interface->extendedAttributes->{MasqueradesAsUndefined}) {
@@ -1965,6 +1963,23 @@ sub GenerateHeader
         push(@headerContent, "    static void visitChildren(JSCell*, JSC::SlotVisitor&);\n");
         push(@headerContent, "    void visitAdditionalChildren(JSC::SlotVisitor&);\n") if $interface->extendedAttributes->{JSCustomMarkFunction};
         push(@headerContent, "\n");
+
+        if ($interface->extendedAttributes->{JSCustomMarkFunction}) {
+            # We assume that the logic in visitAdditionalChildren is highly volatile, and during a
+            # concurrent GC or in between eden GCs something may happen that would lead to this
+            # logic behaving differently. Since this could mark objects or add opaque roots, this
+            # means that after any increment of mutator resumption in a concurrent GC and at least
+            # once during any eden GC we need to re-execute visitAdditionalChildren on any objects
+            # that we had executed it on before. We do this using the DOM's own MarkingConstraint,
+            # which will call visitOutputConstraints on all objects in the DOM's own
+            # outputConstraintSubspace. visitOutputConstraints is the name JSC uses for the method
+            # that the GC calls to ask an object is it would like to mark anything else after the
+            # program resumed since the last call to visitChildren or visitOutputConstraints. Since
+            # this just calls visitAdditionalChildren, you usually don't have to worry about this.
+            push(@headerContent, "    static void visitOutputConstraints(JSCell*, JSC::SlotVisitor&);\n");
+            my $subspaceFunc = IsDOMGlobalObject($interface) ? "globalObjectOutputConstraintSubspaceFor" : "outputConstraintSubspaceFor";
+            push(@headerContent, "    template<typename> static JSC::Subspace* subspaceFor(JSC::VM& vm) { return $subspaceFunc(vm); }\n");
+        }
     }
 
     if (InstanceNeedsEstimatedSize($interface)) {
@@ -4134,6 +4149,15 @@ END
             }
         }
         push(@implContent, "}\n\n");
+        if ($interface->extendedAttributes->{JSCustomMarkFunction}) {
+            push(@implContent, "void ${className}::visitOutputConstraints(JSCell* cell, SlotVisitor& visitor)\n");
+            push(@implContent, "{\n");
+            push(@implContent, "    auto* thisObject = jsCast<${className}*>(cell);\n");
+            push(@implContent, "    ASSERT_GC_OBJECT_INHERITS(thisObject, info());\n");
+            push(@implContent, "    Base::visitOutputConstraints(thisObject, visitor);\n");
+            push(@implContent, "    thisObject->visitAdditionalChildren(visitor);\n");
+            push(@implContent, "}\n\n");
+        }
     }
 
     if (InstanceNeedsEstimatedSize($interface)) {
@@ -4243,7 +4267,7 @@ END
     if (ShouldGenerateWrapperOwnerCode($hasParent, $interface) && !$interface->extendedAttributes->{JSCustomFinalize}) {
         push(@implContent, "void JS${interfaceName}Owner::finalize(JSC::Handle<JSC::Unknown> handle, void* context)\n");
         push(@implContent, "{\n");
-        push(@implContent, "    auto* js${interfaceName} = jsCast<JS${interfaceName}*>(handle.slot()->asCell());\n");
+        push(@implContent, "    auto* js${interfaceName} = static_cast<JS${interfaceName}*>(handle.slot()->asCell());\n");
         push(@implContent, "    auto& world = *static_cast<DOMWrapperWorld*>(context);\n");
         push(@implContent, "    uncacheWrapper(world, &js${interfaceName}->wrapped(), js${interfaceName});\n");
         push(@implContent, "}\n\n");
@@ -5303,7 +5327,7 @@ sub GetNativeType
     return GetEnumerationClassName($type, $interface) if $codeGenerator->IsEnumType($type);
     return GetDictionaryClassName($type, $interface) if $codeGenerator->IsDictionaryType($type);
     return "Vector<" . GetNativeInnerType(@{$type->subtypes}[0], $interface) . ">" if $codeGenerator->IsSequenceOrFrozenArrayType($type);
-    return "HashMap<" . GetNativeInnerType(@{$type->subtypes}[0], $interface) . ", " . GetNativeInnerType(@{$type->subtypes}[1], $interface) . ">" if $codeGenerator->IsRecordType($type);
+    return "Vector<WTF::KeyValuePair<" . GetNativeInnerType(@{$type->subtypes}[0], $interface) . ", " . GetNativeInnerType(@{$type->subtypes}[1], $interface) . ">>" if $codeGenerator->IsRecordType($type);
 
     return "RefPtr<${typeName}>" if $codeGenerator->IsTypedArrayType($type) and $typeName ne "ArrayBuffer";
     return "${typeName}*";
@@ -5320,7 +5344,7 @@ sub GetNativeInnerType
     return GetEnumerationClassName($innerType, $interface) if $codeGenerator->IsEnumType($innerType);
     return GetDictionaryClassName($innerType, $interface) if $codeGenerator->IsDictionaryType($innerType);
     return "Vector<" . GetNativeInnerType(@{$innerType->subtypes}[0], $interface) . ">" if $codeGenerator->IsSequenceOrFrozenArrayType($innerType);
-    return "HashMap<" . GetNativeInnerType(@{$innerType->subtypes}[0], $interface) . ", " . GetNativeInnerType(@{$innerType->subtypes}[1], $interface) . ">" if $codeGenerator->IsRecordType($innerType);
+    return "Vector<WTF::KeyValuePair<" . GetNativeInnerType(@{$innerType->subtypes}[0], $interface) . ", " . GetNativeInnerType(@{$innerType->subtypes}[1], $interface) . ">>" if $codeGenerator->IsRecordType($innerType);
     return "RefPtr<$innerTypeName>";
 }
 

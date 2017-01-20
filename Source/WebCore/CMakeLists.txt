@@ -1189,6 +1189,7 @@ set(WebCore_SOURCES
     bindings/js/ScriptState.cpp
     bindings/js/StructuredClone.cpp
     bindings/js/SerializedScriptValue.cpp
+    bindings/js/WebCoreJSClientData.cpp
     bindings/js/WebCoreTypedArrayController.cpp
     bindings/js/WorkerScriptController.cpp
 
@@ -1855,6 +1856,7 @@ set(WebCore_SOURCES
     loader/FrameLoaderStateMachine.cpp
     loader/HistoryController.cpp
     loader/ImageLoader.cpp
+    loader/LinkHeader.cpp
     loader/LinkLoader.cpp
     loader/LinkPreloadResourceClients.cpp
     loader/LoadTiming.cpp
@@ -1984,6 +1986,7 @@ set(WebCore_SOURCES
     page/Performance.cpp
     page/PerformanceEntry.cpp
     page/PerformanceLogging.cpp
+    page/PerformanceMonitor.cpp
     page/PerformanceNavigation.cpp
     page/PerformanceResourceTiming.cpp
     page/PerformanceTiming.cpp

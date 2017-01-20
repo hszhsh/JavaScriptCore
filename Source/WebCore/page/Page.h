@@ -21,7 +21,6 @@
 #pragma once
 
 #include "ActivityState.h"
-#include "CPUTime.h"
 #include "FindOptions.h"
 #include "FrameLoaderTypes.h"
 #include "LayoutMilestones.h"
@@ -105,6 +104,7 @@ class PageConfiguration;
 class PageConsoleClient;
 class PageDebuggable;
 class PageGroup;
+class PerformanceMonitor;
 class PlugInClient;
 class PluginData;
 class PluginInfoProvider;
@@ -191,6 +191,11 @@ public:
     void incrementSubframeCount() { ++m_subframeCount; }
     void decrementSubframeCount() { ASSERT(m_subframeCount); --m_subframeCount; }
     int subframeCount() const { checkSubframeCountConsistency(); return m_subframeCount; }
+
+    void incrementNestedRunLoopCount();
+    void decrementNestedRunLoopCount();
+    bool insideNestedRunLoop() const { return m_nestedRunLoopCount > 0; }
+    WEBCORE_EXPORT void whenUnnested(std::function<void()>);
 
 #if ENABLE(REMOTE_INSPECTOR)
     WEBCORE_EXPORT bool remoteInspectionAllowed() const;
@@ -352,6 +357,8 @@ public:
 
     // Notifications when the Page starts and stops being presented via a native window.
     WEBCORE_EXPORT void setActivityState(ActivityState::Flags);
+    ActivityState::Flags activityState() const { return m_activityState; }
+
     bool isVisibleAndActive() const;
     WEBCORE_EXPORT void setIsVisible(bool);
     WEBCORE_EXPORT void setIsPrerender();
@@ -554,6 +561,10 @@ public:
     void setEventThrottlingBehaviorOverride(std::optional<EventThrottlingBehavior> throttling) { m_eventThrottlingBehaviorOverride = throttling; }
 
     WebGLStateTracker* webGLStateTracker() const { return m_webGLStateTracker.get(); }
+
+    bool isOnlyNonUtilityPage() const;
+    bool isUtilityPage() const { return m_isUtilityPage; }
+
 private:
     WEBCORE_EXPORT void initGroup();
 
@@ -566,9 +577,6 @@ private:
 #else
     void checkSubframeCountConsistency() const;
 #endif
-
-    void measurePostLoadCPUUsage();
-    void measurePostBackgroundingCPUUsage();
 
     enum ShouldHighlightMatches { DoNotHighlightMatches, HighlightMatches };
     enum ShouldMarkMatches { DoNotMarkMatches, MarkMatches };
@@ -622,7 +630,10 @@ private:
     std::unique_ptr<DiagnosticLoggingClient> m_diagnosticLoggingClient;
     std::unique_ptr<WebGLStateTracker> m_webGLStateTracker;
 
-    int m_subframeCount;
+    int m_nestedRunLoopCount { 0 };
+    std::function<void()> m_unnestCallback;
+
+    int m_subframeCount { 0 };
     String m_groupName;
     bool m_openedByDOM;
 
@@ -748,15 +759,13 @@ private:
     bool m_showAllPlugins { false };
     bool m_controlledByAutomation { false };
     bool m_resourceCachingDisabled { false };
+    bool m_isUtilityPage;
     UserInterfaceLayoutDirection m_userInterfaceLayoutDirection { UserInterfaceLayoutDirection::LTR };
     
     // For testing.
     std::optional<EventThrottlingBehavior> m_eventThrottlingBehaviorOverride;
 
-    Timer m_postPageLoadCPUUsageTimer;
-    std::optional<CPUTime> m_postLoadCPUTime;
-    Timer m_postBackgroundingCPUUsageTimer;
-    std::optional<CPUTime> m_postBackgroundingCPUTime;
+    std::unique_ptr<PerformanceMonitor> m_performanceMonitor;
 };
 
 inline PageGroup& Page::group()

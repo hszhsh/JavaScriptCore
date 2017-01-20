@@ -63,8 +63,8 @@
 #include <runtime/ObjectConstructor.h>
 #include <runtime/PropertyNameArray.h>
 #include <wtf/GetPtr.h>
-#include <wtf/HashMap.h>
 #include <wtf/Variant.h>
+#include <wtf/Vector.h>
 
 #if ENABLE(Condition1)
 #include "JSTestObjectA.h"
@@ -8617,7 +8617,7 @@ bool JSTestObjOwner::isReachableFromOpaqueRoots(JSC::Handle<JSC::Unknown> handle
 
 void JSTestObjOwner::finalize(JSC::Handle<JSC::Unknown> handle, void* context)
 {
-    auto* jsTestObj = jsCast<JSTestObj*>(handle.slot()->asCell());
+    auto* jsTestObj = static_cast<JSTestObj*>(handle.slot()->asCell());
     auto& world = *static_cast<DOMWrapperWorld*>(context);
     uncacheWrapper(world, &jsTestObj->wrapped(), jsTestObj);
 }

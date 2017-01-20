@@ -256,6 +256,7 @@ void SubresourceLoader::didSendData(unsigned long long bytesSent, unsigned long 
 }
 
 #if USE(QUICK_LOOK)
+
 bool SubresourceLoader::shouldCreateQuickLookHandleForResponse(const ResourceResponse& response) const
 {
     if (m_resource->type() != CachedResource::MainResource)
@@ -266,6 +267,7 @@ bool SubresourceLoader::shouldCreateQuickLookHandleForResponse(const ResourceRes
 
     return QuickLookHandle::shouldCreateForMIMEType(response.mimeType());
 }
+
 #endif
 
 void SubresourceLoader::didReceiveResponse(const ResourceResponse& response)
@@ -619,6 +621,13 @@ void SubresourceLoader::didCancel(const ResourceError&)
 
     m_resource->cancelLoad();
     notifyDone();
+}
+
+void SubresourceLoader::didRetrieveDerivedDataFromCache(const String& type, SharedBuffer& buffer)
+{
+    if (m_state != Initialized)
+        return;
+    m_resource->didRetrieveDerivedDataFromCache(type, buffer);
 }
 
 void SubresourceLoader::notifyDone()

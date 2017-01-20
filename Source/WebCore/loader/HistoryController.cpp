@@ -46,7 +46,6 @@
 #include "MainFrame.h"
 #include "Page.h"
 #include "PageCache.h"
-#include "PageGroup.h"
 #include "ScrollingCoordinator.h"
 #include "SerializedScriptValue.h"
 #include "VisitedLinkStore.h"
@@ -846,7 +845,7 @@ void HistoryController::updateCurrentItem()
     }
 }
 
-void HistoryController::pushState(PassRefPtr<SerializedScriptValue> stateObject, const String& title, const String& urlString)
+void HistoryController::pushState(RefPtr<SerializedScriptValue>&& stateObject, const String& title, const String& urlString)
 {
     if (!m_currentItem)
         return;
@@ -860,7 +859,7 @@ void HistoryController::pushState(PassRefPtr<SerializedScriptValue> stateObject,
     // Override data in the current item (created by createItemTree) to reflect
     // the pushState() arguments.
     m_currentItem->setTitle(title);
-    m_currentItem->setStateObject(stateObject);
+    m_currentItem->setStateObject(WTFMove(stateObject));
     m_currentItem->setURLString(urlString);
 
     LOG(History, "HistoryController %p pushState: Adding top item %p, setting url of current item %p to %s", this, topItem.ptr(), m_currentItem.get(), urlString.ascii().data());
@@ -874,7 +873,7 @@ void HistoryController::pushState(PassRefPtr<SerializedScriptValue> stateObject,
     m_frame.loader().client().updateGlobalHistory();
 }
 
-void HistoryController::replaceState(PassRefPtr<SerializedScriptValue> stateObject, const String& title, const String& urlString)
+void HistoryController::replaceState(RefPtr<SerializedScriptValue>&& stateObject, const String& title, const String& urlString)
 {
     if (!m_currentItem)
         return;
@@ -884,7 +883,7 @@ void HistoryController::replaceState(PassRefPtr<SerializedScriptValue> stateObje
     if (!urlString.isEmpty())
         m_currentItem->setURLString(urlString);
     m_currentItem->setTitle(title);
-    m_currentItem->setStateObject(stateObject);
+    m_currentItem->setStateObject(WTFMove(stateObject));
     m_currentItem->setFormData(nullptr);
     m_currentItem->setFormContentType(String());
 

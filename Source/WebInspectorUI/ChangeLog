@@ -1,3 +1,83 @@
+2017-01-19  Devin Rousso  <dcrousso+webkit@gmail.com>
+
+        Web Inspector: Network Tab's "Clear Network Items" button should have keyboard shortcuts
+        https://bugs.webkit.org/show_bug.cgi?id=166943
+
+        Reviewed by Timothy Hatcher.
+
+        * Localizations/en.lproj/localizedStrings.js:
+
+        * UserInterface/Base/Main.js:
+        (WebInspector.contentLoaded):
+        (WebInspector._clear):
+        Move clear keyboard shortcut to main object and call _handleClearShortcut on the visible
+        content view if able.
+
+        * UserInterface/Controllers/JavaScriptLogViewController.js:
+        (WebInspector.JavaScriptLogViewController):
+        (WebInspector.JavaScriptLogViewController.prototype.requestClearMessages):
+        (WebInspector.JavaScriptLogViewController.prototype._handleClearShortcut): Deleted.
+        * UserInterface/Views/LogContentView.js:
+        (WebInspector.LogContentView):
+        (WebInspector.LogContentView.prototype.handleClearShortcut):
+        Move logic for requesting to clear messages from the LogManager to a better named function.
+
+        * UserInterface/Views/NetworkGridContentView.js:
+        (WebInspector.NetworkGridContentView):
+        (WebInspector.NetworkGridContentView.prototype.handleClearShortcut):
+
+2017-01-19  Devin Rousso  <dcrousso+webkit@gmail.com>
+
+        Web Inspector: Dashboard's log/error/warning help tag says "click to show the Console" even when clicking does nothing
+        https://bugs.webkit.org/show_bug.cgi?id=167102
+
+        Reviewed by Brian Burg.
+
+        * UserInterface/Base/Main.js:
+        (WebInspector.showConsoleTab):
+        Don't revert to the All scopes if the requested scope is already selected.
+
+        * Localizations/en.lproj/localizedStrings.js:
+        * UserInterface/Views/DefaultDashboardView.js:
+        (WebInspector.DefaultDashboardView):
+        (WebInspector.DefaultDashboardView.prototype._appendElementForNamedItem):
+        (WebInspector.DefaultDashboardView.prototype._setItemEnabled):
+        Only apply a title to the element when it is enabled.
+
+2017-01-18  Devin Rousso  <dcrousso+webkit@gmail.com>
+
+        Web Inspector: split console should be allowed for Network and Timeline tabs when Inspector is not docked
+        https://bugs.webkit.org/show_bug.cgi?id=167075
+
+        Reviewed by Timothy Hatcher.
+
+        * UserInterface/Base/Main.js:
+        (WebInspector.dockedConfigurationSupportsSplitContentBrowser):
+        Helper function to determine if the current docked state supports having the content view
+        and split console at the same time.  Currently set to be true if not docked bottom.
+
+        * UserInterface/Views/ClusterContentView.js:
+        (WebInspector.ClusterContentView.prototype.get supportsSplitContentBrowser):
+        * UserInterface/Views/ContentView.js:
+        (WebInspector.ContentView.prototype.get supportsSplitContentBrowser):
+        * UserInterface/Views/NetworkTabContentView.js:
+        (WebInspector.NetworkTabContentView.prototype.get supportsSplitContentBrowser):
+        * UserInterface/Views/TimelineTabContentView.js:
+        (WebInspector.TimelineTabContentView.prototype.get supportsSplitContentBrowser): Deleted.
+        Update supportsSplitContentBrowser functions to only be true/false based on the return value
+        of WebInspector.dockedConfigurationSupportsSplitContentBrowser.
+
+2017-01-18  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: console.table only works for the first 5 properties
+        https://bugs.webkit.org/show_bug.cgi?id=167175
+
+        Reviewed by Timothy Hatcher.
+
+        * UserInterface/Views/ConsoleMessageView.js:
+        (WebInspector.ConsoleMessageView.prototype._formatParameterAsTable):
+        Allow a max of 15 columns instead of 10.
+
 2017-01-16  Devin Rousso  <dcrousso+webkit@gmail.com>
 
         Web Inspector: add "Persist Logs on Navigation" to settings screen

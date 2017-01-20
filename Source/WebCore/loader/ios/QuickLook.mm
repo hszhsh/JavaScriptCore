@@ -178,42 +178,116 @@ const char* WebCore::QLPreviewProtocol()
     return previewProtocol.get().data();
 }
 
-@interface WebPreviewConverterDelegate : NSObject {
+static RefPtr<QuickLookHandleClient>& testingClient()
+{
+    static NeverDestroyed<RefPtr<QuickLookHandleClient>> testingClient;
+    return testingClient.get();
+}
+
+static QuickLookHandleClient& emptyClient()
+{
+    static NeverDestroyed<QuickLookHandleClient> emptyClient;
+    return emptyClient.get();
+}
+
+static QuickLookHandleClient& testingOrEmptyClient()
+{
+    if (testingClient())
+        return *testingClient();
+    return emptyClient();
+}
+
+@interface WebPreviewConverter : NSObject {
     RefPtr<ResourceLoader> _resourceLoader;
-    QuickLookHandle* _quickLookHandle;
+    QuickLookHandle* _handle;
+    RefPtr<QuickLookHandleClient> _client;
+    RetainPtr<NSURLResponse> _originalResponse;
+    RetainPtr<QLPreviewConverter> _platformConverter;
+    RetainPtr<NSURLResponse> _previewResponse;
+    RetainPtr<NSMutableArray> _bufferedDataArray;
     BOOL _hasSentDidReceiveResponse;
     BOOL _hasFailed;
 }
+
+- (instancetype)initWithResourceLoader:(ResourceLoader&)resourceLoader resourceResponse:(const ResourceResponse&)resourceResponse quickLookHandle:(QuickLookHandle&)quickLookHandle;
+- (void)setClient:(Ref<QuickLookHandleClient>&&)client;
+- (void)appendDataArray:(NSArray<NSData *> *)dataArray;
+- (void)finishedAppending;
+- (void)failed;
+
+@property (nonatomic, readonly) QLPreviewConverter *platformConverter;
+
 @end
 
-@implementation WebPreviewConverterDelegate
+@implementation WebPreviewConverter
 
-- (id)initWithResourceLoader:(ResourceLoader&)resourceLoader quickLookHandle:(QuickLookHandle&)quickLookHandle
+- (instancetype)initWithResourceLoader:(ResourceLoader&)resourceLoader resourceResponse:(const ResourceResponse&)resourceResponse quickLookHandle:(QuickLookHandle&)quickLookHandle
 {
     self = [super init];
     if (!self)
         return nil;
 
     _resourceLoader = &resourceLoader;
-    _quickLookHandle = &quickLookHandle;
+    _handle = &quickLookHandle;
+    _client = &testingOrEmptyClient();
+    _originalResponse = resourceResponse.nsURLResponse();
+    _platformConverter = adoptNS([allocQLPreviewConverterInstance() initWithConnection:nil delegate:self response:_originalResponse.get() options:nil]);
+    _previewResponse = [_platformConverter previewResponse];
+    _bufferedDataArray = adoptNS([[NSMutableArray alloc] init]);
+
+    LOG(Network, "WebPreviewConverter created with preview file name \"%s\".", [_platformConverter previewFileName]);
     return self;
+}
+
+- (void)setClient:(Ref<QuickLookHandleClient>&&)client
+{
+    if (!testingClient())
+        _client = WTFMove(client);
+}
+
+- (void)appendDataArray:(NSArray<NSData *> *)dataArray
+{
+    LOG(Network, "WebPreviewConverter appending data array with count %ld.", dataArray.count);
+    [_platformConverter appendDataArray:dataArray];
+    [_bufferedDataArray addObjectsFromArray:dataArray];
+    _client->didReceiveDataArray((CFArrayRef)dataArray);
+}
+
+- (void)finishedAppending
+{
+    LOG(Network, "WebPreviewConverter finished appending data.");
+    [_platformConverter finishedAppendingData];
+    _client->didFinishLoading();
+}
+
+- (void)failed
+{
+    LOG(Network, "WebPreviewConverter failed.");
+    [_platformConverter finishConverting];
+    _client->didFail();
+}
+
+- (QLPreviewConverter *)platformConverter
+{
+    return _platformConverter.get();
 }
 
 - (void)_sendDidReceiveResponseIfNecessary
 {
+    [_bufferedDataArray removeAllObjects];
+
     if (_hasSentDidReceiveResponse || _hasFailed)
         return;
 
     // QuickLook might fail to convert a document without calling connection:didFailWithError: (see <rdar://problem/17927972>).
     // A nil MIME type is an indication of such a failure, so stop loading the resource and ignore subsequent delegate messages.
-    NSURLResponse *previewResponse = _quickLookHandle->previewResponse();
-    if (!previewResponse.MIMEType) {
+    if (![_previewResponse MIMEType]) {
         _hasFailed = YES;
         _resourceLoader->didFail(_resourceLoader->cannotShowURLError());
         return;
     }
 
-    ResourceResponse response { previewResponse };
+    ResourceResponse response { _previewResponse.get() };
     response.setIsQuickLook(true);
 
     _hasSentDidReceiveResponse = YES;
@@ -222,7 +296,7 @@ const char* WebCore::QLPreviewProtocol()
 
 - (void)connection:(NSURLConnection *)connection didReceiveData:(NSData *)data lengthReceived:(long long)lengthReceived
 {
-    UNUSED_PARAM(connection);
+    ASSERT_UNUSED(connection, !connection);
     [self _sendDidReceiveResponseIfNecessary];
     if (_hasFailed)
         return;
@@ -235,7 +309,7 @@ const char* WebCore::QLPreviewProtocol()
 
 - (void)connectionDidFinishLoading:(NSURLConnection *)connection
 {
-    UNUSED_PARAM(connection);
+    ASSERT_UNUSED(connection, !connection);
     if (_hasFailed)
         return;
 
@@ -245,7 +319,25 @@ const char* WebCore::QLPreviewProtocol()
 
 - (void)connection:(NSURLConnection *)connection didFailWithError:(NSError *)error
 {
-    UNUSED_PARAM(connection);
+    ASSERT_UNUSED(connection, !connection);
+
+    if (error.code == kQLReturnPasswordProtected && [error.domain isEqualToString:@"QuickLookErrorDomain"]) {
+        if (!_client->supportsPasswordEntry()) {
+            _resourceLoader->didFail(_resourceLoader->cannotShowURLError());
+            return;
+        }
+
+        _client->didRequestPassword([retainedSelf = retainPtr(self)] (const String& password) {
+            NSDictionary *passwordOption = @{ (NSString *)kQLPreviewOptionPasswordKey : password };
+            auto converterWithPassword = adoptNS([allocQLPreviewConverterInstance() initWithConnection:nil delegate:retainedSelf.get() response:retainedSelf->_originalResponse.get() options:passwordOption]);
+            [converterWithPassword appendDataArray:retainedSelf->_bufferedDataArray.get()];
+            [converterWithPassword finishedAppendingData];
+            retainedSelf->_previewResponse = [converterWithPassword previewResponse];
+            retainedSelf->_platformConverter = WTFMove(converterWithPassword);
+        });
+        return;
+    }
+
     [self _sendDidReceiveResponseIfNecessary];
     if (!_hasFailed)
         _resourceLoader->didFail(error);
@@ -273,21 +365,15 @@ NSString *createTemporaryFileForQuickLook(NSString *fileName)
     return success ? uniqueContentPath : nil;
 }
 
-static inline QuickLookHandleClient& emptyClient()
-{
-    static auto& emptyClient = adoptRef(*new QuickLookHandleClient()).leakRef();
-    return emptyClient;
-}
-
 QuickLookHandle::QuickLookHandle(ResourceLoader& loader, const ResourceResponse& response)
     : m_firstRequestURL { loader.originalRequest().nsURLRequest(DoNotUpdateHTTPBody).URL }
-    , m_delegate { adoptNS([[WebPreviewConverterDelegate alloc] initWithResourceLoader:loader quickLookHandle:*this]) }
-    , m_converter { adoptNS([allocQLPreviewConverterInstance() initWithConnection:nil delegate:m_delegate.get() response:response.nsURLResponse() options:nil]) }
-    , m_previewResponse { [m_converter previewResponse] }
-    , m_client { emptyClient() }
+    , m_converter { adoptNS([[WebPreviewConverter alloc] initWithResourceLoader:loader resourceResponse:response quickLookHandle:*this]) }
 {
-    LOG(Network, "QuickLookHandle::QuickLookHandle() - previewFileName: %s", [m_converter previewFileName]);
     loader.didCreateQuickLookHandle(*this);
+}
+
+QuickLookHandle::~QuickLookHandle()
+{
 }
 
 bool QuickLookHandle::shouldCreateForMIMEType(const String& mimeType)
@@ -306,7 +392,7 @@ bool QuickLookHandle::didReceiveData(const char* data, unsigned length)
     if (m_finishedLoadingDataIntoConverter)
         return false;
 
-    didReceiveDataArray(@[ [NSData dataWithBytes:data length:length] ]);
+    [m_converter appendDataArray:@[ [NSData dataWithBytes:data length:length] ]];
     return true;
 }
 
@@ -315,16 +401,8 @@ bool QuickLookHandle::didReceiveBuffer(const SharedBuffer& buffer)
     if (m_finishedLoadingDataIntoConverter)
         return false;
 
-    didReceiveDataArray(buffer.createNSDataArray().get());
+    [m_converter appendDataArray:buffer.createNSDataArray().get()];
     return true;
-}
-
-void QuickLookHandle::didReceiveDataArray(NSArray *dataArray)
-{
-    ASSERT(!m_finishedLoadingDataIntoConverter);
-    LOG(Network, "QuickLookHandle::didReceiveDataArray()");
-    [m_converter appendDataArray:dataArray];
-    m_client->didReceiveDataArray((CFArrayRef)dataArray);
 }
 
 bool QuickLookHandle::didFinishLoading()
@@ -332,49 +410,45 @@ bool QuickLookHandle::didFinishLoading()
     if (m_finishedLoadingDataIntoConverter)
         return false;
 
-    LOG(Network, "QuickLookHandle::didFinishLoading()");
     m_finishedLoadingDataIntoConverter = true;
-    [m_converter finishedAppendingData];
-    m_client->didFinishLoading();
+    [m_converter finishedAppending];
     return true;
 }
 
 void QuickLookHandle::didFail()
 {
-    LOG(Network, "QuickLookHandle::didFail()");
-    m_client->didFail();
-    [m_converter finishConverting];
+    [m_converter failed];
     m_converter = nullptr;
 }
 
 void QuickLookHandle::setClient(Ref<QuickLookHandleClient>&& client)
 {
-    m_client = WTFMove(client);
+    [m_converter setClient:WTFMove(client)];
 }
 
-QuickLookHandle::~QuickLookHandle()
+void QuickLookHandle::setClientForTesting(RefPtr<QuickLookHandleClient>&& client)
 {
-    LOG(Network, "QuickLookHandle::~QuickLookHandle()");
+    testingClient() = WTFMove(client);
 }
 
 String QuickLookHandle::previewFileName() const
 {
-    return [m_converter previewFileName];
+    return [m_converter platformConverter].previewFileName;
 }
 
 String QuickLookHandle::previewUTI() const
 {
-    return [m_converter previewUTI];
+    return [m_converter platformConverter].previewUTI;
 }
 
 NSURL *QuickLookHandle::previewRequestURL() const
 {
-    return [m_converter previewRequest].URL;
+    return [m_converter platformConverter].previewRequest.URL;
 }
 
-NSURLResponse *QuickLookHandle::previewResponse() const
+QLPreviewConverter *QuickLookHandle::converter() const
 {
-    return m_previewResponse.get();
+    return [m_converter platformConverter];
 }
 
 }
