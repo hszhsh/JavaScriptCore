@@ -69,7 +69,7 @@ WebKitSecurityManager* webkitSecurityManagerCreate(WebKitWebContext* webContext)
 static void registerSecurityPolicyForURIScheme(WebKitSecurityManager* manager, const char* scheme, SecurityPolicy policy)
 {
     String urlScheme = String::fromUTF8(scheme);
-    WebProcessPool* processPool = webkitWebContextGetProcessPool(manager->priv->webContext);
+    auto& processPool = webkitWebContextGetProcessPool(manager->priv->webContext);
 
     // We keep the WebCore::SchemeRegistry of the UI process in sync with the
     // web process one, so that we can return the SecurityPolicy for
@@ -77,27 +77,27 @@ static void registerSecurityPolicyForURIScheme(WebKitSecurityManager* manager, c
     switch (policy) {
     case SecurityPolicyLocal:
         WebCore::SchemeRegistry::registerURLSchemeAsLocal(urlScheme);
-        processPool->registerURLSchemeAsLocal(urlScheme);
+        processPool.registerURLSchemeAsLocal(urlScheme);
         break;
     case SecurityPolicyNoAccess:
         WebCore::SchemeRegistry::registerURLSchemeAsNoAccess(urlScheme);
-        processPool->registerURLSchemeAsNoAccess(urlScheme);
+        processPool.registerURLSchemeAsNoAccess(urlScheme);
         break;
     case SecurityPolicyDisplayIsolated:
         WebCore::SchemeRegistry::registerURLSchemeAsDisplayIsolated(urlScheme);
-        processPool->registerURLSchemeAsDisplayIsolated(urlScheme);
+        processPool.registerURLSchemeAsDisplayIsolated(urlScheme);
         break;
     case SecurityPolicySecure:
         WebCore::SchemeRegistry::registerURLSchemeAsSecure(urlScheme);
-        processPool->registerURLSchemeAsSecure(urlScheme);
+        processPool.registerURLSchemeAsSecure(urlScheme);
         break;
     case SecurityPolicyCORSEnabled:
         WebCore::SchemeRegistry::registerURLSchemeAsCORSEnabled(urlScheme);
-        processPool->registerURLSchemeAsCORSEnabled(urlScheme);
+        processPool.registerURLSchemeAsCORSEnabled(urlScheme);
         break;
     case SecurityPolicyEmptyDocument:
         WebCore::SchemeRegistry::registerURLSchemeAsEmptyDocument(urlScheme);
-        processPool->registerURLSchemeAsEmptyDocument(urlScheme);
+        processPool.registerURLSchemeAsEmptyDocument(urlScheme);
         break;
     }
 }
@@ -320,7 +320,7 @@ void webkit_security_manager_register_uri_scheme_as_empty_document(WebKitSecurit
  * Whether @scheme is considered as an empty document scheme.
  * See also webkit_security_manager_register_uri_scheme_as_empty_document().
  *
- * Returns: %TRUE if @scheme is a an empty document scheme or %FALSE otherwise.
+ * Returns: %TRUE if @scheme is an empty document scheme or %FALSE otherwise.
  */
 gboolean webkit_security_manager_uri_scheme_is_empty_document(WebKitSecurityManager* manager, const char* scheme)
 {

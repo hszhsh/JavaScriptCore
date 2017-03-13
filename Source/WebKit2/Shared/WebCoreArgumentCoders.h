@@ -27,8 +27,10 @@
 
 #include "ArgumentCoders.h"
 #include <WebCore/ColorSpace.h>
+#include <WebCore/DiagnosticLoggingClient.h>
 #include <WebCore/FrameLoaderTypes.h>
 #include <WebCore/IndexedDB.h>
+#include <WebCore/NetworkLoadMetrics.h>
 #include <WebCore/PaymentHeaders.h>
 #include <WebCore/ScrollSnapOffsetsInfo.h>
 
@@ -81,7 +83,6 @@ class UserStyleSheet;
 class UserScript;
 class URL;
 struct CompositionUnderline;
-struct Cookie;
 struct DictationAlternative;
 struct DictionaryPopupInfo;
 struct EventTrackingRegions;
@@ -403,11 +404,6 @@ template<> struct ArgumentCoder<WebCore::CompositionUnderline> {
     static bool decode(Decoder&, WebCore::CompositionUnderline&);
 };
 
-template<> struct ArgumentCoder<WebCore::Cookie> {
-    static void encode(Encoder&, const WebCore::Cookie&);
-    static bool decode(Decoder&, WebCore::Cookie&);
-};
-
 template<> struct ArgumentCoder<WebCore::DatabaseDetails> {
     static void encode(Encoder&, const WebCore::DatabaseDetails&);
     static bool decode(Decoder&, WebCore::DatabaseDetails&);
@@ -545,9 +541,19 @@ template<> struct ArgumentCoder<WebCore::Payment> {
     static bool decode(Decoder&, WebCore::Payment&);
 };
 
+template<> struct ArgumentCoder<WebCore::PaymentAuthorizationResult> {
+    static void encode(Encoder&, const WebCore::PaymentAuthorizationResult&);
+    static bool decode(Decoder&, WebCore::PaymentAuthorizationResult&);
+};
+
 template<> struct ArgumentCoder<WebCore::PaymentContact> {
     static void encode(Encoder&, const WebCore::PaymentContact&);
     static bool decode(Decoder&, WebCore::PaymentContact&);
+};
+
+template<> struct ArgumentCoder<WebCore::PaymentError> {
+    static void encode(Encoder&, const WebCore::PaymentError&);
+    static bool decode(Decoder&, WebCore::PaymentError&);
 };
 
 template<> struct ArgumentCoder<WebCore::PaymentMerchantSession> {
@@ -558,6 +564,11 @@ template<> struct ArgumentCoder<WebCore::PaymentMerchantSession> {
 template<> struct ArgumentCoder<WebCore::PaymentMethod> {
     static void encode(Encoder&, const WebCore::PaymentMethod&);
     static bool decode(Decoder&, WebCore::PaymentMethod&);
+};
+
+template<> struct ArgumentCoder<WebCore::PaymentMethodUpdate> {
+    static void encode(Encoder&, const WebCore::PaymentMethodUpdate&);
+    static bool decode(Decoder&, WebCore::PaymentMethodUpdate&);
 };
 
 template<> struct ArgumentCoder<WebCore::PaymentRequest> {
@@ -588,6 +599,16 @@ template<> struct ArgumentCoder<WebCore::PaymentRequest::ShippingMethod> {
 template<> struct ArgumentCoder<WebCore::PaymentRequest::TotalAndLineItems> {
     static void encode(Encoder&, const WebCore::PaymentRequest::TotalAndLineItems&);
     static bool decode(Decoder&, WebCore::PaymentRequest::TotalAndLineItems&);
+};
+
+template<> struct ArgumentCoder<WebCore::ShippingContactUpdate> {
+    static void encode(Encoder&, const WebCore::ShippingContactUpdate&);
+    static bool decode(Decoder&, WebCore::ShippingContactUpdate&);
+};
+
+template<> struct ArgumentCoder<WebCore::ShippingMethodUpdate> {
+    static void encode(Encoder&, const WebCore::ShippingMethodUpdate&);
+    static bool decode(Decoder&, WebCore::ShippingMethodUpdate&);
 };
 
 #endif
@@ -641,6 +662,23 @@ template<> struct EnumTraits<WebCore::HasInsecureContent> {
         WebCore::HasInsecureContent,
         WebCore::HasInsecureContent::No,
         WebCore::HasInsecureContent::Yes
+    >;
+};
+
+template<> struct EnumTraits<WebCore::ShouldSample> {
+    using values = EnumValues<
+        WebCore::ShouldSample,
+        WebCore::ShouldSample::No,
+        WebCore::ShouldSample::Yes
+    >;
+};
+
+template<> struct EnumTraits<WebCore::NetworkLoadPriority> {
+    using values = EnumValues<
+        WebCore::NetworkLoadPriority,
+        WebCore::NetworkLoadPriority::Low,
+        WebCore::NetworkLoadPriority::Medium,
+        WebCore::NetworkLoadPriority::High
     >;
 };
 

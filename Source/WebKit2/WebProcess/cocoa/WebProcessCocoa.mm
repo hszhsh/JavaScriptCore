@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2010-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,9 +25,12 @@
 
 #import "config.h"
 #import "WebProcess.h"
+#import "WebProcessCocoa.h"
 
-#import "CustomProtocolManager.h"
+#import "LegacyCustomProtocolManager.h"
+#import "Logging.h"
 #import "ObjCObjectGraph.h"
+#import <runtime/ConfigFile.h>
 #import "SandboxExtension.h"
 #import "SandboxInitializationParameters.h"
 #import "SecItemShim.h"
@@ -52,6 +55,7 @@
 #import <WebCore/MemoryRelease.h>
 #import <WebCore/NSAccessibilitySPI.h>
 #import <WebCore/PerformanceLogging.h>
+#import <WebCore/QuartzCoreSPI.h>
 #import <WebCore/RuntimeApplicationChecks.h>
 #import <WebCore/WebCoreNSURLExtras.h>
 #import <WebCore/pthreadSPI.h>
@@ -99,12 +103,21 @@ void WebProcess::platformInitializeWebProcess(WebProcessCreationParameters&& par
     SandboxExtension::consumePermanently(parameters.applicationCacheDirectoryExtensionHandle);
     SandboxExtension::consumePermanently(parameters.mediaCacheDirectoryExtensionHandle);
     SandboxExtension::consumePermanently(parameters.mediaKeyStorageDirectoryExtensionHandle);
+    SandboxExtension::consumePermanently(parameters.javaScriptConfigurationDirectoryExtensionHandle);
+#if ENABLE(MEDIA_STREAM)
+    SandboxExtension::consumePermanently(parameters.audioCaptureExtensionHandle);
+#endif
 #if PLATFORM(IOS)
     SandboxExtension::consumePermanently(parameters.cookieStorageDirectoryExtensionHandle);
     SandboxExtension::consumePermanently(parameters.containerCachesDirectoryExtensionHandle);
     SandboxExtension::consumePermanently(parameters.containerTemporaryDirectoryExtensionHandle);
 #endif
 #endif
+
+    if (!parameters.javaScriptConfigurationDirectory.isEmpty()) {
+        String javaScriptConfigFile = parameters.javaScriptConfigurationDirectory + "/JSC.config";
+        JSC::processConfigFile(javaScriptConfigFile.latin1().data(), "com.apple.WebKit.WebContent", parameters.uiProcessBundleIdentifier.latin1().data());
+    }
 
 #if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100
     setSharedHTTPCookieStorage(parameters.uiProcessCookieStorageIdentifier);
@@ -432,7 +445,20 @@ RefPtr<ObjCObjectGraph> WebProcess::transformObjectsToHandles(ObjCObjectGraph& o
 
 void WebProcess::destroyRenderingResources()
 {
-    WKDestroyRenderingResources();
+#if !RELEASE_LOG_DISABLED
+    double startTime = monotonicallyIncreasingTime();
+#endif
+    CABackingStoreCollectBlocking();
+#if !RELEASE_LOG_DISABLED
+    double endTime = monotonicallyIncreasingTime();
+#endif
+    RELEASE_LOG(ProcessSuspension, "%p - WebProcess::destroyRenderingResources() took %.2fms", this, (endTime - startTime) * 1000.0);
+}
+
+// FIXME: This should live somewhere else, and it should have the implementation in line instead of calling out to WKSI.
+void _WKSetCrashReportApplicationSpecificInformation(NSString *infoString)
+{
+    return WKSetCrashReportApplicationSpecificInformation((__bridge CFStringRef)infoString);
 }
 
 } // namespace WebKit

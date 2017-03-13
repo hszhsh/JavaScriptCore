@@ -38,6 +38,7 @@
 @property (nonatomic, readonly) BOOL useTransparentWindows;
 @property (nonatomic, readonly) BOOL usePaginatedMode;
 @property (nonatomic, readonly) BOOL layerBordersVisible;
+@property (nonatomic, readonly) BOOL simpleLineLayoutEnabled;
 @property (nonatomic, readonly) BOOL simpleLineLayoutDebugBordersEnabled;
 @property (nonatomic, readonly) BOOL incrementalRenderingSuppressed;
 @property (nonatomic, readonly) BOOL tiledScrollingIndicatorVisible;
@@ -50,6 +51,7 @@
 @property (nonatomic, readonly) BOOL subPixelCSSOMMetricsEnabled;
 @property (nonatomic, readonly) BOOL acceleratedDrawingEnabled;
 @property (nonatomic, readonly) BOOL displayListDrawingEnabled;
+@property (nonatomic, readonly) BOOL subpixelAntialiasedLayerTextEnabled;
 @property (nonatomic, readonly) BOOL resourceLoadStatisticsEnabled;
 @property (nonatomic, readonly) BOOL visualViewportEnabled;
 @property (nonatomic, readonly) BOOL largeImageAsyncDecodingEnabled;

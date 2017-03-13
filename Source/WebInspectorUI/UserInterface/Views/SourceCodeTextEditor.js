@@ -1669,9 +1669,9 @@ WebInspector.SourceCodeTextEditor = class SourceCodeTextEditor extends WebInspec
 
         var sourceCodeLocation = this._sourceCodeLocationForEditorPosition(this.tokenTrackingController.candidate.hoveredTokenRange.start);
         if (this.sourceCode instanceof WebInspector.SourceMapResource)
-            WebInspector.showOriginalOrFormattedSourceCodeLocation(sourceCodeLocation);
+            WebInspector.showOriginalOrFormattedSourceCodeLocation(sourceCodeLocation, {ignoreNetworkTab: true});
         else
-            WebInspector.showSourceCodeLocation(sourceCodeLocation);
+            WebInspector.showSourceCodeLocation(sourceCodeLocation, {ignoreNetworkTab: true});
     }
 
     tokenTrackingControllerNewHighlightCandidate(tokenTrackingController, candidate)
@@ -2213,7 +2213,7 @@ WebInspector.SourceCodeTextEditor = class SourceCodeTextEditor extends WebInspec
             else if (this._basicBlockAnnotator)
                 this._basicBlockAnnotator.pause();
 
-            timeoutIdentifier = setTimeout(()  => {
+            timeoutIdentifier = setTimeout(() => {
                 timeoutIdentifier = null;
                 if (this._basicBlockAnnotator)
                     this._basicBlockAnnotator.resume();

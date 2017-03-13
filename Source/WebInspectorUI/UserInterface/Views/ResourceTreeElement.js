@@ -89,15 +89,11 @@ WebInspector.ResourceTreeElement = class ResourceTreeElement extends WebInspecto
         return {text: [urlComponents.lastPathComponent, urlComponents.path, this._resource.url]};
     }
 
-    onattach()
-    {
-        super.onattach();
-
-        this.element.addEventListener("contextmenu", this._handleContextMenuEvent.bind(this));
-    }
-
     ondblclick()
     {
+        if (this._resource.type === WebInspector.Resource.Type.WebSocket)
+            return;
+
         InspectorFrontendHost.openInNewTab(this._resource.url);
     }
 
@@ -163,11 +159,11 @@ WebInspector.ResourceTreeElement = class ResourceTreeElement extends WebInspecto
             this.callFirstAncestorFunction("descendantResourceTreeElementMainTitleDidChange", [this, oldMainTitle]);
     }
 
-    _handleContextMenuEvent(event)
+    populateContextMenu(contextMenu, event)
     {
-        let contextMenu = WebInspector.ContextMenu.createFromEvent(event);
-
         WebInspector.appendContextMenuItemsForSourceCode(contextMenu, this._resource);
+
+        super.populateContextMenu(contextMenu, event);
     }
 
     // Private

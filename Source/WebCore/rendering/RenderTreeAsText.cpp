@@ -272,14 +272,30 @@ void RenderTreeAsText::writeRenderObject(TextStream& ts, const RenderObject& o, 
             return;
 
         const RenderBoxModelObject& box = downcast<RenderBoxModelObject>(o);
-        if (box.borderTop() || box.borderRight() || box.borderBottom() || box.borderLeft()) {
+        LayoutUnit borderTop = box.borderTop();
+        LayoutUnit borderRight = box.borderRight();
+        LayoutUnit borderBottom = box.borderBottom();
+        LayoutUnit borderLeft = box.borderLeft();
+        if (box.isFieldset()) {
+            const auto& block = downcast<RenderBlock>(box);
+            if (o.style().writingMode() == TopToBottomWritingMode)
+                borderTop -= block.intrinsicBorderForFieldset();
+            else if (o.style().writingMode() == BottomToTopWritingMode)
+                borderBottom -= block.intrinsicBorderForFieldset();
+            else if (o.style().writingMode() == LeftToRightWritingMode)
+                borderLeft -= block.intrinsicBorderForFieldset();
+            else if (o.style().writingMode() == RightToLeftWritingMode)
+                borderRight -= block.intrinsicBorderForFieldset();
+            
+        }
+        if (borderTop || borderRight || borderBottom || borderLeft) {
             ts << " [border:";
 
             BorderValue prevBorder = o.style().borderTop();
-            if (!box.borderTop())
+            if (!borderTop)
                 ts << " none";
             else {
-                ts << " (" << box.borderTop() << "px ";
+                ts << " (" << borderTop << "px ";
                 printBorderStyle(ts, o.style().borderTopStyle());
                 Color col = o.style().borderTopColor();
                 if (!col.isValid())
@@ -289,10 +305,10 @@ void RenderTreeAsText::writeRenderObject(TextStream& ts, const RenderObject& o, 
 
             if (o.style().borderRight() != prevBorder) {
                 prevBorder = o.style().borderRight();
-                if (!box.borderRight())
+                if (!borderRight)
                     ts << " none";
                 else {
-                    ts << " (" << box.borderRight() << "px ";
+                    ts << " (" << borderRight << "px ";
                     printBorderStyle(ts, o.style().borderRightStyle());
                     Color col = o.style().borderRightColor();
                     if (!col.isValid())
@@ -303,10 +319,10 @@ void RenderTreeAsText::writeRenderObject(TextStream& ts, const RenderObject& o, 
 
             if (o.style().borderBottom() != prevBorder) {
                 prevBorder = box.style().borderBottom();
-                if (!box.borderBottom())
+                if (!borderBottom)
                     ts << " none";
                 else {
-                    ts << " (" << box.borderBottom() << "px ";
+                    ts << " (" << borderBottom << "px ";
                     printBorderStyle(ts, o.style().borderBottomStyle());
                     Color col = o.style().borderBottomColor();
                     if (!col.isValid())
@@ -317,10 +333,10 @@ void RenderTreeAsText::writeRenderObject(TextStream& ts, const RenderObject& o, 
 
             if (o.style().borderLeft() != prevBorder) {
                 prevBorder = o.style().borderLeft();
-                if (!box.borderLeft())
+                if (!borderLeft)
                     ts << " none";
                 else {
-                    ts << " (" << box.borderLeft() << "px ";
+                    ts << " (" << borderLeft << "px ";
                     printBorderStyle(ts, o.style().borderLeftStyle());
                     Color col = o.style().borderLeftColor();
                     if (!col.isValid())
@@ -493,18 +509,20 @@ static void writeTextRun(TextStream& ts, const RenderText& o, const InlineTextBo
     ts << "\n";
 }
 
-static void writeSimpleLine(TextStream& ts, const RenderText& o, const FloatRect& rect, StringView text)
+static void writeSimpleLine(TextStream& ts, const RenderText& renderText, const SimpleLineLayout::RunResolver::Run& run)
 {
+    auto rect = run.rect();
     int x = rect.x();
     int y = rect.y();
     int logicalWidth = ceilf(rect.x() + rect.width()) - x;
 
-    if (is<RenderTableCell>(*o.containingBlock()))
-        y -= floorToInt(downcast<RenderTableCell>(*o.containingBlock()).intrinsicPaddingBefore());
-        
+    if (is<RenderTableCell>(*renderText.containingBlock()))
+        y -= floorToInt(downcast<RenderTableCell>(*renderText.containingBlock()).intrinsicPaddingBefore());
+
     ts << "text run at (" << x << "," << y << ") width " << logicalWidth;
-    ts << ": "
-        << quoteAndEscapeNonPrintables(text);
+    ts << ": " << quoteAndEscapeNonPrintables(run.text());
+    if (run.hasHyphen())
+        ts << " + hyphen string " << quoteAndEscapeNonPrintables(renderText.style().hyphenString().string());
     ts << "\n";
 }
 
@@ -555,7 +573,7 @@ void write(TextStream& ts, const RenderObject& o, int indent, RenderAsTextBehavi
             auto resolver = runResolver(downcast<RenderBlockFlow>(*text.parent()), *layout);
             for (const auto& run : resolver.rangeForRenderer(text)) {
                 writeIndent(ts, indent + 1);
-                writeSimpleLine(ts, text, run.rect(), run.text());
+                writeSimpleLine(ts, text, run);
             }
         } else {
             for (auto* box = text.firstTextBox(); box; box = box->nextTextBox()) {

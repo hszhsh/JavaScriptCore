@@ -42,6 +42,7 @@
 #include <WebCore/CertificateInfo.h>
 #include <WebCore/DiagnosticLoggingKeys.h>
 #include <WebCore/HTTPHeaderNames.h>
+#include <WebCore/NetworkLoadMetrics.h>
 #include <WebCore/ProtectionSpace.h>
 #include <WebCore/SharedBuffer.h>
 #include <WebCore/SynchronousLoaderClient.h>
@@ -390,7 +391,7 @@ void NetworkResourceLoader::didReceiveBuffer(Ref<SharedBuffer>&& buffer, int rep
     sendBuffer(buffer, encodedDataLength);
 }
 
-void NetworkResourceLoader::didFinishLoading(double finishTime)
+void NetworkResourceLoader::didFinishLoading(const NetworkLoadMetrics& networkLoadMetrics)
 {
     RELEASE_LOG_IF_ALLOWED("didFinishLoading: (pageID = %" PRIu64 ", frameID = %" PRIu64 ", resourceID = %" PRIu64 ")", m_parameters.webPageID, m_parameters.webFrameID, m_parameters.identifier);
 
@@ -411,7 +412,7 @@ void NetworkResourceLoader::didFinishLoading(double finishTime)
             // FIXME: Pass a real value or remove the encoded data size feature.
             sendBuffer(*m_bufferedData, -1);
         }
-        send(Messages::WebResourceLoader::DidFinishResourceLoad(finishTime));
+        send(Messages::WebResourceLoader::DidFinishResourceLoad(networkLoadMetrics));
     }
 
 #if ENABLE(NETWORK_CACHE)
@@ -471,11 +472,14 @@ void NetworkResourceLoader::continueWillSendRequest(ResourceRequest&& newRequest
 {
     RELEASE_LOG_IF_ALLOWED("continueWillSendRequest: (pageID = %" PRIu64 ", frameID = %" PRIu64 ", resourceID = %" PRIu64 ")", m_parameters.webPageID, m_parameters.webFrameID, m_parameters.identifier);
 
-    // If there is a match in the network cache, we need to reuse the original cache policy.
+    // If there is a match in the network cache, we need to reuse the original cache policy and partition.
     newRequest.setCachePolicy(originalRequest().cachePolicy());
+    newRequest.setCachePartition(originalRequest().cachePartition());
 
 #if ENABLE(NETWORK_CACHE)
     if (m_isWaitingContinueWillSendRequestForCachedRedirect) {
+        m_isWaitingContinueWillSendRequestForCachedRedirect = false;
+
         LOG(NetworkCache, "(NetworkProcess) Retrieving cached redirect");
 
         if (canUseCachedRedirect(newRequest))
@@ -483,7 +487,6 @@ void NetworkResourceLoader::continueWillSendRequest(ResourceRequest&& newRequest
         else
             startNetworkLoad(newRequest);
 
-        m_isWaitingContinueWillSendRequestForCachedRedirect = false;
         return;
     }
 #endif
@@ -571,17 +574,12 @@ void NetworkResourceLoader::didRetrieveCacheEntry(std::unique_ptr<NetworkCache::
     send(Messages::WebResourceLoader::DidReceiveResponse(entry->response(), needsContinueDidReceiveResponseMessage));
 
     if (entry->sourceStorageRecord().bodyHash && !m_parameters.derivedCachedDataTypesToRetrieve.isEmpty()) {
-#if ENABLE(CACHE_PARTITIONING)
-        String partition = originalRequest().cachePartition();
-#else
-        String partition;
-#endif
         auto bodyHash = *entry->sourceStorageRecord().bodyHash;
         auto* entryPtr = entry.release();
         auto retrieveCount = m_parameters.derivedCachedDataTypesToRetrieve.size();
 
         for (auto& type : m_parameters.derivedCachedDataTypesToRetrieve) {
-            NetworkCache::DataKey key { partition, type, bodyHash };
+            NetworkCache::DataKey key { originalRequest().cachePartition(), type, bodyHash };
             NetworkCache::singleton().retrieveData(key, [loader = makeRef(*this), entryPtr, type, retrieveCount] (const uint8_t* data, size_t size) mutable {
                 loader->m_retrievedDerivedDataCount++;
                 bool retrievedAll = loader->m_retrievedDerivedDataCount == retrieveCount;
@@ -610,13 +608,16 @@ void NetworkResourceLoader::sendResultForCacheEntry(std::unique_ptr<NetworkCache
 {
 #if ENABLE(SHAREABLE_RESOURCE)
     if (!entry->shareableResourceHandle().isNull()) {
-        send(Messages::WebResourceLoader::DidReceiveResource(entry->shareableResourceHandle(), currentTime()));
+        send(Messages::WebResourceLoader::DidReceiveResource(entry->shareableResourceHandle()));
         return;
     }
 #endif
 
+    WebCore::NetworkLoadMetrics networkLoadMetrics;
+    networkLoadMetrics.markComplete();
+
     sendBuffer(*entry->buffer(), entry->buffer()->size());
-    send(Messages::WebResourceLoader::DidFinishResourceLoad(currentTime()));
+    send(Messages::WebResourceLoader::DidFinishResourceLoad(networkLoadMetrics));
 }
 
 void NetworkResourceLoader::validateCacheEntry(std::unique_ptr<NetworkCache::Entry> entry)
@@ -643,6 +644,8 @@ void NetworkResourceLoader::validateCacheEntry(std::unique_ptr<NetworkCache::Ent
 void NetworkResourceLoader::dispatchWillSendRequestForCacheEntry(std::unique_ptr<NetworkCache::Entry> entry)
 {
     ASSERT(entry->redirectRequest());
+    ASSERT(!m_isWaitingContinueWillSendRequestForCachedRedirect);
+
     LOG(NetworkCache, "(NetworkProcess) Executing cached redirect");
 
     ++m_redirectCount;

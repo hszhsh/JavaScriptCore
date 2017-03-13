@@ -30,9 +30,9 @@
 #include "config.h"
 #include "Frame.h"
 
-#include "AnimationController.h"
 #include "ApplyStyleCommand.h"
 #include "BackForwardController.h"
+#include "CSSAnimationController.h"
 #include "CSSComputedStyleDeclaration.h"
 #include "CSSPropertyNames.h"
 #include "CachedCSSStyleSheet.h"
@@ -41,6 +41,7 @@
 #include "ChromeClient.h"
 #include "DOMWindow.h"
 #include "DocumentType.h"
+#include "Editing.h"
 #include "Editor.h"
 #include "EditorClient.h"
 #include "Event.h"
@@ -103,7 +104,6 @@
 #include "XLinkNames.h"
 #include "XMLNSNames.h"
 #include "XMLNames.h"
-#include "htmlediting.h"
 #include "markup.h"
 #include "npruntime_impl.h"
 #include "runtime_root.h"
@@ -160,7 +160,7 @@ Frame::Frame(Page& page, HTMLFrameOwnerElement* ownerElement, FrameLoaderClient&
     , m_script(std::make_unique<ScriptController>(*this))
     , m_editor(std::make_unique<Editor>(*this))
     , m_selection(std::make_unique<FrameSelection>(this))
-    , m_animationController(std::make_unique<AnimationController>(*this))
+    , m_animationController(std::make_unique<CSSAnimationController>(*this))
 #if PLATFORM(IOS)
     , m_overflowAutoScrollTimer(*this, &Frame::overflowAutoScrollTimerFired)
     , m_selectionChangeCallbacksDisabled(false)
@@ -255,8 +255,10 @@ void Frame::setView(RefPtr<FrameView>&& view)
     if (m_eventHandler)
         m_eventHandler->clear();
 
-    m_view = WTFMove(view);
+    RELEASE_ASSERT(!m_doc || !m_doc->hasLivingRenderTree());
 
+    m_view = WTFMove(view);
+    
     // Only one form submission is allowed per view of a part.
     // Since this part may be getting reused as a result of being
     // pulled from the back/forward cache, reset this flag.
@@ -710,8 +712,10 @@ void Frame::injectUserScripts(UserScriptInjectionTime injectionTime)
         if (script.injectedFrames() == InjectInTopFrameOnly && ownerElement())
             return;
 
-        if (script.injectionTime() == injectionTime && UserContentURLPattern::matchesPatterns(document->url(), script.whitelist(), script.blacklist()))
+        if (script.injectionTime() == injectionTime && UserContentURLPattern::matchesPatterns(document->url(), script.whitelist(), script.blacklist())) {
+            m_page->setAsRunningUserScripts();
             m_script->evaluateInWorld(ScriptSourceCode(script.source(), script.url()), world);
+        }
     });
 }
 
@@ -777,7 +781,7 @@ void Frame::willDetachPage()
 
 #if PLATFORM(IOS)
     if (WebThreadCountOfObservedContentModifiers() > 0 && m_page)
-        m_page->chrome().client().clearContentChangeObservers(this);
+        m_page->chrome().client().clearContentChangeObservers(*this);
 #endif
 
     script().clearScriptObjects();
@@ -970,7 +974,7 @@ void Frame::setPageAndTextZoomFactors(float pageZoomFactor, float textZoomFactor
     m_pageZoomFactor = pageZoomFactor;
     m_textZoomFactor = textZoomFactor;
 
-    document->recalcStyle(Style::Force);
+    document->resolveStyle(Document::ResolveStyleType::Rebuild);
 
     for (RefPtr<Frame> child = tree().firstChild(); child; child = child->tree().nextSibling())
         child->setPageAndTextZoomFactors(m_pageZoomFactor, m_textZoomFactor);

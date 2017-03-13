@@ -68,38 +68,11 @@ void ImageSource::clearFrameBufferCache(size_t clearBeforeFrame)
     m_decoder->clearFrameBufferCache(clearBeforeFrame);
 }
 
-void ImageSource::clear(bool destroyAll, size_t count, SharedBuffer* data)
+void ImageSource::clear(SharedBuffer* data)
 {
-    // There's no need to throw away the decoder unless we're explicitly asked
-    // to destroy all of the frames.
-    if (!destroyAll || m_frameCache->hasDecodingQueue()) {
-        clearFrameBufferCache(count);
-        return;
-    }
-
     m_decoder = nullptr;
     m_frameCache->setDecoder(nullptr);
     setData(data, isAllDataReceived());
-}
-
-void ImageSource::destroyDecodedData(SharedBuffer* data, bool destroyAll, size_t count)
-{
-    m_frameCache->destroyDecodedData(destroyAll, count);
-    clear(destroyAll, count, data);
-}
-
-bool ImageSource::destroyDecodedDataIfNecessary(SharedBuffer* data, bool destroyAll, size_t count)
-{
-    // If we have decoded frames but there is no encoded data, we shouldn't destroy
-    // the decoded image since we won't be able to reconstruct it later.
-    if (!data && m_frameCache->frameCount())
-        return false;
-
-    if (!m_frameCache->destroyDecodedDataIfNecessary(destroyAll, count))
-        return false;
-
-    clear(destroyAll, count, data);
-    return true;
 }
 
 bool ImageSource::ensureDecoderAvailable(SharedBuffer* data)
@@ -175,10 +148,10 @@ bool ImageSource::isAllDataReceived()
     return isDecoderAvailable() ? m_decoder->isAllDataReceived() : m_frameCache->frameCount();
 }
 
-bool ImageSource::isAsyncDecodingRequired()
+bool ImageSource::shouldUseAsyncDecoding()
 {
     // FIXME: figure out the best heuristic for enabling async image decoding.
-    return size().area() * sizeof(RGBA32) >= 100 * KB;
+    return size().area() * sizeof(RGBA32) >= (frameCount() > 1 ? 100 * KB : 500 * KB);
 }
 
 SubsamplingLevel ImageSource::maximumSubsamplingLevel()
@@ -218,11 +191,10 @@ NativeImagePtr ImageSource::createFrameImageAtIndex(size_t index, SubsamplingLev
     return isDecoderAvailable() ? m_decoder->createFrameImageAtIndex(index, subsamplingLevel) : nullptr;
 }
 
-NativeImagePtr ImageSource::frameImageAtIndex(size_t index, SubsamplingLevel subsamplingLevel, const GraphicsContext* targetContext)
+NativeImagePtr ImageSource::frameImageAtIndex(size_t index, const std::optional<SubsamplingLevel>& subsamplingLevel, const std::optional<IntSize>& sizeForDrawing, const GraphicsContext* targetContext)
 {
     setDecoderTargetContext(targetContext);
-
-    return m_frameCache->frameImageAtIndex(index, subsamplingLevel);
+    return m_frameCache->frameImageAtIndex(index, subsamplingLevel, sizeForDrawing);
 }
 
 void ImageSource::dump(TextStream& ts)

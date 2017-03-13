@@ -56,11 +56,13 @@
 #include "TemplateRegistryKeyTable.h"
 #include "ThunkGenerators.h"
 #include "VMEntryRecord.h"
+#include "VMTraps.h"
 #include "Watchpoint.h"
 #include <wtf/Bag.h>
 #include <wtf/BumpPointerAllocator.h>
 #include <wtf/DateMath.h>
 #include <wtf/Deque.h>
+#include <wtf/DoublyLinkedList.h>
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
@@ -191,15 +193,15 @@ class QueuedTask {
 public:
     void run();
 
-    QueuedTask(VM& vm, JSGlobalObject* globalObject, PassRefPtr<Microtask> microtask)
+    QueuedTask(VM& vm, JSGlobalObject* globalObject, Ref<Microtask>&& microtask)
         : m_globalObject(vm, globalObject)
-        , m_microtask(microtask)
+        , m_microtask(WTFMove(microtask))
     {
     }
 
 private:
     Strong<JSGlobalObject> m_globalObject;
-    RefPtr<Microtask> m_microtask;
+    Ref<Microtask> m_microtask;
 };
 
 class ConservativeRoots;
@@ -241,7 +243,7 @@ struct ScratchBuffer {
 #pragma warning(pop)
 #endif
 
-class VM : public ThreadSafeRefCounted<VM> {
+class VM : public ThreadSafeRefCounted<VM>, public DoublyLinkedListNode<VM> {
 public:
     // WebCore has a one-to-one mapping of threads to VMs;
     // either create() or createLeaked() should only be called once
@@ -267,7 +269,7 @@ public:
     static Ref<VM> createContextGroup(HeapType = SmallHeap);
     JS_EXPORT_PRIVATE ~VM();
 
-    JS_EXPORT_PRIVATE Watchdog& ensureWatchdog();
+    Watchdog& ensureWatchdog();
     Watchdog* watchdog() { return m_watchdog.get(); }
 
     HeapProfiler* heapProfiler() const { return m_heapProfiler.get(); }
@@ -312,7 +314,7 @@ public:
     // topVMEntryFrame.
     // FIXME: This should be a void*, because it might not point to a CallFrame.
     // https://bugs.webkit.org/show_bug.cgi?id=160441
-    ExecState* topCallFrame;
+    ExecState* topCallFrame { nullptr };
     JSWebAssemblyInstance* topJSWebAssemblyInstance;
     Strong<Structure> structureStructure;
     Strong<Structure> structureRareDataStructure;
@@ -332,6 +334,7 @@ public:
 #if ENABLE(WEBASSEMBLY)
     Strong<Structure> webAssemblyCalleeStructure;
     Strong<Structure> webAssemblyToJSCalleeStructure;
+    Strong<Structure> webAssemblyCodeBlockStructure;
     Strong<JSCell> webAssemblyToJSCallee;
 #endif
     Strong<Structure> moduleProgramExecutableStructure;
@@ -384,7 +387,7 @@ public:
     WTF::SymbolRegistry m_symbolRegistry;
     TemplateRegistryKeyTable m_templateRegistryKeytable;
     CommonIdentifiers* propertyNames;
-    const MarkedArgumentBuffer* emptyList; // Lists are supposed to be allocated on the stack to have their elements properly marked, which is not the case here - but this list has nothing to mark.
+    const ArgList* emptyList;
     SmallStrings smallStrings;
     NumericStrings numericStrings;
     DateInstanceCache dateInstanceCache;
@@ -609,10 +612,6 @@ public:
     RTTraceList* m_rtTraceList;
 #endif
 
-    bool hasExclusiveThread() const { return m_apiLock->hasExclusiveThread(); }
-    std::thread::id exclusiveThread() const { return m_apiLock->exclusiveThread(); }
-    void setExclusiveThread(std::thread::id threadId) { m_apiLock->setExclusiveThread(threadId); }
-
     JS_EXPORT_PRIVATE void resetDateCache();
 
     RegExpCache* regExpCache() { return m_regExpCache; }
@@ -658,12 +657,10 @@ public:
     bool enableControlFlowProfiler();
     bool disableControlFlowProfiler();
 
-    JS_EXPORT_PRIVATE void queueMicrotask(JSGlobalObject*, PassRefPtr<Microtask>);
+    JS_EXPORT_PRIVATE void queueMicrotask(JSGlobalObject*, Ref<Microtask>&&);
     JS_EXPORT_PRIVATE void drainMicrotasks();
     void setGlobalConstRedeclarationShouldThrow(bool globalConstRedeclarationThrow) { m_globalConstRedeclarationShouldThrow = globalConstRedeclarationThrow; }
     ALWAYS_INLINE bool globalConstRedeclarationShouldThrow() const { return m_globalConstRedeclarationShouldThrow; }
-
-    inline bool shouldTriggerTermination(ExecState*);
 
     void setShouldBuildPCToCodeOriginMapping() { m_shouldBuildPCToCodeOriginMapping = true; }
     bool shouldBuilderPCToCodeOriginMapping() const { return m_shouldBuildPCToCodeOriginMapping; }
@@ -674,6 +671,20 @@ public:
     
     template<typename Func>
     void logEvent(CodeBlock*, const char* summary, const Func& func);
+
+    std::optional<PlatformThread> ownerThread() const { return m_apiLock->ownerThread(); }
+
+    VMTraps& traps() { return m_traps; }
+
+    void handleTraps(ExecState* exec, VMTraps::Mask mask = VMTraps::Mask::allEventTypes()) { m_traps.handleTraps(exec, mask); }
+
+    bool needTrapHandling() { return m_traps.needTrapHandling(); }
+    bool needTrapHandling(VMTraps::Mask mask) { return m_traps.needTrapHandling(mask); }
+    void* needTrapHandlingAddress() { return m_traps.needTrapHandlingAddress(); }
+
+    void notifyNeedDebuggerBreak() { m_traps.fireTrap(VMTraps::NeedDebuggerBreak); }
+    void notifyNeedTermination() { m_traps.fireTrap(VMTraps::NeedTermination); }
+    void notifyNeedWatchdogCheck() { m_traps.fireTrap(VMTraps::NeedWatchdogCheck); }
 
 private:
     friend class LLIntOffsetsExtractor;
@@ -770,6 +781,7 @@ private:
     unsigned m_controlFlowProfilerEnabledCount;
     Deque<std::unique_ptr<QueuedTask>> m_microtaskQueue;
     MallocPtr<EncodedJSValue> m_exceptionFuzzBuffer;
+    VMTraps m_traps;
     RefPtr<Watchdog> m_watchdog;
     std::unique_ptr<HeapProfiler> m_heapProfiler;
 #if ENABLE(SAMPLING_PROFILER)
@@ -778,11 +790,16 @@ private:
     std::unique_ptr<ShadowChicken> m_shadowChicken;
     std::unique_ptr<BytecodeIntrinsicRegistry> m_bytecodeIntrinsicRegistry;
 
+    VM* m_prev; // Required by DoublyLinkedListNode.
+    VM* m_next; // Required by DoublyLinkedListNode.
+
     // Friends for exception checking purpose only.
     friend class Heap;
     friend class CatchScope;
     friend class ExceptionScope;
     friend class ThrowScope;
+    friend class VMTraps;
+    friend class WTF::DoublyLinkedListNode<VM>;
 };
 
 #if ENABLE(GC_VALIDATION)

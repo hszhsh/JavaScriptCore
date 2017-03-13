@@ -46,6 +46,7 @@
 #include "APIPolicyClient.h"
 #include "APISessionState.h"
 #include "APIUIClient.h"
+#include "APIWebsitePolicies.h"
 #include "APIWindowFeatures.h"
 #include "AuthenticationChallengeProxy.h"
 #include "LegacySessionStateCoding.h"
@@ -109,7 +110,7 @@ template<> struct ClientTraits<WKPagePolicyClientBase> {
 };
 
 template<> struct ClientTraits<WKPageUIClientBase> {
-    typedef std::tuple<WKPageUIClientV0, WKPageUIClientV1, WKPageUIClientV2, WKPageUIClientV3, WKPageUIClientV4, WKPageUIClientV5, WKPageUIClientV6, WKPageUIClientV7, WKPageUIClientV8> Versions;
+    typedef std::tuple<WKPageUIClientV0, WKPageUIClientV1, WKPageUIClientV2, WKPageUIClientV3, WKPageUIClientV4, WKPageUIClientV5, WKPageUIClientV6, WKPageUIClientV7, WKPageUIClientV8, WKPageUIClientV9> Versions;
 };
 
 #if ENABLE(CONTEXT_MENUS)
@@ -313,6 +314,11 @@ WKBackForwardListRef WKPageGetBackForwardList(WKPageRef pageRef)
 bool WKPageWillHandleHorizontalScrollEvents(WKPageRef pageRef)
 {
     return toImpl(pageRef)->willHandleHorizontalScrollEvents();
+}
+
+void WKPageUpdateWebsitePolicies(WKPageRef pageRef, WKWebsitePoliciesRef websitePoliciesRef)
+{
+    toImpl(pageRef)->updateWebsitePolicies(toImpl(websitePoliciesRef)->websitePolicies());
 }
 
 WKStringRef WKPageCopyTitle(WKPageRef pageRef)
@@ -1894,7 +1900,7 @@ void WKPageSetPageUIClient(WKPageRef pageRef, const WKPageUIClientBase* wkClient
             m_client.setStatusText(toAPI(page), toAPI(text.impl()), m_client.base.clientInfo);
         }
 
-        void mouseDidMoveOverElement(WebPageProxy* page, const WebHitTestResultData& data, WebEvent::Modifiers modifiers, API::Object* userData) override
+        void mouseDidMoveOverElement(WebPageProxy* page, const WebHitTestResultData& data, WebKit::WebEvent::Modifiers modifiers, API::Object* userData) override
         {
             if (!m_client.mouseDidMoveOverElement && !m_client.mouseDidMoveOverElement_deprecatedForUseWithV0)
                 return;
@@ -2235,6 +2241,14 @@ void WKPageSetPageUIClient(WKPageRef pageRef, const WKPageUIClientBase* wkClient
             m_client.didLosePointerLock(toAPI(page), m_client.base.clientInfo);
         }
 #endif
+
+        void handleAutoplayEvent(WebPageProxy& page, WebCore::AutoplayEvent event) override
+        {
+            if (!m_client.handleAutoplayEvent)
+                return;
+
+            m_client.handleAutoplayEvent(toAPI(&page), static_cast<WKAutoplayEvent>(event), m_client.base.clientInfo);
+        }
     };
 
     toImpl(pageRef)->setUIClient(std::make_unique<UIClient>(wkClient));
@@ -2833,51 +2847,3 @@ pid_t WKPageGetProcessIdentifier(WKPageRef page)
 {
     return toImpl(page)->processIdentifier();
 }
-
-#if ENABLE(NETSCAPE_PLUGIN_API)
-
-// -- DEPRECATED --
-
-WKStringRef WKPageGetPluginInformationBundleIdentifierKey()
-{
-    return WKPluginInformationBundleIdentifierKey();
-}
-
-WKStringRef WKPageGetPluginInformationBundleVersionKey()
-{
-    return WKPluginInformationBundleVersionKey();
-}
-
-WKStringRef WKPageGetPluginInformationDisplayNameKey()
-{
-    return WKPluginInformationDisplayNameKey();
-}
-
-WKStringRef WKPageGetPluginInformationFrameURLKey()
-{
-    return WKPluginInformationFrameURLKey();
-}
-
-WKStringRef WKPageGetPluginInformationMIMETypeKey()
-{
-    return WKPluginInformationMIMETypeKey();
-}
-
-WKStringRef WKPageGetPluginInformationPageURLKey()
-{
-    return WKPluginInformationPageURLKey();
-}
-
-WKStringRef WKPageGetPluginInformationPluginspageAttributeURLKey()
-{
-    return WKPluginInformationPluginspageAttributeURLKey();
-}
-
-WKStringRef WKPageGetPluginInformationPluginURLKey()
-{
-    return WKPluginInformationPluginURLKey();
-}
-
-// -- DEPRECATED --
-
-#endif // ENABLE(NETSCAPE_PLUGIN_API)

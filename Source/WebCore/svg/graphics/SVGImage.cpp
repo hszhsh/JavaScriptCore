@@ -40,6 +40,7 @@
 #include "ImageObserver.h"
 #include "IntRect.h"
 #include "JSDOMWindowBase.h"
+#include "LibWebRTCProvider.h"
 #include "MainFrame.h"
 #include "Page.h"
 #include "PageConfiguration.h"
@@ -414,7 +415,11 @@ bool SVGImage::dataChanged(bool allDataReceived)
         return true;
 
     if (allDataReceived) {
-        PageConfiguration pageConfiguration(createEmptyEditorClient(), SocketProvider::create());
+        PageConfiguration pageConfiguration(
+            createEmptyEditorClient(),
+            SocketProvider::create(),
+            makeUniqueRef<LibWebRTCProvider>()
+        );
         fillWithEmptyClients(pageConfiguration);
         m_chromeClient = std::make_unique<SVGImageChromeClient>(this);
         pageConfiguration.chromeClient = m_chromeClient.get();
@@ -445,6 +450,8 @@ bool SVGImage::dataChanged(bool allDataReceived)
         loader.activeDocumentLoader()->writer().begin(URL()); // create the empty document
         loader.activeDocumentLoader()->writer().addData(data()->data(), data()->size());
         loader.activeDocumentLoader()->writer().end();
+
+        frame.document()->updateLayoutIgnorePendingStylesheets();
 
         // Set the intrinsic size before a container size is available.
         m_intrinsicSize = containerSize();

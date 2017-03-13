@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 
-# Copyright (C) 2015-2016 Apple Inc. All rights reserved.
+# Copyright (C) 2015-2017 Apple Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -44,20 +44,55 @@ class Opcode
 end
 
 class Arg
-    attr_reader :role, :type, :width
+    attr_reader :role, :bank, :width
 
-    def initialize(role, type, width)
+    def initialize(role, bank, width)
         @role = role
-        @type = type
+        @bank = bank
         @width = width
+    end
+    
+    def self.widthCode(width)
+        if width == "Ptr"
+            "pointerWidth()"
+        else
+            "Width#{width}"
+        end
     end
 
     def widthCode
-        if width == "Ptr"
-            "Arg::pointerWidth()"
+        Arg.widthCode(width)
+    end
+    
+    def self.roleCode(role)
+        case role
+        when "U"
+            "Use"
+        when "D"
+            "Def"
+        when "ZD"
+            "ZDef"
+        when "UD"
+            "UseDef"
+        when "UZD"
+            "UseZDef"
+        when "UA"
+            "UseAddr"
+        when "S"
+            "Scratch"
+        when "ED"
+            "EarlyDef"
+        when "EZD"
+            "EarlyZDef"
+        when "LU"
+            "LateUse"
         else
-            "Arg::Width#{width}"
+            raise
         end
+    end
+    
+    def roleCode
+        Arg.roleCode(role)
     end
 end
 
@@ -182,7 +217,7 @@ def lex(str, fileName)
 end
 
 def isRole(token)
-    token =~ /\A((U)|(D)|(UD)|(ZD)|(UZD)|(UA)|(S))\Z/
+    token =~ /\A((U)|(D)|(UD)|(ZD)|(UZD)|(UA)|(S)|(ED)|(EZD)|(LU))\Z/
 end
 
 def isGF(token)
@@ -190,7 +225,7 @@ def isGF(token)
 end
 
 def isKind(token)
-    token =~ /\A((Tmp)|(Imm)|(BigImm)|(BitImm)|(BitImm64)|(Addr)|(Index)|(RelCond)|(ResCond)|(DoubleCond))\Z/
+    token =~ /\A((Tmp)|(Imm)|(BigImm)|(BitImm)|(BitImm64)|(SimpleAddr)|(Addr)|(Index)|(RelCond)|(ResCond)|(DoubleCond)|(StatusCond))\Z/
 end
 
 def isArch(token)
@@ -255,16 +290,16 @@ class Parser
         result
     end
 
-    def consumeType
+    def consumeBank
         result = token.string
-        parseError("Expected type (G or F)") unless isGF(result)
+        parseError("Expected bank (G or F)") unless isGF(result)
         advance
         result
     end
 
     def consumeKind
         result = token.string
-        parseError("Expected kind (Imm, BigImm, BitImm, BitImm64, Tmp, Addr, Index, RelCond, ResCond, or DoubleCond)") unless isKind(result)
+        parseError("Expected kind (Imm, BigImm, BitImm, BitImm64, Tmp, SimpleAddr, Addr, Index, RelCond, ResCond, DoubleCond, or StatusCond)") unless isKind(result)
         advance
         result
     end
@@ -369,11 +404,11 @@ class Parser
                     loop {
                         role = consumeRole
                         consume(":")
-                        type = consumeType
+                        bank = consumeBank
                         consume(":")
                         width = consumeWidth
                         
-                        signature << Arg.new(role, type, width)
+                        signature << Arg.new(role, bank, width)
                         
                         break unless token == ","
                         consume(",")
@@ -430,7 +465,7 @@ class Parser
                                 if signature[index].role != "U"
                                     parseError("Form has an immediate for a non-use argument")
                                 end
-                                if signature[index].type != "G"
+                                if signature[index].bank != "G"
                                     parseError("Form has an immediate for a non-general-purpose argument")
                                 end
                             end
@@ -548,7 +583,7 @@ def matchInstOverload(outp, speed, inst)
     outp.puts "switch (#{inst}->kind.opcode) {"
     $opcodes.values.each {
         | opcode |
-        outp.puts "case #{opcode.name}:"
+        outp.puts "case Opcode::#{opcode.name}:"
         if opcode.custom
             yield opcode, nil
         else
@@ -634,28 +669,7 @@ writeH("OpcodeUtils") {
         else
             overload.signature.each_with_index {
                 | arg, index |
-                
-                role = nil
-                case arg.role
-                when "U"
-                    role = "Use"
-                when "D"
-                    role = "Def"
-                when "ZD"
-                    role = "ZDef"
-                when "UD"
-                    role = "UseDef"
-                when "UZD"
-                    role = "UseZDef"
-                when "UA"
-                    role = "UseAddr"
-                when "S"
-                    role = "Scratch"
-                else
-                    raise
-                end
-
-                outp.puts "functor(args[#{index}], Arg::#{role}, Arg::#{arg.type}P, #{arg.widthCode});"
+                outp.puts "functor(args[#{index}], Arg::#{arg.roleCode}, #{arg.bank}P, #{arg.widthCode});"
             }
         end
     }
@@ -668,7 +682,7 @@ writeH("OpcodeUtils") {
     outp.puts "switch (opcode) {"
     $opcodes.values.each {
         | opcode |
-        outp.puts "case #{opcode.name}:"
+        outp.puts "case Opcode::#{opcode.name}:"
         if opcode.custom
             outp.puts "OPGEN_RETURN(#{opcode.name}Custom::isValidFormStatic(arguments...));"
         else
@@ -721,7 +735,7 @@ writeH("OpcodeUtils") {
     $opcodes.values.each {
         | opcode |
         if opcode.attributes[:terminal]
-            outp.puts "case #{opcode.name}:"
+            outp.puts "case Opcode::#{opcode.name}:"
             didFindTerminals = true
         end
     }
@@ -740,7 +754,7 @@ writeH("OpcodeUtils") {
     $opcodes.values.each {
         | opcode |
         if opcode.attributes[:return]
-            outp.puts "case #{opcode.name}:"
+            outp.puts "case Opcode::#{opcode.name}:"
             didFindReturns = true
         end
     }
@@ -766,7 +780,7 @@ writeH("OpcodeGenerated") {
     outp.puts "    switch (opcode) {"
     $opcodes.keys.each {
         | opcode |
-        outp.puts "    case #{opcode}:"
+        outp.puts "    case Opcode::#{opcode}:"
         outp.puts "        out.print(\"#{opcode}\");"
         outp.puts "        return;"
     }
@@ -793,7 +807,7 @@ writeH("OpcodeGenerated") {
                 # Some kinds of Args reqire additional validation.
                 case kind.name
                 when "Tmp"
-                    outp.puts "if (!args[#{index}].tmp().is#{arg.type}P())"
+                    outp.puts "if (!args[#{index}].tmp().is#{arg.bank}P())"
                     outp.puts "OPGEN_RETURN(false);"
                 when "Imm"
                     outp.puts "if (!Arg::isValidImmForm(args[#{index}].value()))"
@@ -803,6 +817,9 @@ writeH("OpcodeGenerated") {
                     outp.puts "OPGEN_RETURN(false);"
                 when "BitImm64"
                     outp.puts "if (!Arg::isValidBitImm64Form(args[#{index}].value()))"
+                    outp.puts "OPGEN_RETURN(false);"
+                when "SimpleAddr"
+                    outp.puts "if (!args[#{index}].tmp().isGP())"
                     outp.puts "OPGEN_RETURN(false);"
                 when "Addr"
                     if arg.role == "UA"
@@ -819,6 +836,7 @@ writeH("OpcodeGenerated") {
                 when "RelCond"
                 when "ResCond"
                 when "DoubleCond"
+                when "StatusCond"
                 else
                     raise "Unexpected kind: #{kind.name}"
                 end
@@ -839,7 +857,7 @@ writeH("OpcodeGenerated") {
     outp.puts "switch (kind.opcode) {"
     $opcodes.values.each {
         | opcode |
-        outp.puts "case #{opcode.name}:"
+        outp.puts "case Opcode::#{opcode.name}:"
 
         if opcode.custom
             outp.puts "OPGEN_RETURN(#{opcode.name}Custom::admitsStack(*this, argIndex));"
@@ -983,7 +1001,7 @@ writeH("OpcodeGenerated") {
     $opcodes.values.each {
         | opcode |
         if opcode.attributes[:terminal]
-            outp.puts "case #{opcode.name}:"
+            outp.puts "case Opcode::#{opcode.name}:"
             foundTrue = true
         end
     }
@@ -993,7 +1011,7 @@ writeH("OpcodeGenerated") {
     $opcodes.values.each {
         | opcode |
         if opcode.custom
-            outp.puts "case #{opcode.name}:"
+            outp.puts "case Opcode::#{opcode.name}:"
             outp.puts "return #{opcode.name}Custom::isTerminal(*this);"
         end
     }
@@ -1011,7 +1029,7 @@ writeH("OpcodeGenerated") {
     $opcodes.values.each {
         | opcode |
         if opcode.attributes[:effects]
-            outp.puts "case #{opcode.name}:"
+            outp.puts "case Opcode::#{opcode.name}:"
             foundTrue = true
         end
     }
@@ -1021,7 +1039,7 @@ writeH("OpcodeGenerated") {
     $opcodes.values.each {
         | opcode |
         if opcode.custom
-            outp.puts "case #{opcode.name}:"
+            outp.puts "case Opcode::#{opcode.name}:"
             outp.puts "return #{opcode.name}Custom::hasNonArgNonControlEffects(*this);"
         end
     }
@@ -1039,7 +1057,7 @@ writeH("OpcodeGenerated") {
     $opcodes.values.each {
         | opcode |
         if opcode.attributes[:terminal] or opcode.attributes[:effects]
-            outp.puts "case #{opcode.name}:"
+            outp.puts "case Opcode::#{opcode.name}:"
             foundTrue = true
         end
     }
@@ -1049,7 +1067,7 @@ writeH("OpcodeGenerated") {
     $opcodes.values.each {
         | opcode |
         if opcode.custom
-            outp.puts "case #{opcode.name}:"
+            outp.puts "case Opcode::#{opcode.name}:"
             outp.puts "return #{opcode.name}Custom::hasNonArgEffects(*this);"
         end
     }
@@ -1086,7 +1104,7 @@ writeH("OpcodeGenerated") {
                 end
                 case kind.name
                 when "Tmp"
-                    if overload.signature[index].type == "G"
+                    if overload.signature[index].bank == "G"
                         outp.print "args[#{index}].gpr()"
                     else
                         outp.print "args[#{index}].fpr()"
@@ -1095,7 +1113,7 @@ writeH("OpcodeGenerated") {
                     outp.print "args[#{index}].asTrustedImm32()"
                 when "BigImm", "BitImm64"
                     outp.print "args[#{index}].asTrustedImm64()"
-                when "Addr"
+                when "SimpleAddr", "Addr"
                     outp.print "args[#{index}].asAddress()"
                 when "Index"
                     outp.print "args[#{index}].asBaseIndex()"
@@ -1105,6 +1123,8 @@ writeH("OpcodeGenerated") {
                     outp.print "args[#{index}].asResultCondition()"
                 when "DoubleCond"
                     outp.print "args[#{index}].asDoubleCondition()"
+                when "StatusCond"
+                    outp.print "args[#{index}].asStatusCondition()"
                 end
             }
 
@@ -1137,7 +1157,7 @@ File.open("JSAir_opcode.js", "w") {
     outp.puts "switch (inst.opcode) {"
     $opcodes.values.each {
         | opcode |
-        outp.puts "case #{opcode.name}:"
+        outp.puts "case Opcode::#{opcode.name}:"
         if opcode.custom
             outp.puts "#{opcode.name}Custom.forEachArg(inst, func);"
         else
@@ -1148,27 +1168,7 @@ File.open("JSAir_opcode.js", "w") {
                 outp.puts "case #{overload.signature.length}:" if needOverloadSwitch
                 overload.signature.each_with_index {
                     | arg, index |
-                    role = nil
-                    case arg.role
-                    when "U"
-                        role = "Use"
-                    when "D"
-                        role = "Def"
-                    when "ZD"
-                        role = "ZDef"
-                    when "UD"
-                        role = "UseDef"
-                    when "UZD"
-                        role = "UseZDef"
-                    when "UA"
-                        role = "UseAddr"
-                    when "S"
-                        role = "Scratch"
-                    else
-                        raise
-                    end
-                    
-                    outp.puts "inst.visitArg(#{index}, func, Arg.#{role}, #{arg.type}P, #{arg.width});"
+                    outp.puts "inst.visitArg(#{index}, func, Arg.#{arg.roleCode}, #{arg.bank}P, #{arg.width});"
                 }
                 outp.puts "break;"
             }
@@ -1193,7 +1193,7 @@ File.open("JSAir_opcode.js", "w") {
     $opcodes.values.each {
         | opcode |
         if opcode.attributes[:terminal] or opcode.attributes[:effects]
-            outp.puts "case #{opcode.name}:"
+            outp.puts "case Opcode::#{opcode.name}:"
             foundTrue = true
         end
     }
@@ -1203,7 +1203,7 @@ File.open("JSAir_opcode.js", "w") {
     $opcodes.values.each {
         | opcode |
         if opcode.custom
-            outp.puts "case #{opcode.name}:"
+            outp.puts "case Opcode::#{opcode.name}:"
             outp.puts "return #{opcode.name}Custom.hasNonArgNonControlEffects(inst);"
         end
     }
@@ -1217,7 +1217,7 @@ File.open("JSAir_opcode.js", "w") {
     outp.puts "switch (opcode) {"
     $opcodes.keys.sort.each_with_index {
         | opcode, index |
-        outp.puts "case #{opcode}:"
+        outp.puts "case Opcode::#{opcode}:"
         outp.puts "return #{index}"
     }
     outp.puts "default:"

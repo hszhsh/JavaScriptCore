@@ -62,13 +62,14 @@ list(APPEND WebCore_SOURCES
     loader/soup/CachedRawResourceSoup.cpp
     loader/soup/SubresourceLoaderSoup.cpp
 
+    page/linux/ResourceUsageOverlayLinux.cpp
+    page/linux/ResourceUsageThreadLinux.cpp
+
     platform/KillRingNone.cpp
     platform/StaticPasteboard.cpp
     platform/UserAgentQuirks.cpp
 
     platform/audio/glib/AudioBusGLib.cpp
-
-    platform/crypto/gcrypt/CryptoDigestGCrypt.cpp
 
     platform/gamepad/glib/GamepadsGlib.cpp
 
@@ -118,6 +119,7 @@ list(APPEND WebCore_SOURCES
 
     platform/graphics/gstreamer/ImageGStreamerCairo.cpp
 
+    platform/graphics/harfbuzz/ComplexTextControllerHarfBuzz.cpp
     platform/graphics/harfbuzz/HarfBuzzFace.cpp
     platform/graphics/harfbuzz/HarfBuzzFaceCairo.cpp
     platform/graphics/harfbuzz/HarfBuzzShaper.cpp
@@ -381,8 +383,12 @@ if (ENABLE_SUBTLE_CRYPTO)
         crypto/WebKitSubtleCrypto.cpp
 
         crypto/algorithms/CryptoAlgorithmAES_CBC.cpp
+        crypto/algorithms/CryptoAlgorithmAES_CFB.cpp
+        crypto/algorithms/CryptoAlgorithmAES_GCM.cpp
         crypto/algorithms/CryptoAlgorithmAES_KW.cpp
+        crypto/algorithms/CryptoAlgorithmECDH.cpp
         crypto/algorithms/CryptoAlgorithmHMAC.cpp
+        crypto/algorithms/CryptoAlgorithmPBKDF2.cpp
         crypto/algorithms/CryptoAlgorithmRSAES_PKCS1_v1_5.cpp
         crypto/algorithms/CryptoAlgorithmRSASSA_PKCS1_v1_5.cpp
         crypto/algorithms/CryptoAlgorithmRSA_OAEP.cpp
@@ -395,19 +401,26 @@ if (ENABLE_SUBTLE_CRYPTO)
         crypto/gcrypt/CryptoAlgorithmHMACGCrypt.cpp
 
         crypto/gnutls/CryptoAlgorithmAES_CBCGnuTLS.cpp
+        crypto/gnutls/CryptoAlgorithmAES_CFBGnuTLS.cpp
+        crypto/gnutls/CryptoAlgorithmAES_GCMGnuTLS.cpp
         crypto/gnutls/CryptoAlgorithmAES_KWGnuTLS.cpp
+        crypto/gnutls/CryptoAlgorithmECDHGnuTLS.cpp
+        crypto/gnutls/CryptoAlgorithmPBKDF2GnuTLS.cpp
         crypto/gnutls/CryptoAlgorithmRSAES_PKCS1_v1_5GnuTLS.cpp
         crypto/gnutls/CryptoAlgorithmRSASSA_PKCS1_v1_5GnuTLS.cpp
         crypto/gnutls/CryptoAlgorithmRSA_OAEPGnuTLS.cpp
         crypto/gnutls/CryptoAlgorithmRegistryGnuTLS.cpp
+        crypto/gnutls/CryptoKeyECGnuTLS.cpp
         crypto/gnutls/CryptoKeyRSAGnuTLS.cpp
         crypto/gnutls/SerializedCryptoKeyWrapGnuTLS.cpp
 
         crypto/keys/CryptoKeyAES.cpp
         crypto/keys/CryptoKeyDataOctetSequence.cpp
         crypto/keys/CryptoKeyDataRSAComponents.cpp
+        crypto/keys/CryptoKeyEC.cpp
         crypto/keys/CryptoKeyHMAC.cpp
         crypto/keys/CryptoKeyRSA.cpp
+        crypto/keys/CryptoKeyRaw.cpp
         crypto/keys/CryptoKeySerializationRaw.cpp
     )
 endif ()

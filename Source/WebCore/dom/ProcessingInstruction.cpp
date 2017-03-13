@@ -57,7 +57,7 @@ ProcessingInstruction::~ProcessingInstruction()
     if (m_cachedSheet)
         m_cachedSheet->removeClient(*this);
 
-    if (inDocument())
+    if (isConnected())
         document().styleScope().removeStyleSheetCandidateNode(*this);
 }
 
@@ -129,12 +129,17 @@ void ProcessingInstruction::checkStyleSheet()
                 m_cachedSheet = nullptr;
             }
 
+            if (m_loading) {
+                m_loading = false;
+                document().styleScope().removePendingSheet(*this);
+            }
+
             String url = document().completeURL(href).string();
             if (!dispatchBeforeLoadEvent(url))
                 return;
 
             m_loading = true;
-            document().styleScope().addPendingSheet();
+            document().styleScope().addPendingSheet(*this);
 
 #if ENABLE(XSLT)
             if (m_isXSL) {
@@ -154,7 +159,7 @@ void ProcessingInstruction::checkStyleSheet()
             else {
                 // The request may have been denied if (for example) the stylesheet is local and the document is remote.
                 m_loading = false;
-                document().styleScope().removePendingSheet();
+                document().styleScope().removePendingSheet(*this);
 #if ENABLE(XSLT)
                 if (m_isXSL)
                     document().styleScope().flushPendingUpdate();
@@ -176,7 +181,7 @@ bool ProcessingInstruction::isLoading() const
 bool ProcessingInstruction::sheetLoaded()
 {
     if (!isLoading()) {
-        document().styleScope().removePendingSheet();
+        document().styleScope().removePendingSheet(*this);
 #if ENABLE(XSLT)
         if (m_isXSL)
             document().styleScope().flushPendingUpdate();
@@ -188,7 +193,7 @@ bool ProcessingInstruction::sheetLoaded()
 
 void ProcessingInstruction::setCSSStyleSheet(const String& href, const URL& baseURL, const String& charset, const CachedCSSStyleSheet* sheet)
 {
-    if (!inDocument()) {
+    if (!isConnected()) {
         ASSERT(!m_sheet);
         return;
     }
@@ -253,7 +258,7 @@ void ProcessingInstruction::addSubresourceAttributeURLs(ListHashSet<URL>& urls) 
 Node::InsertionNotificationRequest ProcessingInstruction::insertedInto(ContainerNode& insertionPoint)
 {
     CharacterData::insertedInto(insertionPoint);
-    if (!insertionPoint.inDocument())
+    if (!insertionPoint.isConnected())
         return InsertionDone;
     document().styleScope().addStyleSheetCandidateNode(*this, m_createdByParser);
     checkStyleSheet();
@@ -263,7 +268,7 @@ Node::InsertionNotificationRequest ProcessingInstruction::insertedInto(Container
 void ProcessingInstruction::removedFrom(ContainerNode& insertionPoint)
 {
     CharacterData::removedFrom(insertionPoint);
-    if (!insertionPoint.inDocument())
+    if (!insertionPoint.isConnected())
         return;
     
     document().styleScope().removeStyleSheetCandidateNode(*this);
@@ -276,7 +281,7 @@ void ProcessingInstruction::removedFrom(ContainerNode& insertionPoint)
 
     if (m_loading) {
         m_loading = false;
-        document().styleScope().removePendingSheet();
+        document().styleScope().removePendingSheet(*this);
     }
 
     document().styleScope().didChangeActiveStyleSheetCandidates();

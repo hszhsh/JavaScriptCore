@@ -8,10 +8,6 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#if !defined(__has_feature) || !__has_feature(objc_arc)
-#error "This file requires ARC support."
-#endif
-
 #import <AVFoundation/AVFoundation.h>
 #import <Foundation/Foundation.h>
 
@@ -25,7 +21,7 @@
 #include "webrtc/base/thread.h"
 #include "webrtc/base/thread_annotations.h"
 #include "webrtc/modules/audio_device/fine_audio_buffer.h"
-#include "webrtc/modules/utility/include/helpers_ios.h"
+#include "webrtc/sdk/objc/Framework/Classes/helpers.h"
 
 #import "WebRTC/RTCLogging.h"
 #import "webrtc/modules/audio_device/ios/objc/RTCAudioSession.h"
@@ -407,9 +403,9 @@ OSStatus AudioDeviceIOS::OnGetPlayoutData(AudioUnitRenderActionFlags* flags,
                                           UInt32 num_frames,
                                           AudioBufferList* io_data) {
   // Verify 16-bit, noninterleaved mono PCM signal format.
-  RTC_DCHECK_EQ(1u, io_data->mNumberBuffers);
+  RTC_DCHECK_EQ(1, io_data->mNumberBuffers);
   AudioBuffer* audio_buffer = &io_data->mBuffers[0];
-  RTC_DCHECK_EQ(1u, audio_buffer->mNumberChannels);
+  RTC_DCHECK_EQ(1, audio_buffer->mNumberChannels);
   // Get pointer to internal audio buffer to which new audio data shall be
   // written.
   const size_t size_in_bytes = audio_buffer->mDataByteSize;
@@ -631,17 +627,11 @@ void AudioDeviceIOS::SetupAudioBuffersForActiveAudioSession() {
   // or deliver, any number of samples (and not only multiple of 10ms) to match
   // the native audio unit buffer size.
   RTC_DCHECK(audio_device_buffer_);
+  const size_t buffer_size_in_bytes = playout_parameters_.GetBytesPerBuffer();
   fine_audio_buffer_.reset(new FineAudioBuffer(
-      audio_device_buffer_, playout_parameters_.GetBytesPerBuffer(),
+      audio_device_buffer_, buffer_size_in_bytes,
       playout_parameters_.sample_rate()));
-
-  // The extra/temporary playoutbuffer must be of this size to avoid
-  // unnecessary memcpy while caching data between successive callbacks.
-  const int required_playout_buffer_size =
-      fine_audio_buffer_->RequiredPlayoutBufferSizeBytes();
-  LOG(LS_INFO) << " required playout buffer size: "
-               << required_playout_buffer_size;
-  playout_audio_buffer_.reset(new SInt8[required_playout_buffer_size]);
+  playout_audio_buffer_.reset(new SInt8[buffer_size_in_bytes]);
 
   // Allocate AudioBuffers to be used as storage for the received audio.
   // The AudioBufferList structure works as a placeholder for the

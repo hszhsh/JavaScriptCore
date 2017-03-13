@@ -257,6 +257,8 @@ void RenderText::styleDidChange(StyleDifference diff, const RenderStyle* oldStyl
     if (!oldStyle) {
         m_useBackslashAsYenSymbol = computeUseBackslashAsYenSymbol();
         needsResetText = m_useBackslashAsYenSymbol;
+        // It should really be computed in the c'tor, but during construction we don't have parent yet -and RenderText style == parent()->style()
+        m_canUseSimplifiedTextMeasuring = computeCanUseSimplifiedTextMeasuring();
     } else if (oldStyle->fontCascade().useBackslashAsYenSymbol() != newStyle.fontCascade().useBackslashAsYenSymbol()) {
         m_useBackslashAsYenSymbol = computeUseBackslashAsYenSymbol();
         needsResetText = true;
@@ -420,25 +422,34 @@ void RenderText::absoluteQuads(Vector<FloatQuad>& quads, bool* wasFixed) const
 
 Vector<FloatQuad> RenderText::absoluteQuadsForRange(unsigned start, unsigned end, bool useSelectionHeight, bool* wasFixed) const
 {
-    const_cast<RenderText&>(*this).ensureLineBoxes();
-
     // Work around signed/unsigned issues. This function takes unsigneds, and is often passed UINT_MAX
-    // to mean "all the way to the end". InlineTextBox coordinates are unsigneds, so changing this 
-    // function to take ints causes various internal mismatches. But selectionRect takes ints, and 
-    // passing UINT_MAX to it causes trouble. Ideally we'd change selectionRect to take unsigneds, but 
+    // to mean "all the way to the end". InlineTextBox coordinates are unsigneds, so changing this
+    // function to take ints causes various internal mismatches. But selectionRect takes ints, and
+    // passing UINT_MAX to it causes trouble. Ideally we'd change selectionRect to take unsigneds, but
     // that would cause many ripple effects, so for now we'll just clamp our unsigned parameters to INT_MAX.
     ASSERT(end == UINT_MAX || end <= INT_MAX);
     ASSERT(start <= INT_MAX);
     start = std::min(start, static_cast<unsigned>(INT_MAX));
     end = std::min(end, static_cast<unsigned>(INT_MAX));
-    
+    if (simpleLineLayout() && !useSelectionHeight)
+        return collectAbsoluteQuadsForRange(*this, start, end, *simpleLineLayout(), wasFixed);
+    const_cast<RenderText&>(*this).ensureLineBoxes();
     return m_lineBoxes.absoluteQuadsForRange(*this, start, end, useSelectionHeight, wasFixed);
+}
+
+Position RenderText::positionForPoint(const LayoutPoint& point)
+{
+    if (auto* layout = simpleLineLayout()) {
+        auto position = Position(textNode(), SimpleLineLayout::textOffsetForPoint(point, *this, *layout));
+        ASSERT(position == positionForPoint(point, nullptr).deepEquivalent());
+        return position;
+    }
+    return positionForPoint(point, nullptr).deepEquivalent();
 }
 
 VisiblePosition RenderText::positionForPoint(const LayoutPoint& point, const RenderRegion*)
 {
     ensureLineBoxes();
-
     return m_lineBoxes.positionForPoint(*this, point);
 }
 
@@ -795,7 +806,8 @@ void RenderText::computePreferredLogicalWidths(float leadWidth, HashSet<const Fo
     const FontCascade& font = style.fontCascade(); // FIXME: This ignores first-line.
     float wordSpacing = font.wordSpacing();
     unsigned len = textLength();
-    LazyLineBreakIterator breakIterator(m_text, style.locale(), mapLineBreakToIteratorMode(style.lineBreak()));
+    auto iteratorMode = mapLineBreakToIteratorMode(style.lineBreak());
+    LazyLineBreakIterator breakIterator(m_text, style.locale(), iteratorMode);
     bool needsWordSpacing = false;
     bool ignoringSpaces = false;
     bool isSpace = false;
@@ -832,7 +844,7 @@ void RenderText::computePreferredLogicalWidths(float leadWidth, HashSet<const Fo
     // word-break, but we support it as though it means break-all.
     bool breakAll = (style.wordBreak() == BreakAllWordBreak || style.wordBreak() == BreakWordBreak) && style.autoWrap();
     bool keepAllWords = style.wordBreak() == KeepAllWordBreak;
-    bool isLooseCJKMode = breakIterator.isLooseCJKMode();
+    bool canUseLineBreakShortcut = iteratorMode == LineBreakIteratorMode::Default;
 
     for (unsigned i = 0; i < len; i++) {
         UChar c = uncheckedCharacterAt(i);
@@ -878,7 +890,7 @@ void RenderText::computePreferredLogicalWidths(float leadWidth, HashSet<const Fo
             continue;
         }
 
-        bool hasBreak = breakAll || isBreakable(breakIterator, i, nextBreakable, breakNBSP, isLooseCJKMode, keepAllWords);
+        bool hasBreak = breakAll || isBreakable(breakIterator, i, nextBreakable, breakNBSP, canUseLineBreakShortcut, keepAllWords);
         bool betweenWords = true;
         unsigned j = i;
         while (c != '\n' && !isSpaceAccordingToStyle(c, style) && c != '\t' && (c != softHyphen || style.hyphens() == HyphensNone)) {
@@ -886,7 +898,7 @@ void RenderText::computePreferredLogicalWidths(float leadWidth, HashSet<const Fo
             if (j == len)
                 break;
             c = uncheckedCharacterAt(j);
-            if (isBreakable(breakIterator, j, nextBreakable, breakNBSP, isLooseCJKMode, keepAllWords) && characterAt(j - 1) != softHyphen)
+            if (isBreakable(breakIterator, j, nextBreakable, breakNBSP, canUseLineBreakShortcut, keepAllWords) && characterAt(j - 1) != softHyphen)
                 break;
             if (breakAll) {
                 betweenWords = false;
@@ -1179,7 +1191,8 @@ void RenderText::setRenderedText(const String& text)
 
     m_isAllASCII = m_text.containsOnlyASCII();
     m_canUseSimpleFontCodePath = computeCanUseSimpleFontCodePath();
-
+    m_canUseSimplifiedTextMeasuring = computeCanUseSimplifiedTextMeasuring();
+    
     if (m_text != originalText) {
         originalTextMap().set(this, originalText);
         m_originalTextDiffersFromRendered = true;
@@ -1219,6 +1232,29 @@ void RenderText::secureText(UChar maskingCharacter)
         characters[i] = maskingCharacter;
     if (characterToReveal)
         characters[revealedCharactersOffset] = characterToReveal;
+}
+
+bool RenderText::computeCanUseSimplifiedTextMeasuring() const
+{
+    if (!m_canUseSimpleFontCodePath)
+        return false;
+    
+    auto& font = style().fontCascade();
+    if (font.wordSpacing() || font.letterSpacing())
+        return false;
+
+    // Additional check on the font codepath.
+    TextRun run(m_text);
+    run.setCharacterScanForCodePath(false);
+    if (font.codePath(run) != FontCascade::Simple)
+        return false;
+
+    auto whitespaceIsCollapsed = style().collapseWhiteSpace();
+    for (unsigned i = 0; i < m_text.length(); ++i) {
+        if ((!whitespaceIsCollapsed && m_text[i] == '\t') || m_text[i] == noBreakSpace || m_text[i] >= HiraganaLetterSmallA)
+            return false;
+    }
+    return true;
 }
 
 void RenderText::setText(const String& text, bool force)
@@ -1469,19 +1505,12 @@ int RenderText::previousOffset(int current) const
         return current - 1;
 
     StringImpl* textImpl = m_text.impl();
-    UBreakIterator* iterator = cursorMovementIterator(StringView(textImpl->characters16(), textImpl->length()));
-    if (!iterator)
-        return current - 1;
-
-    long result = ubrk_preceding(iterator, current);
-    if (result == UBRK_DONE)
-        result = current - 1;
-
-
+    CachedTextBreakIterator iterator(StringView(textImpl->characters16(), textImpl->length()), TextBreakIterator::Mode::Caret, nullAtom);
+    auto result = iterator.preceding(current).value_or(current - 1);
     return result;
 }
 
-#if PLATFORM(COCOA) || PLATFORM(EFL) || PLATFORM(GTK)
+#if PLATFORM(COCOA) || PLATFORM(GTK)
 
 const UChar hangulChoseongStart = 0x1100;
 const UChar hangulChoseongEnd = 0x115F;
@@ -1528,7 +1557,7 @@ int RenderText::previousOffsetForBackwardDeletion(int current) const
 
     // FIXME: Seems like this fancier case could be used on all platforms now, no
     // need for the #else case below.
-#if PLATFORM(COCOA) || PLATFORM(EFL) || PLATFORM(GTK)
+#if PLATFORM(COCOA) || PLATFORM(GTK)
     bool sawRegionalIndicator = false;
     bool sawEmojiGroupCandidate = false;
     bool sawEmojiFitzpatrickModifier = false;
@@ -1649,14 +1678,8 @@ int RenderText::nextOffset(int current) const
         return current + 1;
 
     StringImpl* textImpl = m_text.impl();
-    UBreakIterator* iterator = cursorMovementIterator(StringView(textImpl->characters16(), textImpl->length()));
-    if (!iterator)
-        return current + 1;
-
-    long result = ubrk_following(iterator, current);
-    if (result == UBRK_DONE)
-        result = current + 1;
-
+    CachedTextBreakIterator iterator(StringView(textImpl->characters16(), textImpl->length()), TextBreakIterator::Mode::Caret, nullAtom);
+    auto result = iterator.following(current).value_or(current + 1);
     return result;
 }
 

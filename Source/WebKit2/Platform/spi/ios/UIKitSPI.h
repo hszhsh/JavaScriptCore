@@ -54,6 +54,7 @@
 #import <UIKit/UIStringDrawing_Private.h>
 #import <UIKit/UITableViewCell_Private.h>
 #import <UIKit/UITapGestureRecognizer_Private.h>
+#import <UIKit/UITextEffectsWindow.h>
 #import <UIKit/UITextInput_Private.h>
 #import <UIKit/UITextInteractionAssistant_Private.h>
 #import <UIKit/UIViewControllerTransitioning_Private.h>
@@ -77,6 +78,10 @@
 
 #if HAVE(LINK_PREVIEW)
 #import <UIKit/UIPreviewItemController.h>
+#endif
+
+#if ENABLE(DATA_INTERACTION)
+#import <UIKit/UIItemProvider_Private.h>
 #endif
 
 #else
@@ -308,6 +313,11 @@ typedef enum {
 @property (nonatomic, readonly, getter=_isAnimatingScroll) BOOL isAnimatingScroll;
 @property (nonatomic) CGFloat horizontalScrollDecelerationFactor;
 @property (nonatomic) CGFloat verticalScrollDecelerationFactor;
+@property (nonatomic, readonly) BOOL _isInterruptingDeceleration;
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110000
+@property (nonatomic, setter=_setEdgesScrollingContentIntoSafeArea:) UIRectEdge _edgesScrollingContentIntoSafeArea;
+@property (nonatomic, readonly) UIEdgeInsets _systemContentInset;
+#endif
 @end
 
 @interface NSString (UIKitDetails)
@@ -448,6 +458,10 @@ typedef NS_ENUM (NSInteger, _UIBackdropMaskViewFlags) {
 - (void)setFrameOrigin:(CGPoint)origin;
 - (void)setSize:(CGSize)size;
 @property (nonatomic, assign, setter=_setBackdropMaskViewFlags:) NSInteger _backdropMaskViewFlags;
+- (void)_populateArchivedSubviews:(NSMutableSet *)encodedViews;
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110000
+- (void)safeAreaInsetsDidChange;
+#endif
 @end
 
 @interface UIWebSelectionView : UIView
@@ -520,6 +534,8 @@ typedef NS_ENUM(NSInteger, UIWKGestureType) {
 - (void)selectionChangedWithTouchAt:(CGPoint)point withSelectionTouch:(UIWKSelectionTouch)touch;
 - (void)showDictionaryFor:(NSString *)selectedTerm fromRect:(CGRect)presentationRect;
 - (void)showShareSheetFor:(NSString *)selectedTerm fromRect:(CGRect)presentationRect;
+- (void)showTextServiceFor:(NSString *)selectedTerm fromRect:(CGRect)presentationRect;
+- (void)lookup:(NSString *)textWithContext withRange:(NSRange)range fromRect:(CGRect)presentationRect;
 @property (nonatomic, readonly) UILongPressGestureRecognizer *selectionLongPressRecognizer;
 @end
 
@@ -557,12 +573,17 @@ typedef NS_ENUM(NSInteger, UIWKHandlePosition) {
 @interface UIWKTextInteractionAssistant : UITextInteractionAssistant <UIResponderStandardEditActions>
 @end
 
-@interface UIWKTextInteractionAssistant (UIWKTextInteractionAssistantDetails)
+@interface UIWKTextInteractionAssistant ()
 - (void)selectionChangedWithGestureAt:(CGPoint)point withGesture:(UIWKGestureType)gestureType withState:(UIGestureRecognizerState)gestureState withFlags:(UIWKSelectionFlags)flags;
 - (void)showDictionaryFor:(NSString *)selectedTerm fromRect:(CGRect)presentationRect;
 - (void)selectionChangedWithTouchAt:(CGPoint)point withSelectionTouch:(UIWKSelectionTouch)touch;
 - (void)showTextStyleOptions;
 - (void)hideTextStyleOptions;
+- (void)lookup:(NSString *)textWithContext withRange:(NSRange)range fromRect:(CGRect)presentationRect;
+- (void)showShareSheetFor:(NSString *)selectedTerm fromRect:(CGRect)presentationRect;
+- (void)showTextServiceFor:(NSString *)selectedTerm fromRect:(CGRect)presentationRect;
+- (void)scheduleReplacementsForText:(NSString *)text;
+- (void)scheduleChineseTransliterationForText:(NSString *)text;
 
 @property (nonatomic, readonly, assign) UILongPressGestureRecognizer *loupeGesture;
 @property (nonatomic, readonly, assign) UITapGestureRecognizer *singleTapGesture;
@@ -742,6 +763,7 @@ typedef NS_ENUM(NSInteger, _UIBackdropViewStylePrivate) {
 
 @interface _UINavigationInteractiveTransitionBase ()
 - (id)initWithGestureRecognizerView:(UIView *)gestureRecognizerView animator:(id<UIViewControllerAnimatedTransitioning>)animator delegate:(id<_UINavigationInteractiveTransitionBaseDelegate>)delegate;
+@property (nonatomic, weak) UIPanGestureRecognizer *gestureRecognizer;
 @property (nonatomic, assign) BOOL shouldReverseTranslation;
 @property (nonatomic, retain) _UINavigationParallaxTransition *animationController;
 @end
@@ -847,6 +869,11 @@ typedef enum {
 - (UIScrollView *)_scroller;
 - (CGPoint)accessibilityConvertPointFromSceneReferenceCoordinates:(CGPoint)point;
 - (CGRect)accessibilityConvertRectToSceneReferenceCoordinates:(CGRect)rect;
+@end
+
+@interface UIPeripheralHost (IPI)
+- (void)_beginIgnoringReloadInputViews;
+- (void)_endIgnoringReloadInputViews;
 @end
 
 @interface UIResponder ()

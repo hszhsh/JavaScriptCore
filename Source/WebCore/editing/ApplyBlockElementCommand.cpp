@@ -27,13 +27,13 @@
 #include "config.h"
 #include "ApplyBlockElementCommand.h"
 
+#include "Editing.h"
 #include "HTMLBRElement.h"
 #include "HTMLNames.h"
 #include "RenderElement.h"
 #include "RenderStyle.h"
 #include "Text.h"
 #include "VisibleUnits.h"
-#include "htmlediting.h"
 
 namespace WebCore {
 
@@ -157,11 +157,11 @@ void ApplyBlockElementCommand::formatSelection(const VisiblePosition& startOfSel
         // indentIntoBlockquote could move more than one paragraph if the paragraph
         // is in a list item or a table. As a result, endAfterSelection could refer to a position
         // no longer in the document.
-        if (endAfterSelection.isNotNull() && !endAfterSelection.deepEquivalent().anchorNode()->inDocument())
+        if (endAfterSelection.isNotNull() && !endAfterSelection.deepEquivalent().anchorNode()->isConnected())
             break;
         // Sanity check: Make sure our moveParagraph calls didn't remove endOfNextParagraph.deepEquivalent().deprecatedNode()
         // If somehow we did, return to prevent crashes.
-        if (endOfNextParagraph.isNotNull() && !endOfNextParagraph.deepEquivalent().anchorNode()->inDocument()) {
+        if (endOfNextParagraph.isNotNull() && !endOfNextParagraph.deepEquivalent().anchorNode()->isConnected()) {
             ASSERT_NOT_REACHED();
             return;
         }

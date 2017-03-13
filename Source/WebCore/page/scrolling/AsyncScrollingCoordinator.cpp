@@ -157,6 +157,7 @@ void AsyncScrollingCoordinator::frameViewLayoutUpdated(FrameView& frameView)
     node->setTotalContentsSize(frameView.totalContentsSize());
     node->setReachableContentsSize(frameView.totalContentsSize());
     node->setFixedElementsLayoutRelativeToFrame(frameView.fixedElementsLayoutRelativeToFrame());
+    node->setScrollBehaviorForFixedElements(frameView.scrollBehaviorForFixedElements());
 
 #if ENABLE(CSS_SCROLL_SNAP)
     frameView.updateSnapOffsets();
@@ -269,6 +270,7 @@ void AsyncScrollingCoordinator::scheduleUpdateScrollPositionAfterAsyncScroll(Scr
     if (m_updateNodeScrollPositionTimer.isActive()) {
         if (m_scheduledScrollUpdate.matchesUpdateType(scrollUpdate)) {
             m_scheduledScrollUpdate.scrollPosition = scrollPosition;
+            m_scheduledScrollUpdate.layoutViewportOrigin = layoutViewportOrigin;
             return;
         }
     

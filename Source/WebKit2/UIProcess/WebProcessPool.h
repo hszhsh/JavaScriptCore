@@ -142,9 +142,7 @@ public:
     void setHistoryClient(std::unique_ptr<API::LegacyContextHistoryClient>);
     void setDownloadClient(std::unique_ptr<API::DownloadClient>);
     void setAutomationClient(std::unique_ptr<API::AutomationClient>);
-#if USE(SOUP)
-    void setCustomProtocolManagerClient(std::unique_ptr<API::CustomProtocolManagerClient>&&);
-#endif
+    void setLegacyCustomProtocolManagerClient(std::unique_ptr<API::CustomProtocolManagerClient>&&);
 
     void setMaximumNumberOfProcesses(unsigned); // Can only be called when there are no processes running.
     unsigned maximumNumberOfProcesses() const { return !m_configuration->maximumProcessCount() ? UINT_MAX : m_configuration->maximumProcessCount(); }
@@ -210,9 +208,7 @@ public:
     void registerURLSchemeAsNoAccess(const String&);
     void registerURLSchemeAsDisplayIsolated(const String&);
     void registerURLSchemeAsCORSEnabled(const String&);
-#if ENABLE(CACHE_PARTITIONING)
     void registerURLSchemeAsCachePartitioned(const String&);
-#endif
 
     VisitedLinkStore& visitedLinkStore() { return m_visitedLinkStore.get(); }
 
@@ -237,9 +233,7 @@ public:
     API::LegacyContextHistoryClient& historyClient() { return *m_historyClient; }
     WebContextClient& client() { return m_client; }
 
-#if USE(SOUP)
     API::CustomProtocolManagerClient& customProtocolManagerClient() const { return *m_customProtocolManagerClient; }
-#endif
 
     WebIconDatabase* iconDatabase() const { return m_iconDatabase.get(); }
 
@@ -264,7 +258,7 @@ public:
 
     void allowSpecificHTTPSCertificateForHost(const WebCertificateInfo*, const String& host);
 
-    WebProcessProxy& createNewWebProcessRespectingProcessCountLimit(); // Will return an existing one if limit is met.
+    WebProcessProxy& createNewWebProcessRespectingProcessCountLimit(WebsiteDataStore*); // Will return an existing one if limit is met.
     void warmInitialProcess();
 
     bool shouldTerminate(WebProcessProxy*);
@@ -280,8 +274,10 @@ public:
     void setHTTPPipeliningEnabled(bool);
     bool httpPipeliningEnabled() const;
 
-    void getStatistics(uint32_t statisticsMask, std::function<void (API::Dictionary*, CallbackBase::Error)>);
+    void getStatistics(uint32_t statisticsMask, Function<void (API::Dictionary*, CallbackBase::Error)>&&);
     
+    bool javaScriptConfigurationFileEnabled() { return m_javaScriptConfigurationFileEnabled; }
+    void setJavaScriptConfigurationFileEnabled(bool flag);
     void garbageCollectJavaScriptObjects();
     void setJavaScriptGarbageCollectorTimerEnabled(bool flag);
 
@@ -338,7 +334,6 @@ public:
     void registerSchemeForCustomProtocol(const String&);
     void unregisterSchemeForCustomProtocol(const String&);
 
-    static HashSet<String, ASCIICaseInsensitiveHash>& globalURLSchemesWithCustomProtocolHandlers();
     static void registerGlobalURLSchemeAsHavingCustomProtocolHandlers(const String&);
     static void unregisterGlobalURLSchemeAsHavingCustomProtocolHandlers(const String&);
 
@@ -379,6 +374,7 @@ public:
     static String legacyPlatformDefaultMediaCacheDirectory();
     static String legacyPlatformDefaultApplicationCacheDirectory();
     static String legacyPlatformDefaultNetworkCacheDirectory();
+    static String legacyPlatformDefaultJavaScriptConfigurationDirectory();
     static bool isNetworkCacheEnabled();
 
     bool resourceLoadStatisticsEnabled() { return m_resourceLoadStatisticsEnabled; }
@@ -404,7 +400,7 @@ private:
     void platformInitializeWebProcess(WebProcessCreationParameters&);
     void platformInvalidateContext();
 
-    WebProcessProxy& createNewWebProcess();
+    WebProcessProxy& createNewWebProcess(WebsiteDataStore*);
 
     void requestWebContentStatistics(StatisticsRequest*);
     void requestNetworkingStatistics(StatisticsRequest*);
@@ -476,9 +472,7 @@ private:
     std::unique_ptr<API::AutomationClient> m_automationClient;
     std::unique_ptr<API::DownloadClient> m_downloadClient;
     std::unique_ptr<API::LegacyContextHistoryClient> m_historyClient;
-#if USE(SOUP)
     std::unique_ptr<API::CustomProtocolManagerClient> m_customProtocolManagerClient;
-#endif
 
     RefPtr<WebAutomationSession> m_automationSession;
 
@@ -499,9 +493,7 @@ private:
     HashSet<String> m_schemesToRegisterAsDisplayIsolated;
     HashSet<String> m_schemesToRegisterAsCORSEnabled;
     HashSet<String> m_schemesToRegisterAsAlwaysRevalidated;
-#if ENABLE(CACHE_PARTITIONING)
     HashSet<String> m_schemesToRegisterAsCachePartitioned;
-#endif
 
     bool m_alwaysUsesComplexTextCodePath;
     bool m_shouldUseFontSmoothing;
@@ -526,6 +518,7 @@ private:
     HTTPCookieAcceptPolicy m_initialHTTPCookieAcceptPolicy { HTTPCookieAcceptPolicyOnlyFromMainDocumentDomain };
     WebCore::SoupNetworkProxySettings m_networkProxySettings;
 #endif
+    HashSet<String, ASCIICaseInsensitiveHash> m_urlSchemesRegisteredForCustomProtocols;
 
 #if PLATFORM(MAC)
     RetainPtr<NSObject> m_enhancedAccessibilityObserver;
@@ -558,12 +551,18 @@ private:
 
 #if USE(SOUP)
     bool m_ignoreTLSErrors { true };
-    HashSet<String, ASCIICaseInsensitiveHash> m_urlSchemesRegisteredForCustomProtocols;
 #endif
 
     bool m_memoryCacheDisabled;
     bool m_resourceLoadStatisticsEnabled { false };
-
+    bool m_javaScriptConfigurationFileEnabled {
+#ifndef NDEBUG
+        // Enable JavaScript configuration file processing by default for Debug builds.
+        true
+#else
+        false
+#endif
+    };
     bool m_alwaysRunsAtBackgroundPriority;
 
     UserObservablePageCounter m_userObservablePageCounter;

@@ -125,15 +125,7 @@ normal
 bold
 bolder
 lighter
-100
-200
-300
-400
-500
-600
-700
-800
-900
+
 //
 // CSS_PROP_FONT_SIZE:
 //
@@ -173,6 +165,7 @@ fantasy
 monospace
 -webkit-body
 -webkit-pictograph
+system-ui
 //
 //
 // CSS_PROP_*_COLOR
@@ -1330,8 +1323,6 @@ display-p3
 reduce
 no-preference
 
-#if defined(ENABLE_CSS_GRID_LAYOUT) && ENABLE_CSS_GRID_LAYOUT
 // auto-repeat
 auto-fill
 auto-fit
-#endif

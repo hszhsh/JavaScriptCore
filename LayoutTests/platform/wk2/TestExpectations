@@ -305,7 +305,6 @@ http/tests/security/javascriptURL/xss-ALLOWED-to-javascript-url-sub-frame-2-leve
 
 # These tests use Flash, which is not a good idea, because it is not installed on all machines that run tests.
 # WebKitTestRunner detects attempts to use Flash, and raises an assertion.
-editing/pasteboard/paste-noplugin.html [ Skip ]
 fast/dom/beforeload/flash-before-load.html [ Skip ]
 fast/dom/beforeload/remove-flash-in-beforeload-listener.html [ Skip ]
 fast/loader/sandboxed-plugin-crash.html [ Skip ]
@@ -599,6 +598,7 @@ platform/mac/fast/events/objc-event-api.html
 # https://bugs.webkit.org/show_bug.cgi?id=64285
 editing/pasteboard/file-drag-to-editable.html
 editing/pasteboard/file-input-files-access.html
+fast/dom/FileList-iterator.html
 fast/dom/Window/window-postmessage-clone-frames.html
 fast/dom/Window/window-postmessage-clone.html
 fast/events/data-transfer-files-attribute-identity.html
@@ -697,6 +697,23 @@ http/tests/misc/will-send-request-with-client-provided-http-body.html [ Pass ]
 
 # bug 162281
 imported/w3c/web-platform-tests/fetch/api/request/request-cache-only-if-cached.html [ Failure ]
+
+# Resource Load Statistics are only supported in WebKit2.
+# Marking first five as timeout until <https://bugs.webkit.org/show_bug.cgi?id=168262> is fixed.
+http/tests/loading/resourceLoadStatistics/non-prevalent-resource-with-user-interaction.html [ Pass Timeout ]
+http/tests/loading/resourceLoadStatistics/prevalent-resource-with-user-interaction.html [ Pass Timeout ]
+http/tests/loading/resourceLoadStatistics/non-prevalent-resource-without-user-interaction.html [ Pass Timeout ]
+http/tests/loading/resourceLoadStatistics/prevalent-resource-without-user-interaction.html [ Pass Timeout ]
+http/tests/loading/resourceLoadStatistics/prevalent-resource-with-user-interaction-timeout.html [ Pass Timeout ]
+http/tests/loading/resourceLoadStatistics/classify-as-non-prevalent-based-on-mixed-statistics.html [ Pass ]
+http/tests/loading/resourceLoadStatistics/classify-as-non-prevalent-based-on-sub-frame-under-top-frame-origins.html [ Pass ]
+http/tests/loading/resourceLoadStatistics/classify-as-non-prevalent-based-on-subresource-under-top-frame-origins.html [ Pass ]
+http/tests/loading/resourceLoadStatistics/classify-as-non-prevalent-based-on-subresource-unique-redirects-to.html [ Pass ]
+http/tests/loading/resourceLoadStatistics/classify-as-prevalent-based-on-mixed-statistics.html [ Pass ]
+http/tests/loading/resourceLoadStatistics/classify-as-prevalent-based-on-sub-frame-under-top-frame-origins.html [ Pass ]
+http/tests/loading/resourceLoadStatistics/classify-as-prevalent-based-on-subresource-under-top-frame-origins.html [ Pass ]
+http/tests/loading/resourceLoadStatistics/classify-as-prevalent-based-on-subresource-unique-redirects-to.html [ Pass ]
+http/tests/loading/resourceLoadStatistics/clear-in-memory-and-persistent-store.html [ Pass ]
 
 ### END OF (5) Progressions, expected successes that are expected failures in WebKit1.
 ########################################

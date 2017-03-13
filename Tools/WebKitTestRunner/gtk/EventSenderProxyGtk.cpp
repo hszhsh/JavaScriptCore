@@ -122,6 +122,8 @@ static guint webkitModifiersToGDKModifiers(WKEventModifiers wkModifiers)
         modifiers |= GDK_MOD1_MASK;
     if (wkModifiers & kWKEventModifiersMetaKey)
         modifiers |= GDK_META_MASK;
+    if (wkModifiers & kWKEventModifiersCapsLockKey)
+        modifiers |= GDK_LOCK_MASK;
 
     return modifiers;
 }
@@ -439,7 +441,10 @@ void EventSenderProxy::mouseScrollBy(int horizontal, int vertical)
 void EventSenderProxy::continuousMouseScrollBy(int horizontal, int vertical, bool paged)
 {
     // Gtk+ does not support paged scroll events.
-    g_return_if_fail(!paged);
+    if (paged) {
+        WTFLogAlways("EventSenderProxy::continuousMouseScrollBy not implemented for paged scroll events");
+        return;
+    }
 
     GdkEvent* event = gdk_event_new(GDK_SCROLL);
     event->scroll.x = m_position.x;

@@ -83,9 +83,10 @@ class QuickLookHandle;
 class ResourceError;
 class ResourceHandleClient;
 class ResourceHandleInternal;
-class NetworkLoadTiming;
+class NetworkLoadMetrics;
 class ResourceRequest;
 class ResourceResponse;
+class SoupNetworkSession;
 class SharedBuffer;
 class Timer;
 
@@ -93,6 +94,10 @@ class ResourceHandle : public RefCounted<ResourceHandle>, public AuthenticationC
 public:
     WEBCORE_EXPORT static RefPtr<ResourceHandle> create(NetworkingContext*, const ResourceRequest&, ResourceHandleClient*, bool defersLoading, bool shouldContentSniff);
     WEBCORE_EXPORT static void loadResourceSynchronously(NetworkingContext*, const ResourceRequest&, StoredCredentials, ResourceError&, ResourceResponse&, Vector<char>& data);
+
+#if USE(SOUP)
+    static RefPtr<ResourceHandle> create(SoupNetworkSession&, const ResourceRequest&, ResourceHandleClient*, bool defersLoading, bool shouldContentSniff);
+#endif
 
     WEBCORE_EXPORT virtual ~ResourceHandle();
 
@@ -127,9 +132,9 @@ public:
         
 #if PLATFORM(COCOA) && ENABLE(WEB_TIMING)
 #if USE(CFURLCONNECTION)
-    static void getConnectionTimingData(CFURLConnectionRef, NetworkLoadTiming&);
+    static void getConnectionTimingData(CFURLConnectionRef, NetworkLoadMetrics&);
 #else
-    static void getConnectionTimingData(NSURLConnection *, NetworkLoadTiming&);
+    static void getConnectionTimingData(NSURLConnection *, NetworkLoadMetrics&);
 #endif
 #endif
         
@@ -173,7 +178,7 @@ public:
     void ensureReadBuffer();
     size_t currentStreamPosition() const;
     void didStartRequest();
-    double m_requestTime;
+    MonotonicTime m_requestTime;
 #endif
 
     bool hasAuthenticationChallenge() const;
@@ -240,6 +245,10 @@ private:
         BlockedFailure,
         InvalidURLFailure
     };
+
+#if USE(SOUP)
+    ResourceHandle(SoupNetworkSession&, const ResourceRequest&, ResourceHandleClient*, bool defersLoading, bool shouldContentSniff);
+#endif
 
     void platformSetDefersLoading(bool);
 

@@ -179,13 +179,16 @@ volatile bool done;
 NavigationController* gNavigationController = nullptr;
 RefPtr<TestRunner> gTestRunner;
 
-WebFrame *mainFrame = nullptr;
+WebFrame *mainFrame = nil;
 // This is the topmost frame that is loading, during a given load, or nil when no load is 
 // in progress.  Usually this is the same as the main frame, but not always.  In the case
 // where a frameset is loaded, and then new content is loaded into one of the child frames,
 // that child frame is the "topmost frame that is loading".
-WebFrame *topLoadingFrame = nullptr; // !nil iff a load is in progress
+WebFrame *topLoadingFrame = nil; // !nil iff a load is in progress
 
+#if PLATFORM(MAC)
+NSWindow *mainWindow = nil;
+#endif
 
 CFMutableSetRef disallowedURLs= nullptr;
 static CFRunLoopTimerRef waitToDumpWatchdog;
@@ -375,6 +378,7 @@ static NSSet *allowedFontFamilySet()
         @"Kokonor",
         @"Krungthep",
         @"KufiStandardGK",
+        @"LastResort",
         @"LiHei Pro",
         @"LiSong Pro",
         @"Lucida Grande",
@@ -424,68 +428,6 @@ static NSSet *allowedFontFamilySet()
     return fontFamilySet;
 }
 
-#if !ENABLE(PLATFORM_FONT_LOOKUP)
-static IMP appKitAvailableFontFamiliesIMP;
-static IMP appKitAvailableFontsIMP;
-
-static NSArray *drt_NSFontManager_availableFontFamilies(id self, SEL _cmd)
-{
-    static NSArray *availableFontFamilies;
-    if (availableFontFamilies)
-        return availableFontFamilies;
-    
-    NSArray *availableFamilies = wtfCallIMP<id>(appKitAvailableFontFamiliesIMP, self, _cmd);
-
-    NSMutableSet *prunedFamiliesSet = [NSMutableSet setWithArray:availableFamilies];
-    [prunedFamiliesSet intersectSet:allowedFontFamilySet()];
-
-    availableFontFamilies = [[prunedFamiliesSet allObjects] retain];
-    return availableFontFamilies;
-}
-
-static NSArray *drt_NSFontManager_availableFonts(id self, SEL _cmd)
-{
-    static NSArray *availableFonts;
-    if (availableFonts)
-        return availableFonts;
-    
-    NSSet *allowedFamilies = allowedFontFamilySet();
-    NSMutableArray *availableFontList = [[NSMutableArray alloc] initWithCapacity:[allowedFamilies count] * 2];
-    for (NSString *fontFamily in allowedFontFamilySet()) {
-        NSArray* fontsForFamily = [[NSFontManager sharedFontManager] availableMembersOfFontFamily:fontFamily];
-        for (NSArray* fontInfo in fontsForFamily) {
-            // Font name is the first entry in the array.
-            [availableFontList addObject:[fontInfo objectAtIndex:0]];
-        }
-    }
-
-    availableFonts = availableFontList;
-    return availableFonts;
-}
-
-static void swizzleNSFontManagerMethods()
-{
-    Method availableFontFamiliesMethod = class_getInstanceMethod(objc_getClass("NSFontManager"), @selector(availableFontFamilies));
-    ASSERT(availableFontFamiliesMethod);
-    if (!availableFontFamiliesMethod) {
-        NSLog(@"Failed to swizzle the \"availableFontFamilies\" method on NSFontManager");
-        return;
-    }
-    
-    appKitAvailableFontFamiliesIMP = method_setImplementation(availableFontFamiliesMethod, (IMP)drt_NSFontManager_availableFontFamilies);
-
-    Method availableFontsMethod = class_getInstanceMethod(objc_getClass("NSFontManager"), @selector(availableFonts));
-    ASSERT(availableFontsMethod);
-    if (!availableFontsMethod) {
-        NSLog(@"Failed to swizzle the \"availableFonts\" method on NSFontManager");
-        return;
-    }
-    
-    appKitAvailableFontsIMP = method_setImplementation(availableFontsMethod, (IMP)drt_NSFontManager_availableFonts);
-}
-
-#else
-
 static NSArray *fontWhitelist()
 {
     static NSArray *availableFonts;
@@ -505,7 +447,6 @@ static NSArray *fontWhitelist()
     availableFonts = availableFontList;
     return availableFonts;
 }
-#endif
 
 // Activating system copies of these fonts overrides any others that could be preferred, such as ones
 // in /Library/Fonts/Microsoft, and which don't always have the same metrics.
@@ -584,9 +525,6 @@ static void activateTestingFonts()
 
 static void adjustFonts()
 {
-#if !ENABLE(PLATFORM_FONT_LOOKUP)
-    swizzleNSFontManagerMethods();
-#endif
     activateSystemCoreWebFonts();
     activateTestingFonts();
 }
@@ -776,7 +714,7 @@ WebView *createWebViewAndOffscreenWindow()
     [WebView registerURLSchemeAsLocal:@"feeds"];
     [WebView registerURLSchemeAsLocal:@"feedsearch"];
     
-#if PLATFORM(MAC) && ENABLE(PLATFORM_FONT_LOOKUP)
+#if PLATFORM(MAC)
     [WebView _setFontWhitelist:fontWhitelist()];
 #endif
 
@@ -798,6 +736,7 @@ WebView *createWebViewAndOffscreenWindow()
     NSScreen *firstScreen = [[NSScreen screens] firstObject];
     NSRect windowRect = (showWebView) ? NSOffsetRect(rect, 100, 100) : NSOffsetRect(rect, -10000, [firstScreen frame].size.height - rect.size.height + 10000);
     DumpRenderTreeWindow *window = [[DumpRenderTreeWindow alloc] initWithContentRect:windowRect styleMask:NSBorderlessWindowMask backing:NSBackingStoreBuffered defer:YES];
+    mainWindow = window;
 
     [window setColorSpace:[firstScreen colorSpace]];
     [window setCollectionBehavior:NSWindowCollectionBehaviorStationary];
@@ -895,10 +834,29 @@ static NSString *libraryPathForDumpRenderTree()
         return [@"~/Library/Application Support/DumpRenderTree" stringByExpandingTildeInPath];
 }
 
+static void enableExperimentalFeatures(WebPreferences* preferences)
+{
+    [preferences setCSSGridLayoutEnabled:YES];
+    // FIXME: SpringTimingFunction
+    [preferences setGamepadsEnabled:YES];
+    [preferences setLinkPreloadEnabled:YES];
+    [preferences setModernMediaControlsEnabled:YES];
+    // FIXME: InputEvents
+    [preferences setResourceTimingEnabled:YES];
+    [preferences setSubtleCryptoEnabled:YES];
+    [preferences setUserTimingEnabled:YES];
+    [preferences setWebAnimationsEnabled:YES];
+    [preferences setWebGL2Enabled:YES];
+    [preferences setWebGPUEnabled:YES];
+    [preferences setPeerConnectionEnabled:YES];
+    [preferences setCredentialManagementEnabled:YES];
+}
+
 // Called before each test.
-static void resetWebPreferencesToConsistentValues(const TestOptions& options)
+static void resetWebPreferencesToConsistentValues()
 {
     WebPreferences *preferences = [WebPreferences standardPreferences];
+    enableExperimentalFeatures(preferences);
 
     [preferences setNeedsStorageAccessFromFileURLsQuirk: NO];
     [preferences setAllowUniversalAccessFromFileURLs:YES];
@@ -951,11 +909,13 @@ static void resetWebPreferencesToConsistentValues(const TestOptions& options)
         [preferences setUserStyleSheetEnabled:YES];
     } else
         [preferences setUserStyleSheetEnabled:NO];
+
     [preferences setMediaPlaybackAllowsInline:YES];
     [preferences setVideoPlaybackRequiresUserGesture:NO];
     [preferences setAudioPlaybackRequiresUserGesture:NO];
     [preferences setMediaDataLoadsAutomatically:YES];
     [preferences setInvisibleAutoplayNotPermitted:NO];
+    [preferences setSubpixelAntialiasedLayerTextEnabled:NO];
 
 #if PLATFORM(IOS)
     // Enable the tracker before creating the first WebView will
@@ -986,6 +946,7 @@ static void resetWebPreferencesToConsistentValues(const TestOptions& options)
     [preferences setCustomElementsEnabled:YES];
 
     [preferences setWebGL2Enabled:YES];
+    [preferences setWebGPUEnabled:YES];
 
     [preferences setFetchAPIEnabled:YES];
 
@@ -993,17 +954,22 @@ static void resetWebPreferencesToConsistentValues(const TestOptions& options)
 
     [preferences setHiddenPageDOMTimerThrottlingEnabled:NO];
     [preferences setHiddenPageCSSAnimationSuspensionEnabled:NO];
-
-    preferences.intersectionObserverEnabled = options.enableIntersectionObserver;
-    preferences.modernMediaControlsEnabled = options.enableModernMediaControls;
-
-    [preferences setSubtleCryptoEnabled:YES];
-
+    
     [preferences setMediaStreamEnabled:YES];
-    [preferences setPeerConnectionEnabled:YES];
+    
+    [preferences setLargeImageAsyncDecodingEnabled:NO];
 
     [WebPreferences _clearNetworkLoaderSession];
     [WebPreferences _setCurrentNetworkLoaderSessionCookieAcceptPolicy:NSHTTPCookieAcceptPolicyOnlyFromMainDocumentDomain];
+}
+
+static void setWebPreferencesForTestOptions(const TestOptions& options)
+{
+    WebPreferences *preferences = [WebPreferences standardPreferences];
+
+    preferences.intersectionObserverEnabled = options.enableIntersectionObserver;
+    preferences.modernMediaControlsEnabled = options.enableModernMediaControls;
+    preferences.credentialManagementEnabled = options.enableCredentialManagement;
 }
 
 // Called once on DumpRenderTree startup.
@@ -1822,6 +1788,7 @@ static bool shouldMakeViewportFlexible(const char* pathOrURL)
 static void resetWebViewToConsistentStateBeforeTesting(const TestOptions& options)
 {
     WebView *webView = [mainFrame webView];
+
 #if PLATFORM(IOS)
     adjustWebDocumentForStandardViewport(gWebBrowserView, gWebScrollView);
     [webView _setAllowsMessaging:YES];
@@ -1852,7 +1819,8 @@ static void resetWebViewToConsistentStateBeforeTesting(const TestOptions& option
 
     [WebCache clearCachedCredentials];
     
-    resetWebPreferencesToConsistentValues(options);
+    resetWebPreferencesToConsistentValues();
+    setWebPreferencesForTestOptions(options);
 
     TestRunner::setSerializeHTTPLoads(false);
     TestRunner::setAllowsAnySSLCertificate(false);
@@ -2078,6 +2046,13 @@ static void runTest(const string& inputLine)
         gTestRunner->closeWebInspector();
         gTestRunner->setDeveloperExtrasEnabled(false);
     }
+
+#if PLATFORM(MAC)
+    // Make sure the WebView is parented, since the test may have unparented it.
+    WebView *webView = [mainFrame webView];
+    if (![webView superview])
+        [[mainWindow contentView] addSubview:webView];
+#endif
 
     if (gTestRunner->closeRemainingWindowsWhenComplete()) {
         NSArray* array = [DumpRenderTreeWindow openWindows];

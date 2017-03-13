@@ -23,6 +23,11 @@ class StunRequest;
 
 const int kAllRequests = 0;
 
+// Total max timeouts: 39.75 seconds
+// For years, this was 9.5 seconds, but for networks that experience moments of
+// high RTT (such as 40s on 2G networks), this doesn't work well.
+const int STUN_TOTAL_TIMEOUT = 39750;  // milliseconds
+
 // Manages a set of STUN requests, sending and resending until we receive a
 // response or determine that the request has timed out.
 class StunRequestManager {
@@ -110,11 +115,11 @@ class StunRequest : public rtc::MessageHandler {
 
   // Fills in a request object to be sent.  Note that request's transaction ID
   // will already be set and cannot be changed.
-  virtual void Prepare(StunMessage* request) {}
+  virtual void Prepare(StunMessage*) {}
 
   // Called when the message receives a response or times out.
-  virtual void OnResponse(StunMessage* response) {}
-  virtual void OnErrorResponse(StunMessage* response) {}
+  virtual void OnResponse(StunMessage*) {}
+  virtual void OnErrorResponse(StunMessage*) {}
   virtual void OnTimeout() {}
   // Called when the message is sent.
   virtual void OnSent();

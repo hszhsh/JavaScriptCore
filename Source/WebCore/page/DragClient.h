@@ -26,7 +26,8 @@
 #pragma once
 
 #include "DragActions.h"
-#include "DragImage.h"
+#include "DragItem.h"
+#include "FloatPoint.h"
 #include "IntPoint.h"
 
 namespace WebCore {
@@ -41,13 +42,18 @@ class DragClient {
 public:
     virtual void dragControllerDestroyed() = 0;
 
+    virtual bool useLegacyDragClient() { return true; }
+
     virtual void willPerformDragDestinationAction(DragDestinationAction, const DragData&) = 0;
     virtual void willPerformDragSourceAction(DragSourceAction, const IntPoint&, DataTransfer&) = 0;
+    virtual void didConcludeEditDrag() { }
     virtual DragDestinationAction actionMaskForDrag(const DragData&) = 0;
     virtual DragSourceAction dragSourceActionMaskForPoint(const IntPoint& rootViewPoint) = 0;
     
-    virtual void startDrag(DragImageRef, const IntPoint& dragImageOrigin, const IntPoint& eventPos, DataTransfer&, Frame&, bool linkDrag = false) = 0;
+    virtual void startDrag(DragImage, const IntPoint& dragImageOrigin, const IntPoint& eventPos, const FloatPoint& dragImageAnchor, DataTransfer&, Frame&, DragSourceAction) = 0;
     virtual void dragEnded() { }
+
+    virtual void beginDrag(DragItem, Frame&, const IntPoint&, const IntPoint&, DataTransfer&, DragSourceAction) { }
 
 #if PLATFORM(COCOA)
     // Mac-specific helper function to allow access to web archives and NSPasteboard extras in WebKit.

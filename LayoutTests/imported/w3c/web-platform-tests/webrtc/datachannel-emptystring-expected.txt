@@ -1,5 +1,5 @@
 
-FAIL Can send empty strings across a WebRTC data channel. RTCPeerConnection argument must be a valid dictionary
+FAIL Can send empty strings across a WebRTC data channel. assert_unreached: Error TypeError: Argument 1 ('description') to RTCPeerConnection.setRemoteDescription must be an instance of RTCSessionDescription Reached unreachable code
 Messages exchanged
 
 

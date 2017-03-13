@@ -60,7 +60,7 @@ JITCompiler::JITCompiler(Graph& dfg)
 #if ENABLE(FTL_JIT)
     m_jitCode->tierUpInLoopHierarchy = WTFMove(m_graph.m_plan.tierUpInLoopHierarchy);
     for (unsigned tierUpBytecode : m_graph.m_plan.tierUpAndOSREnterBytecodes)
-        m_jitCode->tierUpEntryTriggers.add(tierUpBytecode, 0);
+        m_jitCode->tierUpEntryTriggers.add(tierUpBytecode, JITCode::TriggerReason::DontTrigger);
 #endif
 }
 
@@ -253,6 +253,8 @@ void JITCompiler::link(LinkBuffer& linkBuffer)
 
     for (unsigned i = m_getByIds.size(); i--;)
         m_getByIds[i].finalize(linkBuffer);
+    for (unsigned i = m_getByIdsWithThis.size(); i--;)
+        m_getByIdsWithThis[i].finalize(linkBuffer);
     for (unsigned i = m_putByIds.size(); i--;)
         m_putByIds[i].finalize(linkBuffer);
 
@@ -407,7 +409,7 @@ void JITCompiler::compile()
     disassemble(*linkBuffer);
     
     m_graph.m_plan.finalizer = std::make_unique<JITFinalizer>(
-        m_graph.m_plan, WTFMove(m_jitCode), WTFMove(linkBuffer));
+        m_graph.m_plan, m_jitCode.releaseNonNull(), WTFMove(linkBuffer));
 }
 
 void JITCompiler::compileFunction()
@@ -504,7 +506,7 @@ void JITCompiler::compileFunction()
     MacroAssemblerCodePtr withArityCheck = linkBuffer->locationOf(m_arityCheck);
 
     m_graph.m_plan.finalizer = std::make_unique<JITFinalizer>(
-        m_graph.m_plan, WTFMove(m_jitCode), WTFMove(linkBuffer), withArityCheck);
+        m_graph.m_plan, m_jitCode.releaseNonNull(), WTFMove(linkBuffer), withArityCheck);
 }
 
 void JITCompiler::disassemble(LinkBuffer& linkBuffer)

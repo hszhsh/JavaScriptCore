@@ -60,6 +60,11 @@ WebInspector.ElementsTabContentView = class ElementsTabContentView extends WebIn
         return WebInspector.ElementsTabContentView.Type;
     }
 
+    get supportsSplitContentBrowser()
+    {
+        return true;
+    }
+
     canShowRepresentedObject(representedObject)
     {
         return representedObject instanceof WebInspector.DOMTree;
@@ -67,15 +72,14 @@ WebInspector.ElementsTabContentView = class ElementsTabContentView extends WebIn
 
     showRepresentedObject(representedObject, cookie)
     {
-        var domTreeContentView = this.contentBrowser.currentContentView;
-        console.assert(!domTreeContentView || domTreeContentView instanceof WebInspector.DOMTreeContentView);
-        if (!domTreeContentView || !(domTreeContentView instanceof WebInspector.DOMTreeContentView)) {
-            // FIXME: Remember inspected node for later when _mainFrameDidChange.
-            return;
-        }
+        if (!this.contentBrowser.currentContentView)
+            this._showDOMTreeContentView();
 
         if (!cookie || !cookie.nodeToSelect)
             return;
+
+        let domTreeContentView = this.contentBrowser.currentContentView;
+        console.assert(domTreeContentView instanceof WebInspector.DOMTreeContentView, "Unexpected DOMTreeContentView representedObject.", domTreeContentView);
 
         domTreeContentView.selectAndRevealDOMNode(cookie.nodeToSelect);
 
@@ -88,7 +92,8 @@ WebInspector.ElementsTabContentView = class ElementsTabContentView extends WebIn
     {
         super.shown();
 
-        this._showDOMTreeContentView();
+        if (!this.contentBrowser.currentContentView)
+            this._showDOMTreeContentView();
     }
 
     closed()

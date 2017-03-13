@@ -30,7 +30,6 @@
 #include "SoupNetworkSession.h"
 
 #include "AuthenticationChallenge.h"
-#include "CryptoDigest.h"
 #include "FileSystem.h"
 #include "GUniquePtrSoup.h"
 #include "Logging.h"
@@ -38,6 +37,7 @@
 #include "SoupNetworkProxySettings.h"
 #include <glib/gstdio.h>
 #include <libsoup/soup.h>
+#include <pal/crypto/CryptoDigest.h>
 #include <wtf/HashSet.h>
 #include <wtf/NeverDestroyed.h>
 #include <wtf/text/Base64.h>
@@ -48,6 +48,7 @@ namespace WebCore {
 static bool gIgnoreTLSErrors;
 static CString gInitialAcceptLanguages;
 static SoupNetworkProxySettings gProxySettings;
+static GType gCustomProtocolRequestType;
 
 #if !LOG_DISABLED
 inline static void soupLogPrinter(SoupLogger*, SoupLoggerLogLevel, char direction, const char* data, gpointer)
@@ -78,7 +79,7 @@ private:
         if (!certificateData)
             return String();
 
-        auto digest = CryptoDigest::create(CryptoDigest::Algorithm::SHA_256);
+        auto digest = PAL::CryptoDigest::create(PAL::CryptoDigest::Algorithm::SHA_256);
         digest->addBytes(certificateData->data, certificateData->len);
 
         auto hash = digest->computeHash();
@@ -139,6 +140,8 @@ SoupNetworkSession::SoupNetworkSession(SoupCookieJar* cookieJar)
         SOUP_SESSION_SSL_USE_SYSTEM_CA_FILE, TRUE,
         SOUP_SESSION_SSL_STRICT, FALSE,
         nullptr);
+
+    setupCustomProtocols();
 
     if (!gInitialAcceptLanguages.isNull())
         setAcceptLanguages(gInitialAcceptLanguages);
@@ -252,28 +255,6 @@ void SoupNetworkSession::setupProxy()
     soup_session_abort(m_soupSession.get());
 }
 
-#if PLATFORM(EFL)
-// FIXME: This function should not exist at all and we don't want to accidentally use it in other ports.
-// The correct way to set proxy settings from the environment is to use a GProxyResolver that does so.
-// It also lacks the rather important https_proxy and ftp_proxy variables, and the uppercase versions of
-// all four variables, all of which you almost surely want to be respected if you're setting http_proxy,
-// and all of which would be supported via the default proxy resolver in non-GNOME/Ubuntu environments
-// (at least, I think that's right). Additionally, it is incorrect for WebKit to respect this environment
-// variable when running in a GNOME or Ubuntu environment, where GNOME proxy configuration should be
-// respected instead. The only reason to retain this function is to not alter the incorrect behavior for EFL.
-void SoupNetworkSession::setProxySettingsFromEnvironment()
-{
-    const char* httpProxy = getenv("http_proxy");
-    if (!httpProxy)
-        return;
-
-    gProxySettings.defaultProxyURL = httpProxy;
-    const char* httpProxyExceptions = getenv("no_proxy");
-    if (httpProxyExceptions)
-        gProxySettings.ignoreHosts.reset(g_strsplit(httpProxyExceptions, ",", -1));
-}
-#endif
-
 void SoupNetworkSession::setProxySettings(const SoupNetworkProxySettings& settings)
 {
     gProxySettings = settings;
@@ -287,6 +268,24 @@ void SoupNetworkSession::setInitialAcceptLanguages(const CString& languages)
 void SoupNetworkSession::setAcceptLanguages(const CString& languages)
 {
     g_object_set(m_soupSession.get(), "accept-language", languages.data(), nullptr);
+}
+
+void SoupNetworkSession::setCustomProtocolRequestType(GType requestType)
+{
+    ASSERT(g_type_is_a(requestType, SOUP_TYPE_REQUEST));
+    gCustomProtocolRequestType = requestType;
+}
+
+void SoupNetworkSession::setupCustomProtocols()
+{
+    if (!g_type_is_a(gCustomProtocolRequestType, SOUP_TYPE_REQUEST))
+        return;
+
+    auto* requestClass = static_cast<SoupRequestClass*>(g_type_class_peek(gCustomProtocolRequestType));
+    if (!requestClass || !requestClass->schemes)
+        return;
+
+    soup_session_add_feature_by_type(m_soupSession.get(), gCustomProtocolRequestType);
 }
 
 void SoupNetworkSession::setShouldIgnoreTLSErrors(bool ignoreTLSErrors)

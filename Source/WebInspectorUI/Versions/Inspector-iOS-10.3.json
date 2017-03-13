@@ -548,6 +548,7 @@
 {
     "domain": "Console",
     "description": "Console domain defines methods and events for interaction with the JavaScript console. Console collects messages created by means of the <a href='http://getfirebug.com/wiki/index.php/Console_API'>JavaScript Console API</a>. One needs to enable this domain using <code>enable</code> command in order to start receiving the console messages. Browser collects messages issued while console domain is not enabled as well and reports them using <code>messageAdded</code> notification upon enabling.",
+    "workerSupported": true,
     "types": [
         {
             "id": "ConsoleMessage",
@@ -586,6 +587,7 @@
             "properties": [
                 { "name": "callFrames", "type": "array", "items": { "$ref": "CallFrame" } },
                 { "name": "topCallFrameIsBoundary", "type": "boolean", "optional": true, "description": "Whether the first item in <code>callFrames</code> is the native function that scheduled the asynchronous operation (e.g. setTimeout)." },
+                { "name": "truncated", "type": "boolean", "optional": true, "description": "Whether one or more frames have been truncated from the bottom of the stack." },
                 { "name": "parentStackTrace", "$ref": "StackTrace", "optional": true, "description": "Parent StackTrace." }
             ]
         }
@@ -1232,80 +1234,6 @@
 }
 ,
 {
-    "domain": "DOMDebugger",
-    "description": "DOM debugging allows setting breakpoints on particular DOM operations and events. JavaScript execution will stop on these operations as if there was a regular breakpoint set.",
-    "availability": "web",
-    "types": [
-        {
-            "id": "DOMBreakpointType",
-            "type": "string",
-            "enum": ["subtree-modified", "attribute-modified", "node-removed"],
-            "description": "DOM breakpoint type."
-        }
-    ],
-    "commands": [
-        {
-            "name": "setDOMBreakpoint",
-            "parameters": [
-                { "name": "nodeId", "$ref": "DOM.NodeId", "description": "Identifier of the node to set breakpoint on." },
-                { "name": "type", "$ref": "DOMBreakpointType", "description": "Type of the operation to stop upon." }
-            ],
-            "description": "Sets breakpoint on particular operation with DOM."
-        },
-        {
-            "name": "removeDOMBreakpoint",
-            "parameters": [
-                { "name": "nodeId", "$ref": "DOM.NodeId", "description": "Identifier of the node to remove breakpoint from." },
-                { "name": "type", "$ref": "DOMBreakpointType", "description": "Type of the breakpoint to remove." }
-            ],
-            "description": "Removes DOM breakpoint that was set using <code>setDOMBreakpoint</code>."
-        },
-        {
-            "name": "setEventListenerBreakpoint",
-            "parameters": [
-                { "name": "eventName", "type": "string", "description": "DOM Event name to stop on (any DOM event will do)." }
-            ],
-            "description": "Sets breakpoint on particular DOM event."
-        },
-        {
-            "name": "removeEventListenerBreakpoint",
-            "parameters": [
-                { "name": "eventName", "type": "string", "description": "Event name." }
-            ],
-            "description": "Removes breakpoint on particular DOM event."
-        },
-        {
-            "name": "setInstrumentationBreakpoint",
-            "parameters": [
-                { "name": "eventName", "type": "string", "description": "Instrumentation name to stop on." }
-            ],
-            "description": "Sets breakpoint on particular native event."
-        },
-        {
-            "name": "removeInstrumentationBreakpoint",
-            "parameters": [
-                { "name": "eventName", "type": "string", "description": "Instrumentation name to stop on." }
-            ],
-            "description": "Sets breakpoint on particular native event."
-        },
-        {
-            "name": "setXHRBreakpoint",
-            "parameters": [
-                { "name": "url", "type": "string", "description": "Resource URL substring. All XHRs having this substring in the URL will get stopped upon." }
-            ],
-            "description": "Sets breakpoint on XMLHttpRequest."
-        },
-        {
-            "name": "removeXHRBreakpoint",
-            "parameters": [
-                { "name": "url", "type": "string", "description": "Resource URL substring." }
-            ],
-            "description": "Removes breakpoint from XMLHttpRequest."
-        }
-    ]
-}
-,
-{
     "domain": "DOMStorage",
     "description": "Query and modify DOM storage.",
     "availability": "web",
@@ -1469,6 +1397,7 @@
 {
     "domain": "Debugger",
     "description": "Debugger domain exposes JavaScript debugging capabilities. It allows setting and removing breakpoints, stepping through execution, exploring stack traces, etc.",
+    "workerSupported": true,
     "types": [
         {
             "id": "BreakpointId",
@@ -3081,6 +3010,7 @@
 {
     "domain": "Runtime",
     "description": "Runtime domain exposes JavaScript runtime by means of remote evaluation and mirror objects. Evaluation results are returned as mirror object that expose object type, string representation and unique identifier that can be used for further object reference. Original objects are maintained in memory unless they are either explicitly released or are released along with the other objects in their object group.",
+    "workerSupported": true,
     "types": [
         {
             "id": "RemoteObjectId",

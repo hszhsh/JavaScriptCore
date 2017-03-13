@@ -216,11 +216,14 @@ void StructureStubInfo::reset(CodeBlock* codeBlock)
     }
 
     switch (accessType) {
-    case AccessType::GetPure:
-        resetGetByID(codeBlock, *this, GetByIDKind::Pure);
+    case AccessType::TryGet:
+        resetGetByID(codeBlock, *this, GetByIDKind::Try);
         break;
     case AccessType::Get:
         resetGetByID(codeBlock, *this, GetByIDKind::Normal);
+        break;
+    case AccessType::GetWithThis:
+        resetGetByID(codeBlock, *this, GetByIDKind::WithThis);
         break;
     case AccessType::Put:
         resetPutByID(codeBlock, *this);

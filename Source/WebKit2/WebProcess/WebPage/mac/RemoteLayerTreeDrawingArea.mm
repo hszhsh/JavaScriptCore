@@ -77,6 +77,7 @@ RemoteLayerTreeDrawingArea::RemoteLayerTreeDrawingArea(WebPage& webPage, const W
 #if PLATFORM(IOS)
     webPage.corePage()->settings().setDelegatesPageScaling(true);
 #endif
+    m_rootLayer->setName("drawing area root");
 
     m_commitQueue = dispatch_queue_create("com.apple.WebKit.WebContent.RemoteLayerTreeDrawingArea.CommitQueue", nullptr);
 
@@ -176,7 +177,6 @@ void RemoteLayerTreeDrawingArea::updatePreferences(const WebPreferencesStore&)
     // Fixed position elements need to be composited and create stacking contexts
     // in order to be scrolled by the ScrollingCoordinator.
     settings.setAcceleratedCompositingForFixedPositionEnabled(true);
-    settings.setFixedPositionCreatesStackingContext(true);
 
     m_rootLayer->setShowDebugBorder(settings.showDebugBorders());
 

@@ -42,7 +42,9 @@
 #include "MediaEndpointConfiguration.h"
 #include "MediaStream.h"
 #include "MediaStreamTrack.h"
+#include "Page.h"
 #include "RTCConfiguration.h"
+#include "RTCController.h"
 #include "RTCDataChannel.h"
 #include "RTCIceCandidate.h"
 #include "RTCIceCandidateEvent.h"
@@ -62,7 +64,12 @@ Ref<RTCPeerConnection> RTCPeerConnection::create(ScriptExecutionContext& context
 {
     Ref<RTCPeerConnection> peerConnection = adoptRef(*new RTCPeerConnection(context));
     peerConnection->suspendIfNeeded();
-
+    // RTCPeerConnection may send events at about any time during its lifetime.
+    // Let's make it uncollectable until the pc is closed by JS or the page stops it.
+    if (peerConnection->m_signalingState != SignalingState::Closed) {
+        peerConnection->setPendingActivity(peerConnection.ptr());
+        peerConnection->registerToController();
+    }
     return peerConnection;
 }
 
@@ -116,6 +123,7 @@ ExceptionOr<Ref<RTCRtpSender>> RTCPeerConnection::addTrack(Ref<MediaStreamTrack>
             existingSender.setMediaStreamIds(WTFMove(mediaStreamIds));
             transceiver->enableSendingDirection();
             sender = &existingSender;
+            
             break;
         }
     }
@@ -139,6 +147,7 @@ ExceptionOr<Ref<RTCRtpSender>> RTCPeerConnection::addTrack(Ref<MediaStreamTrack>
 
     m_backend->markAsNeedingNegotiation();
 
+    m_backend->notifyAddedTrack(*sender);
     return Ref<RTCRtpSender> { *sender };
 }
 
@@ -382,7 +391,7 @@ ExceptionOr<void> RTCPeerConnection::setConfiguration(RTCConfiguration&& configu
     return { };
 }
 
-void RTCPeerConnection::privateGetStats(MediaStreamTrack* selector, PeerConnection::StatsPromise&& promise)
+void RTCPeerConnection::getStats(MediaStreamTrack* selector, Ref<DeferredPromise>&& promise)
 {
     m_backend->getStats(selector, WTFMove(promise));
 }
@@ -412,6 +421,9 @@ void RTCPeerConnection::close()
 
     for (RTCRtpSender& sender : m_transceiverSet->senders())
         sender.stop();
+
+    unregisterFromController();
+    unsetPendingActivity(this);
 }
 
 void RTCPeerConnection::emulatePlatformEvent(const String& action)
@@ -422,6 +434,24 @@ void RTCPeerConnection::emulatePlatformEvent(const String& action)
 void RTCPeerConnection::stop()
 {
     close();
+}
+
+RTCController& RTCPeerConnection::rtcController()
+{
+    ASSERT(scriptExecutionContext());
+    ASSERT(scriptExecutionContext()->isDocument());
+    auto* page = static_cast<Document*>(scriptExecutionContext())->page();
+    return page->rtcController();
+}
+
+void RTCPeerConnection::registerToController()
+{
+    rtcController().add(*this);
+}
+
+void RTCPeerConnection::unregisterFromController()
+{
+    rtcController().remove(*this);
 }
 
 const char* RTCPeerConnection::activeDOMObjectName() const
@@ -482,7 +512,7 @@ void RTCPeerConnection::fireEvent(Event& event)
     dispatchEvent(event);
 }
 
-void RTCPeerConnection::replaceTrack(RTCRtpSender& sender, RefPtr<MediaStreamTrack>&& withTrack, DOMPromise<void>&& promise)
+void RTCPeerConnection::replaceTrack(RTCRtpSender& sender, Ref<MediaStreamTrack>&& withTrack, DOMPromise<void>&& promise)
 {
     m_backend->replaceTrack(sender, WTFMove(withTrack), WTFMove(promise));
 }

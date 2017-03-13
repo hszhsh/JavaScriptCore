@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2010-2017 Apple Inc. All rights reserved.
  * Copyright (C) 2012 Intel Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -733,6 +733,11 @@ void TestInvocation::didReceiveMessageFromInjectedBundle(WKStringRef messageName
         return;
     }
 
+    if (WKStringIsEqualToUTF8CString(messageName, "SetOpenPanelFileURLs")) {
+        TestController::singleton().setOpenPanelFileURLs(static_cast<WKArrayRef>(messageBody));
+        return;
+    }
+
     ASSERT_NOT_REACHED();
 }
 
@@ -788,6 +793,12 @@ WKRetainPtr<WKTypeRef> TestInvocation::didReceiveSynchronousMessageFromInjectedB
         return nullptr;
     }
 
+    if (WKStringIsEqualToUTF8CString(messageName, "SetCookieStoragePartitioningEnabled")) {
+        WKBooleanRef accept = static_cast<WKBooleanRef>(messageBody);
+        WKCookieManagerSetCookieStoragePartitioningEnabled(WKContextGetCookieManager(TestController::singleton().context()), WKBooleanGetValue(accept));
+        return nullptr;
+    }
+    
     if (WKStringIsEqualToUTF8CString(messageName, "ImageCountInGeneralPasteboard")) {
         unsigned count = TestController::singleton().imageCountInGeneralPasteboard();
         WKRetainPtr<WKUInt64Ref> result(AdoptWK, WKUInt64Create(count));
@@ -886,6 +897,150 @@ WKRetainPtr<WKTypeRef> TestInvocation::didReceiveSynchronousMessageFromInjectedB
         return result;
     }
 
+    if (WKStringIsEqualToUTF8CString(messageName, "SetStatisticsPrevalentResource")) {
+        ASSERT(WKGetTypeID(messageBody) == WKDictionaryGetTypeID());
+
+        WKDictionaryRef messageBodyDictionary = static_cast<WKDictionaryRef>(messageBody);
+        WKRetainPtr<WKStringRef> hostNameKey(AdoptWK, WKStringCreateWithUTF8CString("HostName"));
+        WKRetainPtr<WKStringRef> valueKey(AdoptWK, WKStringCreateWithUTF8CString("Value"));
+
+        WKStringRef hostName = static_cast<WKStringRef>(WKDictionaryGetItemForKey(messageBodyDictionary, hostNameKey.get()));
+        WKBooleanRef value = static_cast<WKBooleanRef>(WKDictionaryGetItemForKey(messageBodyDictionary, valueKey.get()));
+
+        TestController::singleton().setStatisticsPrevalentResource(hostName, WKBooleanGetValue(value));
+        return nullptr;
+    }
+
+    if (WKStringIsEqualToUTF8CString(messageName, "IsStatisticsPrevalentResource")) {
+        ASSERT(WKGetTypeID(messageBody) == WKStringGetTypeID());
+
+        WKStringRef hostName = static_cast<WKStringRef>(messageBody);
+        bool isPrevalent = TestController::singleton().isStatisticsPrevalentResource(hostName);
+        WKRetainPtr<WKTypeRef> result(AdoptWK, WKBooleanCreate(isPrevalent));
+        return result;
+    }
+
+    if (WKStringIsEqualToUTF8CString(messageName, "SetStatisticsHasHadUserInteraction")) {
+        ASSERT(WKGetTypeID(messageBody) == WKDictionaryGetTypeID());
+        
+        WKDictionaryRef messageBodyDictionary = static_cast<WKDictionaryRef>(messageBody);
+        WKRetainPtr<WKStringRef> hostNameKey(AdoptWK, WKStringCreateWithUTF8CString("HostName"));
+        WKRetainPtr<WKStringRef> valueKey(AdoptWK, WKStringCreateWithUTF8CString("Value"));
+        
+        WKStringRef hostName = static_cast<WKStringRef>(WKDictionaryGetItemForKey(messageBodyDictionary, hostNameKey.get()));
+        WKBooleanRef value = static_cast<WKBooleanRef>(WKDictionaryGetItemForKey(messageBodyDictionary, valueKey.get()));
+        
+        TestController::singleton().setStatisticsHasHadUserInteraction(hostName, WKBooleanGetValue(value));
+        return nullptr;
+    }
+
+    if (WKStringIsEqualToUTF8CString(messageName, "IsStatisticsHasHadUserInteraction")) {
+        ASSERT(WKGetTypeID(messageBody) == WKStringGetTypeID());
+        
+        WKStringRef hostName = static_cast<WKStringRef>(messageBody);
+        bool hasHadUserInteraction = TestController::singleton().isStatisticsHasHadUserInteraction(hostName);
+        WKRetainPtr<WKTypeRef> result(AdoptWK, WKBooleanCreate(hasHadUserInteraction));
+        return result;
+    }
+    
+    if (WKStringIsEqualToUTF8CString(messageName, "SetStatisticsSubframeUnderTopFrameOrigin")) {
+        ASSERT(WKGetTypeID(messageBody) == WKDictionaryGetTypeID());
+        
+        WKDictionaryRef messageBodyDictionary = static_cast<WKDictionaryRef>(messageBody);
+        WKRetainPtr<WKStringRef> hostNameKey(AdoptWK, WKStringCreateWithUTF8CString("HostName"));
+        WKRetainPtr<WKStringRef> topFrameHostNameKey(AdoptWK, WKStringCreateWithUTF8CString("TopFrameHostName"));
+        
+        WKStringRef hostName = static_cast<WKStringRef>(WKDictionaryGetItemForKey(messageBodyDictionary, hostNameKey.get()));
+        WKStringRef topFrameHostName = static_cast<WKStringRef>(WKDictionaryGetItemForKey(messageBodyDictionary, topFrameHostNameKey.get()));
+
+        TestController::singleton().setStatisticsSubframeUnderTopFrameOrigin(hostName, topFrameHostName);
+        return nullptr;
+    }
+    
+    if (WKStringIsEqualToUTF8CString(messageName, "SetStatisticsSubresourceUnderTopFrameOrigin")) {
+        ASSERT(WKGetTypeID(messageBody) == WKDictionaryGetTypeID());
+        
+        WKDictionaryRef messageBodyDictionary = static_cast<WKDictionaryRef>(messageBody);
+        WKRetainPtr<WKStringRef> hostNameKey(AdoptWK, WKStringCreateWithUTF8CString("HostName"));
+        WKRetainPtr<WKStringRef> topFrameHostNameKey(AdoptWK, WKStringCreateWithUTF8CString("TopFrameHostName"));
+        
+        WKStringRef hostName = static_cast<WKStringRef>(WKDictionaryGetItemForKey(messageBodyDictionary, hostNameKey.get()));
+        WKStringRef topFrameHostName = static_cast<WKStringRef>(WKDictionaryGetItemForKey(messageBodyDictionary, topFrameHostNameKey.get()));
+        
+        TestController::singleton().setStatisticsSubresourceUnderTopFrameOrigin(hostName, topFrameHostName);
+        return nullptr;
+    }
+    
+    if (WKStringIsEqualToUTF8CString(messageName, "SetStatisticsSubresourceUniqueRedirectTo")) {
+        ASSERT(WKGetTypeID(messageBody) == WKDictionaryGetTypeID());
+        
+        WKDictionaryRef messageBodyDictionary = static_cast<WKDictionaryRef>(messageBody);
+        WKRetainPtr<WKStringRef> hostNameKey(AdoptWK, WKStringCreateWithUTF8CString("HostName"));
+        WKRetainPtr<WKStringRef> hostNameRedirectedToKey(AdoptWK, WKStringCreateWithUTF8CString("HostNameRedirectedTo"));
+        
+        WKStringRef hostName = static_cast<WKStringRef>(WKDictionaryGetItemForKey(messageBodyDictionary, hostNameKey.get()));
+        WKStringRef hostNameRedirectedTo = static_cast<WKStringRef>(WKDictionaryGetItemForKey(messageBodyDictionary, hostNameRedirectedToKey.get()));
+        
+        TestController::singleton().setStatisticsSubresourceUniqueRedirectTo(hostName, hostNameRedirectedTo);
+        return nullptr;
+    }
+
+    if (WKStringIsEqualToUTF8CString(messageName, "SetStatisticsTimeToLiveUserInteraction")) {
+        ASSERT(WKGetTypeID(messageBody) == WKDoubleGetTypeID());
+        WKDoubleRef seconds = static_cast<WKDoubleRef>(messageBody);
+        TestController::singleton().setStatisticsTimeToLiveUserInteraction(WKDoubleGetValue(seconds));
+        return nullptr;
+    }
+    
+    if (WKStringIsEqualToUTF8CString(messageName, "StatisticsFireDataModificationHandler")) {
+        TestController::singleton().statisticsFireDataModificationHandler();
+        return nullptr;
+    }
+    
+    if (WKStringIsEqualToUTF8CString(messageName, "StatisticsFireShouldPartitionCookiesHandler")) {
+        ASSERT(WKGetTypeID(messageBody) == WKDictionaryGetTypeID());
+        
+        WKDictionaryRef messageBodyDictionary = static_cast<WKDictionaryRef>(messageBody);
+        WKRetainPtr<WKStringRef> hostNameKey(AdoptWK, WKStringCreateWithUTF8CString("HostName"));
+        WKRetainPtr<WKStringRef> valueKey(AdoptWK, WKStringCreateWithUTF8CString("Value"));
+        
+        WKStringRef hostName = static_cast<WKStringRef>(WKDictionaryGetItemForKey(messageBodyDictionary, hostNameKey.get()));
+        WKBooleanRef value = static_cast<WKBooleanRef>(WKDictionaryGetItemForKey(messageBodyDictionary, valueKey.get()));
+        
+        TestController::singleton().statisticsFireShouldPartitionCookiesHandler(hostName, WKBooleanGetValue(value));
+        return nullptr;
+    }
+    
+    if (WKStringIsEqualToUTF8CString(messageName, "StatisticsNotifyPagesWhenDataRecordsWereScanned")) {
+        ASSERT(WKGetTypeID(messageBody) == WKBooleanGetTypeID());
+        WKBooleanRef value = static_cast<WKBooleanRef>(messageBody);
+        TestController::singleton().setStatisticsNotifyPagesWhenDataRecordsWereScanned(WKBooleanGetValue(value));
+        return nullptr;
+    }
+
+    if (WKStringIsEqualToUTF8CString(messageName, "StatisticsShouldClassifyResourcesBeforeDataRecordsRemoval")) {
+        ASSERT(WKGetTypeID(messageBody) == WKBooleanGetTypeID());
+        WKBooleanRef value = static_cast<WKBooleanRef>(messageBody);
+        TestController::singleton().setStatisticsShouldClassifyResourcesBeforeDataRecordsRemoval(WKBooleanGetValue(value));
+        return nullptr;
+    }
+
+    if (WKStringIsEqualToUTF8CString(messageName, "SetStatisticsMinimumTimeBetweeenDataRecordsRemoval")) {
+        ASSERT(WKGetTypeID(messageBody) == WKDoubleGetTypeID());
+        WKDoubleRef seconds = static_cast<WKDoubleRef>(messageBody);
+        TestController::singleton().setStatisticsMinimumTimeBetweeenDataRecordsRemoval(WKDoubleGetValue(seconds));
+        return nullptr;
+    }
+    
+    if (WKStringIsEqualToUTF8CString(messageName, "StatisticsClearInMemoryAndPersistentStore")) {
+        TestController::singleton().statisticsClearInMemoryAndPersistentStore();
+        return nullptr;
+    }
+    
+    if (WKStringIsEqualToUTF8CString(messageName, "StatisticsResetToConsistentState")) {
+        TestController::singleton().statisticsResetToConsistentState();
+        return nullptr;
+    }
 
     ASSERT_NOT_REACHED();
     return nullptr;

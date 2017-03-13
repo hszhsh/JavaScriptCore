@@ -179,7 +179,9 @@ private:
     void setTitle(const WebCore::StringWithDirection&, const WebCore::URL&) final;
     
     String userAgent(const WebCore::URL&) final;
-    
+
+    String overrideContentSecurityPolicy() const final;
+
     void savePlatformDataToCachedFrame(WebCore::CachedFrame*) final;
     void transitionToCommittedFromCachedFrame(WebCore::CachedFrame*) final;
 #if PLATFORM(IOS)
@@ -199,7 +201,7 @@ private:
 
     RefPtr<WebCore::Widget> createPlugin(const WebCore::IntSize&, WebCore::HTMLPlugInElement&, const WebCore::URL&, const Vector<String>&, const Vector<String>&, const String&, bool loadManually) final;
     void recreatePlugin(WebCore::Widget*) final;
-    void redirectDataToPlugin(WebCore::Widget* pluginWidget) final;
+    void redirectDataToPlugin(WebCore::Widget&) final;
     
 #if ENABLE(WEBGL)
     WebCore::WebGLLoadPolicy webGLPolicyForURL(const String&) const final;
@@ -245,7 +247,7 @@ private:
     void forcePageTransitionIfNeeded() final;
 
 #if USE(QUICK_LOOK)
-    void didCreateQuickLookHandle(WebCore::QuickLookHandle&) final;
+    RefPtr<WebCore::QuickLookHandleClient> createQuickLookHandleClient(const String& fileName, const String& uti) final;
 #endif
 
 #if ENABLE(CONTENT_FILTERING)

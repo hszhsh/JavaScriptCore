@@ -35,6 +35,7 @@
 #include "AccessibilityListBox.h"
 #include "AccessibilitySpinButton.h"
 #include "AccessibilityTable.h"
+#include "Editing.h"
 #include "ElementIterator.h"
 #include "EventNames.h"
 #include "FloatRect.h"
@@ -70,7 +71,6 @@
 #include "UserGestureIndicator.h"
 #include "VisibleUnits.h"
 #include "Widget.h"
-#include "htmlediting.h"
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/StringBuilder.h>
 #include <wtf/unicode/CharacterNames.h>
@@ -2075,7 +2075,7 @@ bool AccessibilityNodeObject::canSetValueAttribute() const
     if (isProgressIndicator() || isSlider())
         return true;
 
-#if PLATFORM(GTK) || PLATFORM(EFL)
+#if PLATFORM(GTK)
     // In ATK, input types which support aria-readonly are treated as having a
     // settable value if the user can modify the widget's value or its state.
     if (supportsARIAReadOnly() || isRadioButton())

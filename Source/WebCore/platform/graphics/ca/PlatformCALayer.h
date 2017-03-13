@@ -23,8 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef PlatformCALayer_h
-#define PlatformCALayer_h
+#pragma once
 
 #include "FloatRoundedRect.h"
 #include "GraphicsLayer.h"
@@ -68,7 +67,6 @@ public:
         LayerTypeWebLayer,
         LayerTypeSimpleLayer,
         LayerTypeTransformLayer,
-        LayerTypeWebTiledLayer,
         LayerTypeTiledBackingLayer,
         LayerTypePageTiledBackingLayer,
         LayerTypeTiledBackingTileLayer,
@@ -114,6 +112,8 @@ public:
     virtual void copyContentsFromLayer(PlatformCALayer*) = 0;
 
     LayerType layerType() const { return m_layerType; }
+    
+    bool canHaveBackingStore() const;
 
     virtual PlatformCALayer* superlayer() const = 0;
     virtual void removeFromSuperlayer() = 0;
@@ -176,6 +176,12 @@ public:
     virtual bool acceleratesDrawing() const = 0;
     virtual void setAcceleratesDrawing(bool) = 0;
 
+    virtual bool wantsDeepColorBackingStore() const = 0;
+    virtual void setWantsDeepColorBackingStore(bool) = 0;
+
+    virtual bool supportsSubpixelAntialiasedText() const = 0;
+    virtual void setSupportsSubpixelAntialiasedText(bool) = 0;
+
     virtual CFTypeRef contents() const = 0;
     virtual void setContents(CFTypeRef) = 0;
 
@@ -234,7 +240,7 @@ public:
 
     virtual TiledBacking* tiledBacking() = 0;
 
-    virtual void drawTextAtPoint(CGContextRef, CGFloat x, CGFloat y, CGSize scale, CGFloat fontSize, const char* text, size_t length) const;
+    virtual void drawTextAtPoint(CGContextRef, CGFloat x, CGFloat y, CGSize scale, CGFloat fontSize, const char* text, size_t length, CGFloat strokeWidthAsPercentageOfFontSize = 0, Color strokeColor = Color()) const;
 
     static void flipContext(CGContextRef, CGFloat height);
     
@@ -298,5 +304,3 @@ WEBCORE_EXPORT TextStream& operator<<(TextStream&, PlatformCALayer::FilterType);
 SPECIALIZE_TYPE_TRAITS_BEGIN(ToValueTypeName) \
     static bool isType(const WebCore::PlatformCALayer& layer) { return layer.predicate; } \
 SPECIALIZE_TYPE_TRAITS_END()
-
-#endif // PlatformCALayer_h

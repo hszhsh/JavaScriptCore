@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2014-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -63,10 +63,12 @@ public:
         String applicationCacheFlatFileSubdirectoryName;
 
         String mediaCacheDirectory;
+        String indexedDBDatabaseDirectory;
         String webSQLDatabaseDirectory;
         String localStorageDirectory;
         String mediaKeysStorageDirectory;
         String resourceLoadStatisticsDirectory;
+        String javaScriptConfigurationDirectory;
     };
     static Ref<WebsiteDataStore> createNonPersistent();
     static Ref<WebsiteDataStore> create(Configuration);
@@ -79,12 +81,25 @@ public:
 
     bool resourceLoadStatisticsEnabled() const;
     void setResourceLoadStatisticsEnabled(bool);
+    void registerSharedResourceLoadObserver();
 
     static void cloneSessionData(WebPageProxy& sourcePage, WebPageProxy& newPage);
 
     void fetchData(OptionSet<WebsiteDataType>, OptionSet<WebsiteDataFetchOption>, std::function<void (Vector<WebsiteDataRecord>)> completionHandler);
+    void fetchDataForTopPrivatelyOwnedDomains(OptionSet<WebsiteDataType>, OptionSet<WebsiteDataFetchOption>, const Vector<String>& topPrivatelyOwnedDomains, std::function<void(Vector<WebsiteDataRecord>&&, Vector<String>&&)> completionHandler);
     void removeData(OptionSet<WebsiteDataType>, std::chrono::system_clock::time_point modifiedSince, std::function<void ()> completionHandler);
     void removeData(OptionSet<WebsiteDataType>, const Vector<WebsiteDataRecord>&, std::function<void ()> completionHandler);
+    void removeDataForTopPrivatelyOwnedDomains(OptionSet<WebsiteDataType>, OptionSet<WebsiteDataFetchOption>, const Vector<String>& topPrivatelyOwnedDomains, std::function<void(Vector<String>)> completionHandler);
+
+#if HAVE(CFNETWORK_STORAGE_PARTITIONING)
+    void shouldPartitionCookiesForTopPrivatelyOwnedDomains(const Vector<String>&, bool value);
+#endif
+    void resolveDirectoriesIfNecessary();
+    const String& resolvedApplicationCacheDirectory() const { return m_resolvedConfiguration.applicationCacheDirectory; }
+    const String& resolvedMediaCacheDirectory() const { return m_resolvedConfiguration.mediaCacheDirectory; }
+    const String& resolvedMediaKeysDirectory() const { return m_resolvedConfiguration.mediaKeysStorageDirectory; }
+    const String& resolvedDatabaseDirectory() const { return m_resolvedConfiguration.webSQLDatabaseDirectory; }
+    const String& resolvedJavaScriptConfigurationDirectory() const { return m_resolvedConfiguration.javaScriptConfigurationDirectory; }
 
     StorageManager* storageManager() { return m_storageManager.get(); }
 
@@ -118,6 +133,8 @@ private:
     const WebCore::SessionID m_sessionID;
 
     const Configuration m_configuration;
+    Configuration m_resolvedConfiguration;
+    bool m_hasResolvedDirectories { false };
 
     const RefPtr<StorageManager> m_storageManager;
     const RefPtr<WebResourceLoadStatisticsStore> m_resourceLoadStatistics;

@@ -170,6 +170,12 @@ WebInspector.CSSKeywordCompletions._propertyKeywordMap = {
     "clear": [
         "none", "left", "right", "both"
     ],
+    "fill-rule": [
+        "nonzero", "evenodd"
+    ],
+    "stroke-linecap": [
+        "butt", "round", "square"
+    ],
     "stroke-linejoin": [
         "round", "miter", "bevel"
     ],
@@ -382,7 +388,7 @@ WebInspector.CSSKeywordCompletions._propertyKeywordMap = {
         "-apple-system-headline", "-apple-system-body", "-apple-system-subheadline", "-apple-system-footnote",
         "-apple-system-caption1", "-apple-system-caption2", "-apple-system-short-headline", "-apple-system-short-body",
         "-apple-system-short-subheadline", "-apple-system-short-footnote", "-apple-system-short-caption1",
-        "-apple-system-tall-body", "-apple-system-title1", "-apple-system-title2", "-apple-system-title3"
+        "-apple-system-tall-body", "-apple-system-title1", "-apple-system-title2", "-apple-system-title3", "system-ui"
     ],
     "dominant-baseline": [
         "middle", "auto", "central", "text-before-edge", "text-after-edge", "ideographic", "alphabetic", "hanging",
@@ -491,7 +497,7 @@ WebInspector.CSSKeywordCompletions._propertyKeywordMap = {
         "-apple-system-subheadline", "-apple-system-footnote", "-apple-system-caption1", "-apple-system-caption2",
         "-apple-system-short-headline", "-apple-system-short-body", "-apple-system-short-subheadline",
         "-apple-system-short-footnote", "-apple-system-short-caption1", "-apple-system-tall-body",
-        "-apple-system-title1", "-apple-system-title2", "-apple-system-title3"
+        "-apple-system-title1", "-apple-system-title2", "-apple-system-title3", "system-ui"
     ],
     "text-overflow-mode": [
         "clip", "ellipsis"

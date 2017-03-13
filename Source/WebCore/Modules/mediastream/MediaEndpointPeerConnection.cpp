@@ -68,12 +68,14 @@ static const size_t iceUfragSize = 6;
 // Size range from 22 to 256 ice-chars defined in RFC 5245.
 static const size_t icePasswordSize = 24;
 
+#if !USE(LIBWEBRTC)
 static std::unique_ptr<PeerConnectionBackend> createMediaEndpointPeerConnection(RTCPeerConnection& peerConnection)
 {
     return std::unique_ptr<PeerConnectionBackend>(new MediaEndpointPeerConnection(peerConnection));
 }
 
 CreatePeerConnectionBackend PeerConnectionBackend::create = createMediaEndpointPeerConnection;
+#endif
 
 static String randomString(size_t size)
 {
@@ -418,9 +420,7 @@ void MediaEndpointPeerConnection::setLocalDescriptionTask(RefPtr<RTCSessionDescr
     if (m_peerConnection.internalIceGatheringState() == IceGatheringState::New && mediaDescriptions.size())
         m_peerConnection.updateIceGatheringState(IceGatheringState::Gathering);
 
-    if (m_peerConnection.internalSignalingState() == SignalingState::Stable && m_negotiationNeeded)
-        m_peerConnection.scheduleNegotiationNeededEvent();
-
+    markAsNeedingNegotiation();
     setLocalDescriptionSucceeded();
 }
 
@@ -664,11 +664,9 @@ void MediaEndpointPeerConnection::addIceCandidateTask(RTCIceCandidate& rtcCandid
     addIceCandidateSucceeded();
 }
 
-void MediaEndpointPeerConnection::getStats(MediaStreamTrack*, PeerConnection::StatsPromise&& promise)
+void MediaEndpointPeerConnection::getStats(MediaStreamTrack* track, Ref<DeferredPromise>&& promise)
 {
-    notImplemented();
-
-    promise.reject(NOT_SUPPORTED_ERR);
+    m_mediaEndpoint->getStats(track, WTFMove(promise));
 }
 
 Vector<RefPtr<MediaStream>> MediaEndpointPeerConnection::getRemoteStreams() const
@@ -695,7 +693,7 @@ std::unique_ptr<RTCDataChannelHandler> MediaEndpointPeerConnection::createDataCh
     return m_mediaEndpoint->createDataChannelHandler(label, options);
 }
 
-void MediaEndpointPeerConnection::replaceTrack(RTCRtpSender& sender, RefPtr<MediaStreamTrack>&& withTrack, DOMPromise<void>&& promise)
+void MediaEndpointPeerConnection::replaceTrack(RTCRtpSender& sender, Ref<MediaStreamTrack>&& withTrack, DOMPromise<void>&& promise)
 {
     RTCRtpTransceiver* transceiver = matchTransceiver(m_peerConnection.getTransceivers(), [&sender] (RTCRtpTransceiver& current) {
         return &current.sender() == &sender;
@@ -715,7 +713,7 @@ void MediaEndpointPeerConnection::replaceTrack(RTCRtpSender& sender, RefPtr<Medi
     });
 }
 
-void MediaEndpointPeerConnection::replaceTrackTask(RTCRtpSender& sender, const String& mid, RefPtr<MediaStreamTrack>&& withTrack, DOMPromise<void>& promise)
+void MediaEndpointPeerConnection::replaceTrackTask(RTCRtpSender& sender, const String& mid, Ref<MediaStreamTrack>&& withTrack, DOMPromise<void>& promise)
 {
     if (m_peerConnection.internalSignalingState() == SignalingState::Closed)
         return;
@@ -729,17 +727,6 @@ void MediaEndpointPeerConnection::replaceTrackTask(RTCRtpSender& sender, const S
 void MediaEndpointPeerConnection::doStop()
 {
     m_mediaEndpoint->stop();
-}
-
-void MediaEndpointPeerConnection::markAsNeedingNegotiation()
-{
-    if (m_negotiationNeeded)
-        return;
-
-    m_negotiationNeeded = true;
-
-    if (m_peerConnection.internalSignalingState() == SignalingState::Stable)
-        m_peerConnection.scheduleNegotiationNeededEvent();
 }
 
 void MediaEndpointPeerConnection::emulatePlatformEvent(const String& action)

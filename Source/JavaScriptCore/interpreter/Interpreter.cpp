@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010, 2012-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2008-2017 Apple Inc. All rights reserved.
  * Copyright (C) 2008 Cameron Zwarich <cwzwarich@uwaterloo.ca>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -302,7 +302,6 @@ Interpreter::Interpreter(VM& vm)
 #if !ENABLE(JIT)
     , m_cloopStack(vm)
 #endif
-    , m_errorHandlingModeReentry(0)
 #if !ASSERT_DISABLED
     , m_initialized(false)
 #endif
@@ -576,7 +575,7 @@ ALWAYS_INLINE static void notifyDebuggerOfUnwinding(CallFrame* callFrame)
     auto catchScope = DECLARE_CATCH_SCOPE(vm);
     if (Debugger* debugger = callFrame->vmEntryGlobalObject()->debugger()) {
         SuspendExceptionScope scope(&vm);
-        if (jsDynamicCast<JSFunction*>(callFrame->jsCallee()))
+        if (jsDynamicCast<JSFunction*>(vm, callFrame->jsCallee()))
             debugger->unwindEvent(callFrame);
         else
             debugger->didExecuteProgram(callFrame);
@@ -681,7 +680,7 @@ NEVER_INLINE HandlerInfo* Interpreter::unwind(VM& vm, CallFrame*& callFrame, Exc
 
     // Calculate an exception handler vPC, unwinding call frames as necessary.
     HandlerInfo* handler = nullptr;
-    UnwindFunctor functor(callFrame, isTerminatedExecutionException(exception), codeBlock, handler);
+    UnwindFunctor functor(callFrame, isTerminatedExecutionException(vm, exception), codeBlock, handler);
     callFrame->iterate(functor);
     if (!handler)
         return nullptr;
@@ -691,6 +690,7 @@ NEVER_INLINE HandlerInfo* Interpreter::unwind(VM& vm, CallFrame*& callFrame, Exc
 
 void Interpreter::notifyDebuggerOfExceptionToBeThrown(CallFrame* callFrame, Exception* exception)
 {
+    VM& vm = callFrame->vm();
     Debugger* debugger = callFrame->vmEntryGlobalObject()->debugger();
     if (debugger && debugger->needsExceptionCallbacks() && !exception->didNotifyInspectorOfThrow()) {
         // This code assumes that if the debugger is enabled then there is no inlining.
@@ -699,7 +699,7 @@ void Interpreter::notifyDebuggerOfExceptionToBeThrown(CallFrame* callFrame, Exce
         // https://bugs.webkit.org/show_bug.cgi?id=121754
 
         bool hasCatchHandler;
-        bool isTermination = isTerminatedExecutionException(exception);
+        bool isTermination = isTerminatedExecutionException(vm, exception);
         if (isTermination)
             hasCatchHandler = false;
         else {
@@ -727,11 +727,15 @@ static inline JSObject* checkedReturn(JSObject* returnValue)
     return returnValue;
 }
 
-JSValue Interpreter::execute(ProgramExecutable* program, CallFrame* callFrame, JSObject* thisObj)
+JSValue Interpreter::executeProgram(const SourceCode& source, CallFrame* callFrame, JSObject* thisObj)
 {
     JSScope* scope = thisObj->globalObject()->globalScope();
     VM& vm = *scope->vm();
     auto throwScope = DECLARE_THROW_SCOPE(vm);
+
+    ProgramExecutable* program = ProgramExecutable::create(callFrame, source);
+    ASSERT(throwScope.exception() || program);
+    RETURN_IF_EXCEPTION(throwScope, { });
 
     ASSERT(!throwScope.exception());
     ASSERT(!vm.isCollectorBusyOnCurrentThread());
@@ -850,14 +854,17 @@ failedJSONP:
     {
         CodeBlock* tempCodeBlock;
         JSObject* error = program->prepareForExecution<ProgramExecutable>(vm, nullptr, scope, CodeForCall, tempCodeBlock);
-        ASSERT(!throwScope.exception() || throwScope.exception() == jsDynamicCast<Exception*>(error));
+        ASSERT(!throwScope.exception() || throwScope.exception() == jsDynamicCast<Exception*>(vm, error));
         if (error)
             return checkedReturn(throwException(callFrame, throwScope, error));
         codeBlock = jsCast<ProgramCodeBlock*>(tempCodeBlock);
     }
 
-    if (UNLIKELY(vm.shouldTriggerTermination(callFrame)))
-        return throwTerminatedExecutionException(callFrame, throwScope);
+    VMTraps::Mask mask(VMTraps::NeedTermination, VMTraps::NeedWatchdogCheck);
+    if (UNLIKELY(vm.needTrapHandling(mask))) {
+        vm.handleTraps(callFrame, mask);
+        RETURN_IF_EXCEPTION(throwScope, throwScope.exception());
+    }
 
     if (scope->structure()->isUncacheableDictionary())
         scope->flattenDictionaryObject(vm);
@@ -914,8 +921,11 @@ JSValue Interpreter::executeCall(CallFrame* callFrame, JSObject* function, CallT
     } else
         newCodeBlock = 0;
 
-    if (UNLIKELY(vm.shouldTriggerTermination(callFrame)))
-        return throwTerminatedExecutionException(callFrame, throwScope);
+    VMTraps::Mask mask(VMTraps::NeedTermination, VMTraps::NeedWatchdogCheck);
+    if (UNLIKELY(vm.needTrapHandling(mask))) {
+        vm.handleTraps(callFrame, mask);
+        RETURN_IF_EXCEPTION(throwScope, throwScope.exception());
+    }
 
     ProtoCallFrame protoCallFrame;
     protoCallFrame.init(newCodeBlock, function, thisValue, argsCount, args.data());
@@ -977,8 +987,11 @@ JSObject* Interpreter::executeConstruct(CallFrame* callFrame, JSObject* construc
     } else
         newCodeBlock = 0;
 
-    if (UNLIKELY(vm.shouldTriggerTermination(callFrame)))
-        return throwTerminatedExecutionException(callFrame, throwScope);
+    VMTraps::Mask mask(VMTraps::NeedTermination, VMTraps::NeedWatchdogCheck);
+    if (UNLIKELY(vm.needTrapHandling(mask))) {
+        vm.handleTraps(callFrame, mask);
+        RETURN_IF_EXCEPTION(throwScope, throwScope.exception());
+    }
 
     ProtoCallFrame protoCallFrame;
     protoCallFrame.init(newCodeBlock, constructor, newTarget, argsCount, args.data());
@@ -1001,7 +1014,7 @@ JSObject* Interpreter::executeConstruct(CallFrame* callFrame, JSObject* construc
     return checkedReturn(asObject(result));
 }
 
-CallFrameClosure Interpreter::prepareForRepeatCall(FunctionExecutable* functionExecutable, CallFrame* callFrame, ProtoCallFrame* protoCallFrame, JSFunction* function, int argumentCountIncludingThis, JSScope* scope, JSValue* args)
+CallFrameClosure Interpreter::prepareForRepeatCall(FunctionExecutable* functionExecutable, CallFrame* callFrame, ProtoCallFrame* protoCallFrame, JSFunction* function, int argumentCountIncludingThis, JSScope* scope, const ArgList& args)
 {
     VM& vm = *scope->vm();
     auto throwScope = DECLARE_THROW_SCOPE(vm);
@@ -1021,7 +1034,7 @@ CallFrameClosure Interpreter::prepareForRepeatCall(FunctionExecutable* functionE
 
     size_t argsCount = argumentCountIncludingThis;
 
-    protoCallFrame->init(newCodeBlock, function, jsUndefined(), argsCount, args);
+    protoCallFrame->init(newCodeBlock, function, jsUndefined(), argsCount, args.data());
     // Return the successful closure:
     CallFrameClosure result = { callFrame, protoCallFrame, function, functionExecutable, &vm, scope, newCodeBlock->numParameters(), argumentCountIncludingThis };
     return result;
@@ -1039,8 +1052,11 @@ JSValue Interpreter::execute(CallFrameClosure& closure)
 
     StackStats::CheckPoint stackCheckPoint;
 
-    if (UNLIKELY(vm.shouldTriggerTermination(closure.oldCallFrame)))
-        return throwTerminatedExecutionException(closure.oldCallFrame, throwScope);
+    VMTraps::Mask mask(VMTraps::NeedTermination, VMTraps::NeedWatchdogCheck);
+    if (UNLIKELY(vm.needTrapHandling(mask))) {
+        vm.handleTraps(closure.oldCallFrame, mask);
+        RETURN_IF_EXCEPTION(throwScope, throwScope.exception());
+    }
 
     // Execute the code:
     JSValue result = closure.functionExecutable->generatedJITCodeForCall()->execute(&vm, closure.protoCallFrame);
@@ -1140,8 +1156,11 @@ JSValue Interpreter::execute(EvalExecutable* eval, CallFrame* callFrame, JSValue
         }
     }
 
-    if (UNLIKELY(vm.shouldTriggerTermination(callFrame)))
-        return throwTerminatedExecutionException(callFrame, throwScope);
+    VMTraps::Mask mask(VMTraps::NeedTermination, VMTraps::NeedWatchdogCheck);
+    if (UNLIKELY(vm.needTrapHandling(mask))) {
+        vm.handleTraps(callFrame, mask);
+        RETURN_IF_EXCEPTION(throwScope, throwScope.exception());
+    }
 
     ASSERT(codeBlock->numParameters() == 1); // 1 parameter for 'this'.
 
@@ -1179,8 +1198,11 @@ JSValue Interpreter::execute(ModuleProgramExecutable* executable, CallFrame* cal
         codeBlock = jsCast<ModuleProgramCodeBlock*>(tempCodeBlock);
     }
 
-    if (UNLIKELY(vm.shouldTriggerTermination(callFrame)))
-        return throwTerminatedExecutionException(callFrame, throwScope);
+    VMTraps::Mask mask(VMTraps::NeedTermination, VMTraps::NeedWatchdogCheck);
+    if (UNLIKELY(vm.needTrapHandling(mask))) {
+        vm.handleTraps(callFrame, mask);
+        RETURN_IF_EXCEPTION(throwScope, throwScope.exception());
+    }
 
     if (scope->structure()->isUncacheableDictionary())
         scope->flattenDictionaryObject(vm);

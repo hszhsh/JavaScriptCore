@@ -389,7 +389,9 @@ macro(GENERATE_WEBKIT2_MESSAGE_SOURCES _output_source _input_files)
 endmacro()
 
 macro(MAKE_JS_FILE_ARRAYS _output_cpp _output_h _scripts _scripts_dependencies)
-    if (WIN32)
+    if (NOT CMAKE_VERSION VERSION_LESS 3.1)
+        set(_python_path ${CMAKE_COMMAND} -E env "PYTHONPATH=${JavaScriptCore_SCRIPTS_DIR}")
+    elseif (WIN32)
         set(_python_path set "PYTHONPATH=${JavaScriptCore_SCRIPTS_DIR}" &&)
     else ()
         set(_python_path "PYTHONPATH=${JavaScriptCore_SCRIPTS_DIR}")
@@ -433,4 +435,16 @@ macro(PROCESS_ALLINONE_FILE _file_list _all_in_one_file _result_file_list _no_co
         set(${_result_file_list} ${_new_result})
     endforeach ()
 
+endmacro()
+
+# Helper macros for debugging CMake problems.
+macro(WEBKIT_DEBUG_DUMP_COMMANDS)
+    set(CMAKE_VERBOSE_MAKEFILE ON)
+endmacro()
+
+macro(WEBKIT_DEBUG_DUMP_VARIABLES)
+    set_cmake_property(_variableNames VARIABLES)
+    foreach (_variableName ${_variableNames})
+       message(STATUS "${_variableName}=${${_variableName}}")
+    endforeach ()
 endmacro()

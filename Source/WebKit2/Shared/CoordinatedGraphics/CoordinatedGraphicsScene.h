@@ -40,11 +40,6 @@
 #include <wtf/ThreadingPrimitives.h>
 #include <wtf/Vector.h>
 
-#if USE(GRAPHICS_SURFACE)
-#include <WebCore/GraphicsSurface.h>
-#include <WebCore/TextureMapperSurfaceBackingStore.h>
-#endif
-
 #if USE(COORDINATED_GRAPHICS_THREADED)
 #include <WebCore/TextureMapperPlatformLayerProxy.h>
 #endif
@@ -70,7 +65,6 @@ public:
     explicit CoordinatedGraphicsScene(CoordinatedGraphicsSceneClient*);
     virtual ~CoordinatedGraphicsScene();
     void paintToCurrentGLContext(const WebCore::TransformationMatrix&, float, const WebCore::FloatRect&, const WebCore::Color& backgroundColor, bool drawsBackground, const WebCore::FloatPoint&, WebCore::TextureMapper::PaintFlags = 0);
-    void paintToGraphicsContext(PlatformGraphicsContext*, const WebCore::Color& backgroundColor, bool drawsBackground);
     void detach();
     void appendUpdate(std::function<void()>&&);
 
@@ -102,10 +96,6 @@ private:
     void setLayerFiltersIfNeeded(WebCore::TextureMapperLayer*, const WebCore::CoordinatedGraphicsLayerState&);
     void setLayerAnimationsIfNeeded(WebCore::TextureMapperLayer*, const WebCore::CoordinatedGraphicsLayerState&);
     void syncPlatformLayerIfNeeded(WebCore::TextureMapperLayer*, const WebCore::CoordinatedGraphicsLayerState&);
-#if USE(GRAPHICS_SURFACE)
-    void createPlatformLayerIfNeeded(WebCore::TextureMapperLayer*, const WebCore::CoordinatedGraphicsLayerState&);
-    void destroyPlatformLayerIfNeeded(WebCore::TextureMapperLayer*, const WebCore::CoordinatedGraphicsLayerState&);
-#endif
     void setLayerRepaintCountIfNeeded(WebCore::TextureMapperLayer*, const WebCore::CoordinatedGraphicsLayerState&);
 
     void syncUpdateAtlases(const WebCore::CoordinatedGraphicsState&);
@@ -166,11 +156,6 @@ private:
     BackingStoreMap m_backingStores;
 
     HashSet<RefPtr<CoordinatedBackingStore>> m_backingStoresWithPendingBuffers;
-
-#if USE(GRAPHICS_SURFACE)
-    typedef HashMap<WebCore::TextureMapperLayer*, RefPtr<WebCore::TextureMapperSurfaceBackingStore>> SurfaceBackingStoreMap;
-    SurfaceBackingStoreMap m_surfaceBackingStores;
-#endif
 
 #if USE(COORDINATED_GRAPHICS_THREADED)
     typedef HashMap<WebCore::TextureMapperLayer*, RefPtr<WebCore::TextureMapperPlatformLayerProxy>> PlatformLayerProxyMap;

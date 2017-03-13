@@ -285,6 +285,16 @@ static _WKStorageBlockingPolicy toAPI(WebCore::SecurityOrigin::StorageBlockingPo
     _preferences->setVisibleDebugOverlayRegions(regionFlags);
 }
 
+- (BOOL)_simpleLineLayoutEnabled
+{
+    return _preferences->simpleLineLayoutEnabled();
+}
+
+- (void)_setSimpleLineLayoutEnabled:(BOOL)simpleLineLayoutEnabled
+{
+    _preferences->setSimpleLineLayoutEnabled(simpleLineLayoutEnabled);
+}
+
 - (BOOL)_simpleLineLayoutDebugBordersEnabled
 {
     return _preferences->simpleLineLayoutDebugBordersEnabled();
@@ -353,6 +363,16 @@ static _WKStorageBlockingPolicy toAPI(WebCore::SecurityOrigin::StorageBlockingPo
 - (void)_setTextAutosizingEnabled:(BOOL)enabled
 {
     _preferences->setTextAutosizingEnabled(enabled);
+}
+
+- (BOOL)_subpixelAntialiasedLayerTextEnabled
+{
+    return _preferences->subpixelAntialiasedLayerTextEnabled();
+}
+
+- (void)_setSubpixelAntialiasedLayerTextEnabled:(BOOL)enabled
+{
+    _preferences->setSubpixelAntialiasedLayerTextEnabled(enabled);
 }
 
 - (BOOL)_developerExtrasEnabled

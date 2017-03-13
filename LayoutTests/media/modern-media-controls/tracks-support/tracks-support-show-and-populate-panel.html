@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- webkit-test-runner [ enableModernMediaControls=true ] -->
+<!DOCTYPE html>
 <script src="../../../resources/js-test-pre.js"></script>
 <body>
 <video src="../../content/CC+Subtitles.mov" style="width: 640px; height: 360px;" controls autoplay></video>
@@ -33,7 +33,7 @@ function clickOnTracksButton()
 
 function listContentsOfTracksPanel()
 {
-    for (let section of shadowRoot.lastChild.querySelectorAll(".tracks-panel-section")) {
+    for (let section of shadowRoot.lastChild.querySelectorAll("section")) {
         debug(section.querySelector("h3").textContent);
         for (let item of section.querySelectorAll("li"))
             debug("  " + item.textContent);

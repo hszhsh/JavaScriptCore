@@ -94,13 +94,8 @@ private:
     bool m_syntheticItalic;
 };
 
-static void appendFontWithInvalidUnicodeRangeIfLoading(FontRanges& ranges, Ref<FontAccessor>&& fontAccessor, const Vector<CSSFontFace::UnicodeRange>& unicodeRanges)
+static void appendFont(FontRanges& ranges, Ref<FontAccessor>&& fontAccessor, const Vector<CSSFontFace::UnicodeRange>& unicodeRanges)
 {
-    if (fontAccessor->isLoading()) {
-        ranges.appendRange({ 0, 0, WTFMove(fontAccessor) });
-        return;
-    }
-
     if (unicodeRanges.isEmpty()) {
         ranges.appendRange({ 0, 0x7FFFFFFF, WTFMove(fontAccessor) });
         return;
@@ -112,7 +107,7 @@ static void appendFontWithInvalidUnicodeRangeIfLoading(FontRanges& ranges, Ref<F
 
 FontRanges CSSSegmentedFontFace::fontRanges(const FontDescription& fontDescription)
 {
-    FontTraitsMask desiredTraitsMask = fontDescription.traitsMask();
+    auto desiredRequest = fontDescription.fontSelectionRequest();
 
     auto addResult = m_cache.add(FontDescriptionKey(fontDescription), FontRanges());
     auto& result = addResult.iterator->value;
@@ -122,9 +117,9 @@ FontRanges CSSSegmentedFontFace::fontRanges(const FontDescription& fontDescripti
             if (face->allSourcesFailed())
                 continue;
 
-            FontTraitsMask traitsMask = face->traitsMask();
-            bool syntheticBold = (fontDescription.fontSynthesis() & FontSynthesisWeight) && !(traitsMask & (FontWeight600Mask | FontWeight700Mask | FontWeight800Mask | FontWeight900Mask)) && (desiredTraitsMask & (FontWeight600Mask | FontWeight700Mask | FontWeight800Mask | FontWeight900Mask));
-            bool syntheticItalic = (fontDescription.fontSynthesis() & FontSynthesisStyle) && !(traitsMask & FontStyleItalicMask) && (desiredTraitsMask & FontStyleItalicMask);
+            auto selectionCapabilities = face->fontSelectionCapabilities();
+            bool syntheticBold = (fontDescription.fontSynthesis() & FontSynthesisWeight) && !isFontWeightBold(selectionCapabilities.weight.maximum) && isFontWeightBold(desiredRequest.weight);
+            bool syntheticItalic = (fontDescription.fontSynthesis() & FontSynthesisStyle) && !isItalic(selectionCapabilities.slope.maximum) && isItalic(desiredRequest.slope);
 
             // This doesn't trigger an unnecessary download because every element styled with this family will need font metrics in order to run layout.
             // Metrics used for layout come from FontRanges::fontForFirstRange(), which assumes that the first font is non-null.
@@ -132,7 +127,7 @@ FontRanges CSSSegmentedFontFace::fontRanges(const FontDescription& fontDescripti
             auto fontAccessor = CSSFontAccessor::create(face, fontDescription, syntheticBold, syntheticItalic);
             if (result.isNull() && !fontAccessor->font())
                 continue;
-            appendFontWithInvalidUnicodeRangeIfLoading(result, WTFMove(fontAccessor), face->ranges());
+            appendFont(result, WTFMove(fontAccessor), face->ranges());
         }
     }
     return result;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2016-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,13 +26,14 @@
 #include "config.h"
 #include "WebResourceLoadStatisticsStore.h"
 
-#include "APIWebsiteDataStore.h"
 #include "WebProcessMessages.h"
 #include "WebProcessPool.h"
+#include "WebProcessProxy.h"
 #include "WebResourceLoadStatisticsStoreMessages.h"
 #include "WebsiteDataFetchOption.h"
 #include "WebsiteDataType.h"
 #include <WebCore/KeyedCoding.h>
+#include <WebCore/ResourceLoadObserver.h>
 #include <WebCore/ResourceLoadStatistics.h>
 #include <wtf/CurrentTime.h>
 #include <wtf/MainThread.h>
@@ -44,9 +45,10 @@ using namespace WebCore;
 
 namespace WebKit {
 
-static const auto numberOfSecondsBetweenRemovingDataRecords = 60;
-static const auto featureVectorLengthThreshold = 3;
+static auto minimumTimeBetweeenDataRecordsRemoval = 60;
 static OptionSet<WebKit::WebsiteDataType> dataTypesToRemove;
+static auto notifyPages = false;
+static auto shouldClassifyResourcesBeforeDataRecordsRemoval = true;
 
 Ref<WebResourceLoadStatisticsStore> WebResourceLoadStatisticsStore::create(const String& resourceLoadStatisticsDirectory)
 {
@@ -54,9 +56,9 @@ Ref<WebResourceLoadStatisticsStore> WebResourceLoadStatisticsStore::create(const
 }
 
 WebResourceLoadStatisticsStore::WebResourceLoadStatisticsStore(const String& resourceLoadStatisticsDirectory)
-    : m_resourceStatisticsStore(ResourceLoadStatisticsStore::create())
+    : m_resourceLoadStatisticsStore(ResourceLoadStatisticsStore::create())
     , m_statisticsQueue(WorkQueue::create("WebResourceLoadStatisticsStore Process Data Queue"))
-    , m_storagePath(resourceLoadStatisticsDirectory)
+    , m_statisticsStoragePath(resourceLoadStatisticsDirectory)
 {
 }
 
@@ -64,39 +66,29 @@ WebResourceLoadStatisticsStore::~WebResourceLoadStatisticsStore()
 {
 }
 
-bool WebResourceLoadStatisticsStore::hasPrevalentResourceCharacteristics(const ResourceLoadStatistics& resourceStatistic)
+void WebResourceLoadStatisticsStore::setNotifyPagesWhenDataRecordsWereScanned(bool always)
 {
-    auto subresourceUnderTopFrameOriginsCount = resourceStatistic.subresourceUnderTopFrameOrigins.size();
-    auto subresourceUniqueRedirectsToCount = resourceStatistic.subresourceUniqueRedirectsTo.size();
-    auto subframeUnderTopFrameOriginsCount = resourceStatistic.subframeUnderTopFrameOrigins.size();
-    
-    if (!subresourceUnderTopFrameOriginsCount
-        && !subresourceUniqueRedirectsToCount
-        && !subframeUnderTopFrameOriginsCount)
-        return false;
-
-    if (subresourceUnderTopFrameOriginsCount > featureVectorLengthThreshold
-        || subresourceUniqueRedirectsToCount > featureVectorLengthThreshold
-        || subframeUnderTopFrameOriginsCount > featureVectorLengthThreshold)
-        return true;
-
-    // The resource is considered prevalent if the feature vector
-    // is longer than the threshold.
-    // Vector length for n dimensions is sqrt(a^2 + (...) + n^2).
-    double vectorLength = 0;
-    vectorLength += subresourceUnderTopFrameOriginsCount * subresourceUnderTopFrameOriginsCount;
-    vectorLength += subresourceUniqueRedirectsToCount * subresourceUniqueRedirectsToCount;
-    vectorLength += subframeUnderTopFrameOriginsCount * subframeUnderTopFrameOriginsCount;
-
-    ASSERT(vectorLength > 0);
-
-    return sqrt(vectorLength) > featureVectorLengthThreshold;
+    notifyPages = always;
 }
-    
+
+void WebResourceLoadStatisticsStore::setShouldClassifyResourcesBeforeDataRecordsRemoval(bool value)
+{
+    shouldClassifyResourcesBeforeDataRecordsRemoval = value;
+}
+
+void WebResourceLoadStatisticsStore::setMinimumTimeBetweeenDataRecordsRemoval(double seconds)
+{
+    if (seconds >= 0)
+        minimumTimeBetweeenDataRecordsRemoval = seconds;
+}
+
 void WebResourceLoadStatisticsStore::classifyResource(ResourceLoadStatistics& resourceStatistic)
 {
-    if (!resourceStatistic.isPrevalentResource && hasPrevalentResourceCharacteristics(resourceStatistic)) {
+    if (!resourceStatistic.isPrevalentResource
+        && m_resourceLoadStatisticsClassifier.hasPrevalentResourceCharacteristics(resourceStatistic)) {
         resourceStatistic.isPrevalentResource = true;
+        if (!resourceStatistic.hadUserInteraction)
+            m_resourceLoadStatisticsStore->fireShouldPartitionCookiesHandler(resourceStatistic.highLevelDomain, true);
     }
 }
 
@@ -110,12 +102,8 @@ void WebResourceLoadStatisticsStore::removeDataRecords()
         return;
 
     double now = currentTime();
-    if (!m_lastTimeDataRecordsWereRemoved) {
-        m_lastTimeDataRecordsWereRemoved = now;
-        return;
-    }
-
-    if (now < (m_lastTimeDataRecordsWereRemoved + numberOfSecondsBetweenRemovingDataRecords))
+    if (m_lastTimeDataRecordsWereRemoved
+        && now < m_lastTimeDataRecordsWereRemoved + minimumTimeBetweeenDataRecordsRemoval)
         return;
 
     m_dataRecordsRemovalPending = true;
@@ -123,57 +111,49 @@ void WebResourceLoadStatisticsStore::removeDataRecords()
 
     if (dataTypesToRemove.isEmpty()) {
         dataTypesToRemove |= WebsiteDataType::Cookies;
-        dataTypesToRemove |= WebsiteDataType::LocalStorage;
-        dataTypesToRemove |= WebsiteDataType::IndexedDBDatabases;
         dataTypesToRemove |= WebsiteDataType::DiskCache;
         dataTypesToRemove |= WebsiteDataType::MemoryCache;
+        dataTypesToRemove |= WebsiteDataType::OfflineWebApplicationCache;
+        dataTypesToRemove |= WebsiteDataType::SessionStorage;
+        dataTypesToRemove |= WebsiteDataType::LocalStorage;
+        dataTypesToRemove |= WebsiteDataType::WebSQLDatabases;
+        dataTypesToRemove |= WebsiteDataType::IndexedDBDatabases;
+        dataTypesToRemove |= WebsiteDataType::MediaKeys;
+        dataTypesToRemove |= WebsiteDataType::HSTSCache;
+        dataTypesToRemove |= WebsiteDataType::SearchFieldRecentSearches;
+#if ENABLE(NETSCAPE_PLUGIN_API)
+        dataTypesToRemove |= WebsiteDataType::PlugInData;
+#endif
+#if ENABLE(MEDIA_STREAM)
+        dataTypesToRemove |= WebsiteDataType::MediaDeviceIdentifier;
+#endif
     }
 
     // Switch to the main thread to get the default website data store
     RunLoop::main().dispatch([prevalentResourceDomains = WTFMove(prevalentResourceDomains), this] () mutable {
-        auto& websiteDataStore = API::WebsiteDataStore::defaultDataStore()->websiteDataStore();
-
-        websiteDataStore.fetchData(dataTypesToRemove, { }, [prevalentResourceDomains = WTFMove(prevalentResourceDomains), this](auto websiteDataRecords) {
-            Vector<WebsiteDataRecord> dataRecords;
-            Vector<String> prevalentResourceDomainsWithDataRecords;
-            for (auto& websiteDataRecord : websiteDataRecords) {
-                for (auto& prevalentResourceDomain : prevalentResourceDomains) {
-                    if (websiteDataRecord.displayName.endsWithIgnoringASCIICase(prevalentResourceDomain)) {
-                        auto suffixStart = websiteDataRecord.displayName.length() - prevalentResourceDomain.length();
-                        if (!suffixStart || websiteDataRecord.displayName[suffixStart - 1] == '.') {
-                            dataRecords.append(websiteDataRecord);
-                            prevalentResourceDomainsWithDataRecords.append(prevalentResourceDomain);
-                        }
-                    }
-                }
-            }
-
-            if (!dataRecords.size()) {
-                m_dataRecordsRemovalPending = false;
-                return;
-            }
-
-            auto& websiteDataStore = API::WebsiteDataStore::defaultDataStore()->websiteDataStore();
-            websiteDataStore.removeData(dataTypesToRemove, dataRecords, [prevalentResourceDomainsWithDataRecords = WTFMove(prevalentResourceDomainsWithDataRecords), this] {
-                this->coreStore().updateStatisticsForRemovedDataRecords(prevalentResourceDomainsWithDataRecords);
-                m_dataRecordsRemovalPending = false;
-            });
+        WebProcessProxy::deleteWebsiteDataForTopPrivatelyOwnedDomainsInAllPersistentDataStores(dataTypesToRemove, prevalentResourceDomains, notifyPages, [this](Vector<String> domainsWithDeletedWebsiteData) mutable {
+            this->coreStore().updateStatisticsForRemovedDataRecords(domainsWithDeletedWebsiteData);
+            m_dataRecordsRemovalPending = false;
         });
     });
+}
+
+void WebResourceLoadStatisticsStore::processStatisticsAndDataRecords()
+{
+    if (shouldClassifyResourcesBeforeDataRecordsRemoval) {
+        coreStore().processStatistics([this] (ResourceLoadStatistics& resourceStatistic) {
+            classifyResource(resourceStatistic);
+        });
+    }
+    removeDataRecords();
+
+    writeStoreToDisk();
 }
 
 void WebResourceLoadStatisticsStore::resourceLoadStatisticsUpdated(const Vector<WebCore::ResourceLoadStatistics>& origins)
 {
     coreStore().mergeStatistics(origins);
-
-    coreStore().processStatistics([this] (ResourceLoadStatistics& resourceStatistic) {
-        classifyResource(resourceStatistic);
-        removeDataRecords();
-    });
-    
-    auto encoder = coreStore().createEncoderFromData();
-    
-    writeEncoderToDisk(*encoder.get(), "full_browsing_session");
+    processStatisticsAndDataRecords();
 }
 
 void WebResourceLoadStatisticsStore::setResourceLoadStatisticsEnabled(bool enabled)
@@ -189,6 +169,27 @@ void WebResourceLoadStatisticsStore::setResourceLoadStatisticsEnabled(bool enabl
 bool WebResourceLoadStatisticsStore::resourceLoadStatisticsEnabled() const
 {
     return m_resourceLoadStatisticsEnabled;
+}
+
+void WebResourceLoadStatisticsStore::registerSharedResourceLoadObserver()
+{
+    ResourceLoadObserver::sharedObserver().setStatisticsStore(m_resourceLoadStatisticsStore.copyRef());
+    m_resourceLoadStatisticsStore->setNotificationCallback([this] {
+        if (m_resourceLoadStatisticsStore->isEmpty())
+            return;
+        processStatisticsAndDataRecords();
+    });
+}
+    
+void WebResourceLoadStatisticsStore::registerSharedResourceLoadObserver(std::function<void(const Vector<String>& primaryDomain, bool value)>&& shouldPartitionCookiesForDomainsHandler)
+{
+    registerSharedResourceLoadObserver();
+    m_resourceLoadStatisticsStore->setShouldPartitionCookiesCallback([this, shouldPartitionCookiesForDomainsHandler = WTFMove(shouldPartitionCookiesForDomainsHandler)] (const Vector<String>& primaryDomains, bool value) {
+        shouldPartitionCookiesForDomainsHandler(primaryDomains, value);
+    });
+    m_resourceLoadStatisticsStore->setWritePersistentStoreCallback([this]() {
+        writeStoreToDisk();
+    });
 }
 
 void WebResourceLoadStatisticsStore::readDataFromDiskIfNeeded()
@@ -229,11 +230,17 @@ void WebResourceLoadStatisticsStore::applicationWillTerminate()
 
 String WebResourceLoadStatisticsStore::persistentStoragePath(const String& label) const
 {
-    if (m_storagePath.isEmpty())
+    if (m_statisticsStoragePath.isEmpty())
         return emptyString();
 
     // TODO Decide what to call this file
-    return pathByAppendingComponent(m_storagePath, label + "_resourceLog.plist");
+    return pathByAppendingComponent(m_statisticsStoragePath, label + "_resourceLog.plist");
+}
+
+void WebResourceLoadStatisticsStore::writeStoreToDisk()
+{
+    auto encoder = coreStore().createEncoderFromData();
+    writeEncoderToDisk(*encoder.get(), "full_browsing_session");
 }
 
 void WebResourceLoadStatisticsStore::writeEncoderToDisk(KeyedEncoder& encoder, const String& label) const
@@ -246,8 +253,8 @@ void WebResourceLoadStatisticsStore::writeEncoderToDisk(KeyedEncoder& encoder, c
     if (resourceLog.isEmpty())
         return;
 
-    if (!m_storagePath.isEmpty())
-        makeAllDirectories(m_storagePath);
+    if (!m_statisticsStoragePath.isEmpty())
+        makeAllDirectories(m_statisticsStoragePath);
 
     auto handle = openFile(resourceLog, OpenForWrite);
     if (!handle)

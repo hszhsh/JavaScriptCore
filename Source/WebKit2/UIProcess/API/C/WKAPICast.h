@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2010-2017 Apple Inc. All rights reserved.
  * Portions Copyright (c) 2010 Motorola Mobility, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -51,6 +51,8 @@
 #include <WebCore/Settings.h>
 
 namespace API {
+class ContentExtension;
+class ContentExtensionStore;
 class ExperimentalFeature;
 class FrameHandle;
 class FrameInfo;
@@ -63,8 +65,6 @@ class OpenPanelParameters;
 class PageConfiguration;
 class ProcessPoolConfiguration;
 class SessionState;
-class UserContentExtension;
-class UserContentExtensionStore;
 class UserScript;
 class WebsiteDataStore;
 class WebsitePolicies;
@@ -107,6 +107,7 @@ class WebProcessPool;
 class WebProtectionSpace;
 class WebRenderLayer;
 class WebRenderObject;
+class WebResourceLoadStatisticsManager;
 class WebTextChecker;
 class WebUserContentControllerProxy;
 class WebVibrationProxy;
@@ -156,11 +157,12 @@ WK_ADD_API_MAPPING(WKPreferencesRef, WebPreferences)
 WK_ADD_API_MAPPING(WKProtectionSpaceRef, WebProtectionSpace)
 WK_ADD_API_MAPPING(WKRenderLayerRef, WebRenderLayer)
 WK_ADD_API_MAPPING(WKRenderObjectRef, WebRenderObject)
+WK_ADD_API_MAPPING(WKResourceLoadStatisticsManagerRef, WebResourceLoadStatisticsManager)
 WK_ADD_API_MAPPING(WKSessionStateRef, API::SessionState)
 WK_ADD_API_MAPPING(WKTextCheckerRef, WebTextChecker)
 WK_ADD_API_MAPPING(WKUserContentControllerRef, WebUserContentControllerProxy)
-WK_ADD_API_MAPPING(WKUserContentExtensionStoreRef, API::UserContentExtensionStore)
-WK_ADD_API_MAPPING(WKUserContentFilterRef, API::UserContentExtension)
+WK_ADD_API_MAPPING(WKUserContentExtensionStoreRef, API::ContentExtensionStore)
+WK_ADD_API_MAPPING(WKUserContentFilterRef, API::ContentExtension)
 WK_ADD_API_MAPPING(WKUserMediaPermissionCheckRef, UserMediaPermissionCheckProxy)
 WK_ADD_API_MAPPING(WKUserMediaPermissionRequestRef, UserMediaPermissionRequestProxy)
 WK_ADD_API_MAPPING(WKUserScriptRef, API::UserScript)
@@ -553,10 +555,6 @@ inline ProxyingRefPtr<WebGrammarDetail> toAPI(const WebCore::GrammarDetail& gram
 
 #if defined(BUILDING_GTK__)
 #include "WKAPICastGtk.h"
-#endif
-
-#if defined(BUILDING_EFL__)
-#include "WKAPICastEfl.h"
 #endif
 
 #endif // WKAPICast_h

@@ -29,6 +29,7 @@
 #include "PageVisibilityState.h"
 #include "Pagination.h"
 #include "PlatformScreen.h"
+#include "RTCController.h"
 #include "Region.h"
 #include "ScrollTypes.h"
 #include "SessionID.h"
@@ -97,6 +98,8 @@ class HTMLMediaElement;
 class UserInputBridge;
 class InspectorClient;
 class InspectorController;
+class LibWebRTCProvider;
+class LowPowerModeNotifier;
 class MainFrame;
 class MediaCanStartListener;
 class MediaPlaybackTarget;
@@ -109,9 +112,7 @@ class PlugInClient;
 class PluginData;
 class PluginInfoProvider;
 class PluginViewBase;
-#if ENABLE(POINTER_LOCK)
 class PointerLockController;
-#endif
 class ProgressTracker;
 class ProgressTrackerClient;
 class Range;
@@ -166,6 +167,7 @@ public:
 
     static void refreshPlugins(bool reload);
     WEBCORE_EXPORT PluginData& pluginData();
+    void clearPluginData();
 
     WEBCORE_EXPORT void setCanStartMedia(bool);
     bool canStartMedia() const { return m_canStartMedia; }
@@ -222,6 +224,8 @@ public:
 #if ENABLE(POINTER_LOCK)
     PointerLockController& pointerLockController() const { return *m_pointerLockController; }
 #endif
+    LibWebRTCProvider& libWebRTCProvider() { return m_libWebRTCProvider.get(); }
+    RTCController& rtcController() { return m_rtcController; }
 
     ValidationMessageClient* validationMessageClient() const { return m_validationMessageClient.get(); }
     void updateValidationBubbleStateIfNeeded();
@@ -236,7 +240,7 @@ public:
     ProgressTracker& progress() const { return *m_progress; }
     BackForwardController& backForward() const { return *m_backForwardController; }
 
-    std::chrono::milliseconds domTimerAlignmentInterval() const { return m_timerAlignmentInterval; }
+    Seconds domTimerAlignmentInterval() const { return m_domTimerAlignmentInterval; }
 
 #if ENABLE(VIEW_MODE_CSS_MEDIA)
     enum ViewMode {
@@ -359,6 +363,7 @@ public:
     WEBCORE_EXPORT void setActivityState(ActivityState::Flags);
     ActivityState::Flags activityState() const { return m_activityState; }
 
+    bool isWindowActive() const;
     bool isVisibleAndActive() const;
     WEBCORE_EXPORT void setIsVisible(bool);
     WEBCORE_EXPORT void setIsPrerender();
@@ -387,6 +392,9 @@ public:
 #if ENABLE(RESOURCE_USAGE)
     void setResourceUsageOverlayVisible(bool);
 #endif
+
+    void setAsRunningUserScripts() { m_isRunningUserScripts = true; }
+    bool isRunningUserScripts() const { return m_isRunningUserScripts; }
 
     void setDebugger(JSC::Debugger*);
     JSC::Debugger* debugger() const { return m_debugger; }
@@ -544,7 +552,7 @@ public:
     void setShowAllPlugins(bool showAll) { m_showAllPlugins = showAll; }
     bool showAllPlugins() const;
 
-    WEBCORE_EXPORT void setTimerAlignmentIntervalIncreaseLimit(std::chrono::milliseconds);
+    WEBCORE_EXPORT void setDOMTimerAlignmentIntervalIncreaseLimit(Seconds);
 
     bool isControlledByAutomation() const { return m_controlledByAutomation; }
     void setControlledByAutomation(bool controlled) { m_controlledByAutomation = controlled; }
@@ -564,6 +572,13 @@ public:
 
     bool isOnlyNonUtilityPage() const;
     bool isUtilityPage() const { return m_isUtilityPage; }
+
+#if ENABLE(DATA_INTERACTION)
+    WEBCORE_EXPORT bool hasSelectionAtPosition(const FloatPoint&) const;
+#endif
+
+    bool isLowPowerModeEnabled() const;
+    WEBCORE_EXPORT void setLowPowerModeEnabledOverrideForTesting(std::optional<bool>);
 
 private:
     WEBCORE_EXPORT void initGroup();
@@ -587,12 +602,14 @@ private:
 
     Vector<Ref<PluginViewBase>> pluginViews();
 
+    void handleLowModePowerChange(bool);
+
     enum class TimerThrottlingState { Disabled, Enabled, EnabledIncreasing };
     void hiddenPageDOMTimerThrottlingStateChanged();
     void setTimerThrottlingState(TimerThrottlingState);
     void updateTimerThrottlingState();
     void updateDOMTimerAlignmentInterval();
-    void timerAlignmentIntervalIncreaseTimerFired();
+    void domTimerAlignmentIntervalIncreaseTimerFired();
 
     const std::unique_ptr<Chrome> m_chrome;
     const std::unique_ptr<DragCaretController> m_dragCaretController;
@@ -629,6 +646,9 @@ private:
     std::unique_ptr<ValidationMessageClient> m_validationMessageClient;
     std::unique_ptr<DiagnosticLoggingClient> m_diagnosticLoggingClient;
     std::unique_ptr<WebGLStateTracker> m_webGLStateTracker;
+
+    UniqueRef<LibWebRTCProvider> m_libWebRTCProvider;
+    RTCController m_rtcController;
 
     int m_nestedRunLoopCount { 0 };
     std::function<void()> m_unnestCallback;
@@ -692,10 +712,10 @@ private:
 #endif // ENABLE(VIEW_MODE_CSS_MEDIA)
 
     TimerThrottlingState m_timerThrottlingState { TimerThrottlingState::Disabled };
-    std::chrono::steady_clock::time_point m_timerThrottlingStateLastChangedTime { std::chrono::steady_clock::duration::zero() };
-    std::chrono::milliseconds m_timerAlignmentInterval;
-    Timer m_timerAlignmentIntervalIncreaseTimer;
-    std::chrono::milliseconds m_timerAlignmentIntervalIncreaseLimit { 0 };
+    MonotonicTime m_timerThrottlingStateLastChangedTime;
+    Seconds m_domTimerAlignmentInterval;
+    Timer m_domTimerAlignmentIntervalIncreaseTimer;
+    Seconds m_domTimerAlignmentIntervalIncreaseLimit;
 
     bool m_isEditable;
     bool m_isPrerender;
@@ -766,6 +786,10 @@ private:
     std::optional<EventThrottlingBehavior> m_eventThrottlingBehaviorOverride;
 
     std::unique_ptr<PerformanceMonitor> m_performanceMonitor;
+    std::unique_ptr<LowPowerModeNotifier> m_lowPowerModeNotifier;
+    std::optional<bool> m_lowPowerModeEnabledOverrideForTesting;
+
+    bool m_isRunningUserScripts { false };
 };
 
 inline PageGroup& Page::group()

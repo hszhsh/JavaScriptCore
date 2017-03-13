@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009, 2012-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2008-2017 Apple Inc. All rights reserved.
  * Copyright (C) 2008 Cameron Zwarich <cwzwarich@uwaterloo.ca>
  * Copyright (C) 2012 Igalia, S.L.
  *
@@ -46,7 +46,6 @@
 #include <functional>
 #include <wtf/CheckedArithmetic.h>
 #include <wtf/HashTraits.h>
-#include <wtf/PassRefPtr.h>
 #include <wtf/SegmentedVector.h>
 #include <wtf/SetForScope.h>
 #include <wtf/Vector.h>
@@ -108,7 +107,7 @@ namespace JSC {
     }
 
     struct FinallyJump {
-        FinallyJump(CompletionType jumpID, int targetLexicalScopeIndex, Label* targetLabel)
+        FinallyJump(CompletionType jumpID, int targetLexicalScopeIndex, Label& targetLabel)
             : jumpID(jumpID)
             , targetLexicalScopeIndex(targetLexicalScopeIndex)
             , targetLabel(targetLabel)
@@ -116,14 +115,14 @@ namespace JSC {
 
         CompletionType jumpID;
         int targetLexicalScopeIndex;
-        RefPtr<Label> targetLabel;
+        Ref<Label> targetLabel;
     };
 
     struct FinallyContext {
         FinallyContext() { }
-        FinallyContext(FinallyContext* outerContext, Label* finallyLabel)
+        FinallyContext(FinallyContext* outerContext, Label& finallyLabel)
             : m_outerContext(outerContext)
-            , m_finallyLabel(finallyLabel)
+            , m_finallyLabel(&finallyLabel)
         {
             ASSERT(m_jumps.isEmpty());
         }
@@ -137,7 +136,7 @@ namespace JSC {
         bool handlesReturns() const { return m_handlesReturns; }
         void setHandlesReturns() { m_handlesReturns = true; }
 
-        void registerJump(CompletionType jumpID, int lexicalScopeIndex, Label* targetLabel)
+        void registerJump(CompletionType jumpID, int lexicalScopeIndex, Label& targetLabel)
         {
             m_jumps.append(FinallyJump(jumpID, lexicalScopeIndex, targetLabel));
         }
@@ -248,12 +247,12 @@ namespace JSC {
     };
 
     struct TryData {
-        RefPtr<Label> target;
+        Ref<Label> target;
         HandlerType handlerType;
     };
 
     struct TryContext {
-        RefPtr<Label> start;
+        Ref<Label> start;
         TryData* tryData;
     };
 
@@ -322,8 +321,8 @@ namespace JSC {
     };
 
     struct TryRange {
-        RefPtr<Label> start;
-        RefPtr<Label> end;
+        Ref<Label> start;
+        Ref<Label> end;
         TryData* tryData;
     };
 
@@ -446,7 +445,8 @@ namespace JSC {
         }
 
         LabelScopePtr newLabelScope(LabelScope::Type, const Identifier* = 0);
-        PassRefPtr<Label> newLabel();
+        Ref<Label> newLabel();
+        Ref<Label> newEmittedLabel();
 
         void emitNode(RegisterID* dst, StatementNode* n)
         {
@@ -504,7 +504,7 @@ namespace JSC {
             return emitNodeInTailPosition(nullptr, n);
         }
 
-        void emitNodeInConditionContext(ExpressionNode* n, Label* trueTarget, Label* falseTarget, FallThroughMode fallThroughMode)
+        void emitNodeInConditionContext(ExpressionNode* n, Label& trueTarget, Label& falseTarget, FallThroughMode fallThroughMode)
         {
             if (UNLIKELY(!m_vm->isSafeToRecurse())) {
                 emitThrowExpressionTooDeepException();
@@ -551,10 +551,10 @@ namespace JSC {
             return (m_codeType != FunctionCode || rightHasAssignments) && !rightIsPure;
         }
 
-        ALWAYS_INLINE PassRefPtr<RegisterID> emitNodeForLeftHandSide(ExpressionNode* n, bool rightHasAssignments, bool rightIsPure)
+        ALWAYS_INLINE RefPtr<RegisterID> emitNodeForLeftHandSide(ExpressionNode* n, bool rightHasAssignments, bool rightIsPure)
         {
             if (leftHandSideNeedsCopy(rightHasAssignments, rightIsPure)) {
-                PassRefPtr<RegisterID> dst = newTemporary();
+                RefPtr<RegisterID> dst = newTemporary();
                 emitNode(dst.get(), n);
                 return dst;
             }
@@ -587,6 +587,7 @@ namespace JSC {
         RegisterID* emitLoad(RegisterID* dst, bool);
         RegisterID* emitLoad(RegisterID* dst, const Identifier&);
         RegisterID* emitLoad(RegisterID* dst, JSValue, SourceCodeRepresentation = SourceCodeRepresentation::Other);
+        RegisterID* emitLoad(RegisterID* dst, HashSet<UniquedStringImpl*>& excludedList);
         RegisterID* emitLoadGlobalObject(RegisterID* dst);
 
         RegisterID* emitUnaryOp(OpcodeID, RegisterID* dst, RegisterID* src);
@@ -628,7 +629,7 @@ namespace JSC {
         RegisterID* emitInstanceOf(RegisterID* dst, RegisterID* value, RegisterID* basePrototype);
         RegisterID* emitInstanceOfCustom(RegisterID* dst, RegisterID* value, RegisterID* constructor, RegisterID* hasInstanceValue);
         RegisterID* emitTypeOf(RegisterID* dst, RegisterID* src) { return emitUnaryOp(op_typeof, dst, src); }
-        RegisterID* emitIn(RegisterID* dst, RegisterID* property, RegisterID* base) { return emitBinaryOp(op_in, dst, property, base, OperandTypes()); }
+        RegisterID* emitIn(RegisterID* dst, RegisterID* property, RegisterID* base);
 
         RegisterID* emitTryGetById(RegisterID* dst, RegisterID* base, const Identifier& property);
         RegisterID* emitGetById(RegisterID* dst, RegisterID* base, const Identifier& property);
@@ -695,16 +696,16 @@ namespace JSC {
         RegisterID* emitPutToScope(RegisterID* scope, const Variable&, RegisterID* value, ResolveMode, InitializationMode);
         RegisterID* initializeVariable(const Variable&, RegisterID* value);
 
-        PassRefPtr<Label> emitLabel(Label*);
+        void emitLabel(Label&);
         void emitLoopHint();
-        PassRefPtr<Label> emitJump(Label* target);
-        PassRefPtr<Label> emitJumpIfTrue(RegisterID* cond, Label* target);
-        PassRefPtr<Label> emitJumpIfFalse(RegisterID* cond, Label* target);
-        PassRefPtr<Label> emitJumpIfNotFunctionCall(RegisterID* cond, Label* target);
-        PassRefPtr<Label> emitJumpIfNotFunctionApply(RegisterID* cond, Label* target);
+        void emitJump(Label& target);
+        void emitJumpIfTrue(RegisterID* cond, Label& target);
+        void emitJumpIfFalse(RegisterID* cond, Label& target);
+        void emitJumpIfNotFunctionCall(RegisterID* cond, Label& target);
+        void emitJumpIfNotFunctionApply(RegisterID* cond, Label& target);
 
         void emitEnter();
-        void emitWatchdog();
+        void emitCheckTraps();
 
         RegisterID* emitHasIndexedProperty(RegisterID* dst, RegisterID* base, RegisterID* propertyName);
         RegisterID* emitHasStructureProperty(RegisterID* dst, RegisterID* base, RegisterID* propertyName, RegisterID* enumerator);
@@ -739,9 +740,9 @@ namespace JSC {
         bool emitReadOnlyExceptionIfNeeded(const Variable&);
 
         // Start a try block. 'start' must have been emitted.
-        TryData* pushTry(Label* start, Label* handlerLabel, HandlerType);
+        TryData* pushTry(Label& start, Label& handlerLabel, HandlerType);
         // End a try block. 'end' must have been emitted.
-        void popTry(TryData*, Label* end);
+        void popTry(TryData*, Label& end);
         void emitCatch(RegisterID* exceptionRegister, RegisterID* thrownValueRegister);
 
     private:
@@ -834,18 +835,18 @@ namespace JSC {
             emitMove(completionValueRegister(), reg);
         }
 
-        void emitJumpIf(OpcodeID compareOpcode, RegisterID* completionTypeRegister, CompletionType, Label* jumpTarget);
+        void emitJumpIf(OpcodeID compareOpcode, RegisterID* completionTypeRegister, CompletionType, Label& jumpTarget);
 
-        bool emitJumpViaFinallyIfNeeded(int targetLabelScopeDepth, Label* jumpTarget);
+        bool emitJumpViaFinallyIfNeeded(int targetLabelScopeDepth, Label& jumpTarget);
         bool emitReturnViaFinallyIfNeeded(RegisterID* returnRegister);
-        void emitFinallyCompletion(FinallyContext&, RegisterID* completionTypeRegister, Label* normalCompletionLabel);
+        void emitFinallyCompletion(FinallyContext&, RegisterID* completionTypeRegister, Label& normalCompletionLabel);
 
     private:
         bool allocateCompletionRecordRegisters();
         void releaseCompletionRecordRegisters();
 
     public:
-        FinallyContext* pushFinallyControlFlowScope(Label* finallyLabel);
+        FinallyContext* pushFinallyControlFlowScope(Label& finallyLabel);
         FinallyContext popFinallyControlFlowScope();
 
         void pushIndexedForInScope(RegisterID* local, RegisterID* index);
@@ -858,7 +859,7 @@ namespace JSC {
         LabelScopePtr continueTarget(const Identifier&);
 
         void beginSwitch(RegisterID*, SwitchInfo::SwitchType);
-        void endSwitch(uint32_t clauseCount, RefPtr<Label>*, ExpressionNode**, Label* defaultLabel, int32_t min, int32_t range);
+        void endSwitch(uint32_t clauseCount, const Vector<Ref<Label>, 8>&, ExpressionNode**, Label& defaultLabel, int32_t min, int32_t range);
 
         void emitYieldPoint(RegisterID*);
 
@@ -948,7 +949,7 @@ namespace JSC {
         // Helper for emitCall() and emitConstruct(). This works because the set of
         // expected functions have identical behavior for both call and construct
         // (i.e. "Object()" is identical to "new Object()").
-        ExpectedFunction emitExpectedFunctionSnippet(RegisterID* dst, RegisterID* func, ExpectedFunction, CallArguments&, Label* done);
+        ExpectedFunction emitExpectedFunctionSnippet(RegisterID* dst, RegisterID* func, ExpectedFunction, CallArguments&, Label& done);
         
         RegisterID* emitCall(OpcodeID, RegisterID* dst, RegisterID* func, ExpectedFunction, CallArguments&, const JSTextPosition& divot, const JSTextPosition& divotStart, const JSTextPosition& divotEnd, DebuggableCall);
 
@@ -1100,7 +1101,7 @@ namespace JSC {
         // https://bugs.webkit.org/show_bug.cgi?id=165980
         SegmentedVector<ControlFlowScope, 16> m_controlFlowScopeStack;
         Vector<SwitchInfo> m_switchContextStack;
-        Vector<RefPtr<ForInContext>> m_forInContextStack;
+        Vector<Ref<ForInContext>> m_forInContextStack;
         Vector<TryContext> m_tryContextStack;
         unsigned m_yieldPoints { 0 };
 

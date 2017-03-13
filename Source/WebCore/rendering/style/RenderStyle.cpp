@@ -208,17 +208,12 @@ RenderStyle RenderStyle::replace(RenderStyle&& newStyle)
 
 bool RenderStyle::isCSSGridLayoutEnabled()
 {
-#if ENABLE(CSS_GRID_LAYOUT)
     return RuntimeEnabledFeatures::sharedFeatures().isCSSGridLayoutEnabled();
-#else
-    return false;
-#endif
 }
 
 static StyleSelfAlignmentData resolvedSelfAlignment(const StyleSelfAlignmentData& value, ItemPosition normalValueBehavior)
 {
-    ASSERT(value.position() != ItemPositionAuto);
-    if (value.position() == ItemPositionNormal)
+    if (value.position() == ItemPositionNormal || value.position() == ItemPositionAuto)
         return { normalValueBehavior, OverflowAlignmentDefault };
     return value;
 }
@@ -228,13 +223,13 @@ StyleSelfAlignmentData RenderStyle::resolvedAlignItems(ItemPosition normalValueB
     return resolvedSelfAlignment(alignItems(), normalValueBehaviour);
 }
 
-StyleSelfAlignmentData RenderStyle::resolvedAlignSelf(const RenderStyle& parentStyle, ItemPosition normalValueBehaviour) const
+StyleSelfAlignmentData RenderStyle::resolvedAlignSelf(const RenderStyle* parentStyle, ItemPosition normalValueBehaviour) const
 {
     // The auto keyword computes to the parent's align-items computed value.
     // We will return the behaviour of 'normal' value if needed, which is specific of each layout model.
-    if (alignSelf().position() == ItemPositionAuto)
-        return parentStyle.resolvedAlignItems(normalValueBehaviour);
-    return resolvedSelfAlignment(alignSelf(), normalValueBehaviour);
+    if (!parentStyle || alignSelf().position() != ItemPositionAuto)
+        return resolvedSelfAlignment(alignSelf(), normalValueBehaviour);
+    return parentStyle->resolvedAlignItems(normalValueBehaviour);
 }
 
 StyleSelfAlignmentData RenderStyle::resolvedJustifyItems(ItemPosition normalValueBehaviour) const
@@ -247,13 +242,13 @@ StyleSelfAlignmentData RenderStyle::resolvedJustifyItems(ItemPosition normalValu
     return resolvedSelfAlignment(justifyItems(), normalValueBehaviour);
 }
 
-StyleSelfAlignmentData RenderStyle::resolvedJustifySelf(const RenderStyle& parentStyle, ItemPosition normalValueBehaviour) const
+StyleSelfAlignmentData RenderStyle::resolvedJustifySelf(const RenderStyle* parentStyle, ItemPosition normalValueBehaviour) const
 {
     // The auto keyword computes to the parent's justify-items computed value.
     // We will return the behaviour of 'normal' value if needed, which is specific of each layout model.
-    if (justifySelf().position() == ItemPositionAuto)
-        return parentStyle.resolvedJustifyItems(normalValueBehaviour);
-    return resolvedSelfAlignment(justifySelf(), normalValueBehaviour);
+    if (!parentStyle || justifySelf().position() != ItemPositionAuto)
+        return resolvedSelfAlignment(justifySelf(), normalValueBehaviour);
+    return parentStyle->resolvedJustifyItems(normalValueBehaviour);
 }
 
 static inline ContentPosition resolvedContentAlignmentPosition(const StyleContentAlignmentData& value, const StyleContentAlignmentData& normalValueBehavior)
@@ -583,11 +578,9 @@ bool RenderStyle::changeRequiresLayout(const RenderStyle& other, unsigned& chang
             }
         }
 
-#if ENABLE(CSS_GRID_LAYOUT)
         if (m_rareNonInheritedData->grid != other.m_rareNonInheritedData->grid
             || m_rareNonInheritedData->gridItem != other.m_rareNonInheritedData->gridItem)
             return true;
-#endif
 
 #if ENABLE(DASHBOARD_SUPPORT)
         // If regions change, trigger a relayout to re-calc regions.
@@ -860,6 +853,9 @@ bool RenderStyle::changeRequiresRepaint(const RenderStyle& other, unsigned& chan
         || m_rareInheritedData->imageRendering != other.m_rareInheritedData->imageRendering)
         return true;
 
+    if (m_rareNonInheritedData->isNotFinal != other.m_rareNonInheritedData->isNotFinal)
+        return true;
+
     if (m_rareNonInheritedData->shapeOutside != other.m_rareNonInheritedData->shapeOutside)
         return true;
 
@@ -913,6 +909,12 @@ StyleDifference RenderStyle::diff(const RenderStyle& other, unsigned& changedCon
         if (svgChange == StyleDifferenceLayout)
             return svgChange;
     }
+
+    // These properties affect the cached stroke bounding box rects.
+    if (m_rareInheritedData->capStyle != other.m_rareInheritedData->capStyle
+        || m_rareInheritedData->joinStyle != other.m_rareInheritedData->joinStyle
+        || m_rareInheritedData->strokeWidth != other.m_rareInheritedData->strokeWidth)
+        return StyleDifferenceLayout;
 
     if (changeRequiresLayout(other, changedContextSensitiveProperties))
         return StyleDifferenceLayout;
@@ -2216,5 +2218,75 @@ void RenderStyle::setDashboardRegion(int type, const String& label, Length&& top
 }
 
 #endif
+
+Vector<PaintType, 3> RenderStyle::paintTypesForPaintOrder(PaintOrder order)
+{
+    Vector<PaintType, 3> paintOrder;
+    switch (order) {
+    case PaintOrder::Normal:
+        FALLTHROUGH;
+    case PaintOrder::Fill:
+        paintOrder.append(PaintType::Fill);
+        paintOrder.append(PaintType::Stroke);
+        paintOrder.append(PaintType::Markers);
+        break;
+    case PaintOrder::FillMarkers:
+        paintOrder.append(PaintType::Fill);
+        paintOrder.append(PaintType::Markers);
+        paintOrder.append(PaintType::Stroke);
+        break;
+    case PaintOrder::Stroke:
+        paintOrder.append(PaintType::Stroke);
+        paintOrder.append(PaintType::Fill);
+        paintOrder.append(PaintType::Markers);
+        break;
+    case PaintOrder::StrokeMarkers:
+        paintOrder.append(PaintType::Stroke);
+        paintOrder.append(PaintType::Markers);
+        paintOrder.append(PaintType::Fill);
+        break;
+    case PaintOrder::Markers:
+        paintOrder.append(PaintType::Markers);
+        paintOrder.append(PaintType::Fill);
+        paintOrder.append(PaintType::Stroke);
+        break;
+    case PaintOrder::MarkersStroke:
+        paintOrder.append(PaintType::Markers);
+        paintOrder.append(PaintType::Stroke);
+        paintOrder.append(PaintType::Fill);
+        break;
+    };
+    return paintOrder;
+}
+
+float RenderStyle::computedStrokeWidth(const IntSize& viewportSize) const
+{
+    if (!hasExplicitlySetStrokeWidth())
+        return textStrokeWidth();
+    
+    const Length& length = strokeWidth();
+
+    if (length.isPercent()) {
+        // According to the spec, https://drafts.fxtf.org/paint/#stroke-width, the percentage is relative to the scaled viewport size.
+        // The scaled viewport size is the geometric mean of the viewport width and height.
+        ExceptionOr<float> result = length.value() * (viewportSize.width() + viewportSize.height()) / 200.0f;
+        if (result.hasException())
+            return 0;
+        return result.releaseReturnValue();
+    }
+    
+    if (length.isAuto() || !length.isSpecified())
+        return 0;
+    
+    return floatValueForLength(length, viewportSize.width());
+}
+
+bool RenderStyle::hasPositiveStrokeWidth() const
+{
+    if (!hasExplicitlySetStrokeWidth())
+        return textStrokeWidth() > 0;
+
+    return strokeWidth().isPositive();
+}
 
 } // namespace WebCore

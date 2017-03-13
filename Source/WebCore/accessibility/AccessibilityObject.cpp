@@ -34,6 +34,7 @@
 #include "AccessibilityScrollView.h"
 #include "AccessibilityTable.h"
 #include "DOMTokenList.h"
+#include "Editing.h"
 #include "Editor.h"
 #include "ElementIterator.h"
 #include "EventHandler.h"
@@ -70,7 +71,6 @@
 #include "TextIterator.h"
 #include "UserGestureIndicator.h"
 #include "VisibleUnits.h"
-#include "htmlediting.h"
 #include <wtf/NeverDestroyed.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/StringBuilder.h>
@@ -86,7 +86,7 @@ AccessibilityObject::AccessibilityObject()
     , m_haveChildren(false)
     , m_role(UnknownRole)
     , m_lastKnownIsIgnoredValue(DefaultBehavior)
-#if PLATFORM(GTK) || (PLATFORM(EFL) && HAVE(ACCESSIBILITY))
+#if PLATFORM(GTK)
     , m_wrapper(nullptr)
 #endif
 {
@@ -2103,6 +2103,47 @@ static void initializeRoleMap()
         { "contentinfo", LandmarkContentInfoRole },
         { "dialog", ApplicationDialogRole },
         { "directory", DirectoryRole },
+        // The 'doc-*' roles are defined the ARIA DPUB mobile: https://www.w3.org/TR/dpub-aam-1.0/ 
+        // Editor's draft is currently at https://rawgit.com/w3c/aria/master/dpub-aam/dpub-aam.html 
+        { "doc-abstract", LandmarkRegionRole },
+        { "doc-acknowledgments", LandmarkRegionRole },
+        { "doc-afterword", LandmarkRegionRole },
+        { "doc-appendix", LandmarkRegionRole },
+        { "doc-backlink", WebCoreLinkRole },
+        { "doc-biblioentry", GroupRole },
+        { "doc-bibliography", LandmarkRegionRole },
+        { "doc-biblioref", WebCoreLinkRole },
+        { "doc-chapter", LandmarkRegionRole },
+        { "doc-colophon", GroupRole },
+        { "doc-conclusion", LandmarkRegionRole },
+        { "doc-cover", ImageRole },
+        { "doc-credit", GroupRole },
+        { "doc-credits", LandmarkRegionRole },
+        { "doc-dedication", GroupRole },
+        { "doc-endnote", GroupRole },
+        { "doc-endnotes", LandmarkRegionRole },
+        { "doc-epigraph", GroupRole },
+        { "doc-epilogue", LandmarkRegionRole },
+        { "doc-errata", LandmarkRegionRole },
+        { "doc-example", GroupRole },
+        { "doc-footnote", GroupRole },
+        { "doc-foreword", LandmarkRegionRole },
+        { "doc-glossary", LandmarkRegionRole },
+        { "doc-glossref", WebCoreLinkRole },
+        { "doc-index", LandmarkNavigationRole },
+        { "doc-introduction", LandmarkRegionRole },
+        { "doc-noteref", WebCoreLinkRole },
+        { "doc-notice", GroupRole },
+        { "doc-pagebreak", GroupRole },
+        { "doc-pagelist", LandmarkNavigationRole },
+        { "doc-part", LandmarkRegionRole },
+        { "doc-preface", LandmarkRegionRole },
+        { "doc-prologue", LandmarkRegionRole },
+        { "doc-pullquote", GroupRole },
+        { "doc-qna", GroupRole },
+        { "doc-subtitle", HeadingRole },
+        { "doc-tip", GroupRole },
+        { "doc-toc", LandmarkNavigationRole },
         { "grid", GridRole },
         { "gridcell", GridCellRole },
         { "table", TableRole },
@@ -2917,7 +2958,7 @@ TextIteratorBehavior AccessibilityObject::textIteratorBehaviorForTextRange() con
 {
     TextIteratorBehavior behavior = TextIteratorIgnoresStyleVisibility;
     
-#if PLATFORM(GTK) || PLATFORM(EFL)
+#if PLATFORM(GTK)
     // We need to emit replaced elements for GTK, and present
     // them with the 'object replacement character' (0xFFFC).
     behavior = static_cast<TextIteratorBehavior>(behavior | TextIteratorEmitsObjectReplacementCharacters);

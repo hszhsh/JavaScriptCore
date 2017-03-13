@@ -150,8 +150,8 @@ public:
     virtual void pinnedStateDidChange(WebKit::WebPageProxy&) { }
 
     virtual void isPlayingAudioDidChange(WebKit::WebPageProxy&) { }
-    virtual void didBeginCaptureSession() { }
-    virtual void didEndCaptureSession() { }
+    virtual void mediaCaptureStateDidChange(WebCore::MediaProducer::MediaStateFlags) { }
+    virtual void handleAutoplayEvent(WebKit::WebPageProxy&, WebCore::AutoplayEvent) { }
 
 #if ENABLE(MEDIA_SESSION)
     virtual void mediaSessionMetadataDidChange(WebKit::WebPageProxy&, WebKit::WebMediaSessionMetadata*) { }

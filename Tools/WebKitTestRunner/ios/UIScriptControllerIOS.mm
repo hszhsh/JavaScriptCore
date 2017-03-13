@@ -94,6 +94,18 @@ void UIScriptController::doAfterNextStablePresentationUpdate(JSValueRef callback
     }];
 }
 
+void UIScriptController::doAfterVisibleContentRectUpdate(JSValueRef callback)
+{
+    TestRunnerWKWebView *webView = TestController::singleton().mainWebView()->platformView();
+
+    unsigned callbackID = m_context->prepareForAsyncTask(callback, CallbackTypeNonPersistent);
+    [webView _doAfterNextVisibleContentRectUpdate:^ {
+        if (!m_context)
+            return;
+        m_context->asyncTaskComplete(callbackID);
+    }];
+}
+
 void UIScriptController::zoomToScale(double scale, JSValueRef callback)
 {
     TestRunnerWKWebView *webView = TestController::singleton().mainWebView()->platformView();
@@ -105,6 +117,25 @@ void UIScriptController::zoomToScale(double scale, JSValueRef callback)
             return;
         m_context->asyncTaskComplete(callbackID);
     }];
+}
+
+void UIScriptController::retrieveSpeakSelectionContent(JSValueRef callback)
+{
+    TestRunnerWKWebView *webView = TestController::singleton().mainWebView()->platformView();
+    
+    unsigned callbackID = m_context->prepareForAsyncTask(callback, CallbackTypeNonPersistent);
+    
+    [webView accessibilityRetrieveSpeakSelectionContentWithCompletionHandler:^() {
+        if (!m_context)
+            return;
+        m_context->asyncTaskComplete(callbackID);
+    }];
+}
+
+JSRetainPtr<JSStringRef> UIScriptController::accessibilitySpeakSelectionContent() const
+{
+    TestRunnerWKWebView *webView = TestController::singleton().mainWebView()->platformView();
+    return JSStringCreateWithCFString((CFStringRef)webView.accessibilitySpeakSelectionContent);
 }
 
 void UIScriptController::simulateAccessibilitySettingsChangeNotification(JSValueRef callback)
@@ -515,6 +546,21 @@ JSRetainPtr<JSStringRef> UIScriptController::scrollingTreeAsText() const
 {
     TestRunnerWKWebView *webView = TestController::singleton().mainWebView()->platformView();
     return JSStringCreateWithCFString((CFStringRef)[webView _scrollingTreeAsText]);
+}
+
+JSObjectRef UIScriptController::propertiesOfLayerWithID(uint64_t layerID) const
+{
+    return JSValueToObject(m_context->jsContext(), [JSValue valueWithObject:[TestController::singleton().mainWebView()->platformView() _propertiesOfLayerWithID:layerID] inContext:[JSContext contextWithJSGlobalContextRef:m_context->jsContext()]].JSValueRef, nullptr);
+}
+
+void UIScriptController::removeViewFromWindow(JSValueRef callback)
+{
+    TestController::singleton().mainWebView()->removeFromWindow();
+}
+
+void UIScriptController::addViewToWindow(JSValueRef callback)
+{
+    TestController::singleton().mainWebView()->addToWindow();
 }
 
 void UIScriptController::platformSetDidStartFormControlInteractionCallback()

@@ -334,7 +334,7 @@ private:
     void continueFragmentScrollAfterNavigationPolicy(const ResourceRequest&, bool shouldContinue);
 
     bool shouldPerformFragmentNavigation(bool isFormSubmission, const String& httpMethod, FrameLoadType, const URL&);
-    void scrollToFragmentWithParentBoundary(const URL&);
+    void scrollToFragmentWithParentBoundary(const URL&, bool isNewNavigation = true);
 
     void checkLoadCompleteForThisFrame();
 
@@ -366,7 +366,7 @@ private:
     void requestFromDelegate(ResourceRequest&, unsigned long& identifier, ResourceError&);
 
     WEBCORE_EXPORT void detachChildren();
-    void closeAndRemoveChild(Frame*);
+    void closeAndRemoveChild(Frame&);
 
     void loadInSameDocument(const URL&, SerializedScriptValue* stateObject, bool isNewNavigation);
 

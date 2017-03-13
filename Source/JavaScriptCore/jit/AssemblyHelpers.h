@@ -158,6 +158,16 @@ public:
         }
 #endif
     }
+
+    void loadValue(void* address, JSValueRegs regs)
+    {
+#if USE(JSVALUE64)
+        load64(address, regs.gpr());
+#else
+        load32(bitwise_cast<void*>(bitwise_cast<uintptr_t>(address) + PayloadOffset), regs.payloadGPR());
+        load32(bitwise_cast<void*>(bitwise_cast<uintptr_t>(address) + TagOffset), regs.tagGPR());
+#endif
+    }
     
     // Note that this clobbers offset.
     void loadProperty(GPRReg object, GPRReg offset, JSValueRegs result);
@@ -1185,6 +1195,7 @@ public:
     JS_EXPORT_PRIVATE Jump emitExceptionCheck(
         ExceptionCheckKind = NormalExceptionCheck, ExceptionJumpWidth = NormalJumpWidth);
     JS_EXPORT_PRIVATE Jump emitNonPatchableExceptionCheck();
+    Jump emitJumpIfException();
 
 #if ENABLE(SAMPLING_COUNTERS)
     static void emitCount(MacroAssembler& jit, AbstractSamplingCounter& counter, int32_t increment = 1)

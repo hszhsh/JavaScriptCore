@@ -67,6 +67,7 @@ namespace WebCore {
     macro(blocked) \
     macro(blur) \
     macro(boundary) \
+    macro(bufferedAmountLowThreshold) \
     macro(cached) \
     macro(cancel) \
     macro(canplay) \
@@ -241,6 +242,7 @@ namespace WebCore {
     macro(volumechange) \
     macro(waiting) \
     macro(waitingforkey) \
+    macro(webglcontextchanged) \
     macro(webglcontextcreationerror) \
     macro(webglcontextlost) \
     macro(webglcontextrestored) \

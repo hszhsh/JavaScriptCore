@@ -29,9 +29,11 @@
 #if ENABLE(FTL_JIT)
 
 #include "AirCode.h"
+#include "AirDisassembler.h"
 #include "B3Generate.h"
 #include "B3ProcedureInlines.h"
 #include "B3StackSlot.h"
+#include "B3Value.h"
 #include "CodeBlockWithJITType.h"
 #include "CCallHelpers.h"
 #include "DFGCommon.h"
@@ -56,6 +58,9 @@ void compile(State& state, Safepoint::Result& safepointResult)
     Graph& graph = state.graph;
     CodeBlock* codeBlock = graph.m_codeBlock;
     VM& vm = graph.m_vm;
+
+    if (shouldDumpDisassembly())
+        state.proc->code().setDisassembler(std::make_unique<B3::Air::Disassembler>());
 
     {
         GraphSafepoint safepoint(state.graph, safepointResult);
@@ -151,6 +156,80 @@ void compile(State& state, Safepoint::Result& safepointResult)
     state.generatedFunction = bitwise_cast<GeneratedFunction>(
         state.finalizer->b3CodeLinkBuffer->entrypoint().executableAddress());
     state.jitCode->initializeB3Byproducts(state.proc->releaseByproducts());
+
+    if (B3::Air::Disassembler* disassembler = state.proc->code().disassembler()) {
+        PrintStream& out = WTF::dataFile();
+
+        out.print("\nGenerated FTL JIT code for ", CodeBlockWithJITType(state.graph.m_codeBlock, JITCode::FTLJIT), ", instruction count = ", state.graph.m_codeBlock->instructionCount(), ":\n");
+
+        LinkBuffer& linkBuffer = *state.finalizer->b3CodeLinkBuffer;
+        B3::Value* currentB3Value = nullptr;
+        Node* currentDFGNode = nullptr;
+
+        HashSet<B3::Value*> printedValues;
+        HashSet<Node*> printedNodes;
+        const char* dfgPrefix = "    ";
+        const char* b3Prefix  = "          ";
+        const char* airPrefix = "              ";
+        const char* asmPrefix = "                ";
+
+        auto printDFGNode = [&] (Node* node) {
+            if (currentDFGNode == node)
+                return;
+
+            currentDFGNode = node;
+            if (!currentDFGNode)
+                return;
+
+            HashSet<Node*> localPrintedNodes;
+            std::function<void(Node*)> printNodeRecursive = [&] (Node* node) {
+                if (printedNodes.contains(node) || localPrintedNodes.contains(node))
+                    return;
+
+                localPrintedNodes.add(node);
+                graph.doToChildren(node, [&] (Edge child) {
+                    printNodeRecursive(child.node());
+                });
+                graph.dump(out, dfgPrefix, node);
+            };
+            printNodeRecursive(node);
+            printedNodes.add(node);
+        };
+
+        auto printB3Value = [&] (B3::Value* value) {
+            if (currentB3Value == value)
+                return;
+
+            currentB3Value = value;
+            if (!currentB3Value)
+                return;
+
+            printDFGNode(bitwise_cast<Node*>(value->origin().data()));
+
+            HashSet<B3::Value*> localPrintedValues;
+            std::function<void(B3::Value*)> printValueRecursive = [&] (B3::Value* value) {
+                if (printedValues.contains(value) || localPrintedValues.contains(value))
+                    return;
+
+                localPrintedValues.add(value);
+                for (unsigned i = 0; i < value->numChildren(); i++)
+                    printValueRecursive(value->child(i));
+                out.print(b3Prefix);
+                value->deepDump(state.proc.get(), out);
+                out.print("\n");
+            };
+
+            printValueRecursive(currentB3Value);
+            printedValues.add(value);
+        };
+
+        auto forEachInst = [&] (B3::Air::Inst& inst) {
+            printB3Value(inst.origin);
+        };
+
+        disassembler->dump(state.proc->code(), out, linkBuffer, airPrefix, asmPrefix, forEachInst);
+        linkBuffer.didAlreadyDisassemble();
+    }
 }
 
 } } // namespace JSC::FTL

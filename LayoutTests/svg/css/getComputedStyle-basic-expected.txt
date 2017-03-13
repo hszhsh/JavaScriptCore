@@ -376,8 +376,6 @@ rect: style.getPropertyValue(-webkit-line-align) : none
 rect: style.getPropertyCSSValue(-webkit-line-align) : [object CSSPrimitiveValue]
 rect: style.getPropertyValue(-webkit-line-box-contain) : block inline replaced
 rect: style.getPropertyCSSValue(-webkit-line-box-contain) : [object CSSValue]
-rect: style.getPropertyValue(-webkit-line-break) : auto
-rect: style.getPropertyCSSValue(-webkit-line-break) : [object CSSPrimitiveValue]
 rect: style.getPropertyValue(-webkit-line-clamp) : none
 rect: style.getPropertyCSSValue(-webkit-line-clamp) : [object CSSPrimitiveValue]
 rect: style.getPropertyValue(-webkit-line-grid) : none
@@ -496,9 +494,9 @@ rect: style.getPropertyValue(stop-color) : rgb(0, 0, 0)
 rect: style.getPropertyCSSValue(stop-color) : [object CSSPrimitiveValue]
 rect: style.getPropertyValue(stop-opacity) : 1
 rect: style.getPropertyCSSValue(stop-opacity) : [object CSSPrimitiveValue]
-rect: style.getPropertyValue(color-interpolation) : srgb
+rect: style.getPropertyValue(color-interpolation) : sRGB
 rect: style.getPropertyCSSValue(color-interpolation) : [object CSSPrimitiveValue]
-rect: style.getPropertyValue(color-interpolation-filters) : linearrgb
+rect: style.getPropertyValue(color-interpolation-filters) : linearRGB
 rect: style.getPropertyCSSValue(color-interpolation-filters) : [object CSSPrimitiveValue]
 rect: style.getPropertyValue(color-rendering) : auto
 rect: style.getPropertyCSSValue(color-rendering) : [object CSSPrimitiveValue]
@@ -930,8 +928,6 @@ g: style.getPropertyValue(-webkit-line-align) : none
 g: style.getPropertyCSSValue(-webkit-line-align) : [object CSSPrimitiveValue]
 g: style.getPropertyValue(-webkit-line-box-contain) : block inline replaced
 g: style.getPropertyCSSValue(-webkit-line-box-contain) : [object CSSValue]
-g: style.getPropertyValue(-webkit-line-break) : auto
-g: style.getPropertyCSSValue(-webkit-line-break) : [object CSSPrimitiveValue]
 g: style.getPropertyValue(-webkit-line-clamp) : none
 g: style.getPropertyCSSValue(-webkit-line-clamp) : [object CSSPrimitiveValue]
 g: style.getPropertyValue(-webkit-line-grid) : none
@@ -1050,9 +1046,9 @@ g: style.getPropertyValue(stop-color) : rgb(0, 0, 0)
 g: style.getPropertyCSSValue(stop-color) : [object CSSPrimitiveValue]
 g: style.getPropertyValue(stop-opacity) : 1
 g: style.getPropertyCSSValue(stop-opacity) : [object CSSPrimitiveValue]
-g: style.getPropertyValue(color-interpolation) : srgb
+g: style.getPropertyValue(color-interpolation) : sRGB
 g: style.getPropertyCSSValue(color-interpolation) : [object CSSPrimitiveValue]
-g: style.getPropertyValue(color-interpolation-filters) : linearrgb
+g: style.getPropertyValue(color-interpolation-filters) : linearRGB
 g: style.getPropertyCSSValue(color-interpolation-filters) : [object CSSPrimitiveValue]
 g: style.getPropertyValue(color-rendering) : auto
 g: style.getPropertyCSSValue(color-rendering) : [object CSSPrimitiveValue]

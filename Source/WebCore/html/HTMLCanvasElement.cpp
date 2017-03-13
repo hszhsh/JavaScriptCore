@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004, 2006, 2007 Apple Inc. All rights reserved.
+ * Copyright (C) 2004, 2006, 2007, 2017 Apple Inc. All rights reserved.
  * Copyright (C) 2007 Alp Toker <alp@atoker.com>
  * Copyright (C) 2010 Torch Mobile (Beijing) Co. Ltd. All rights reserved.
  *
@@ -28,6 +28,8 @@
 #include "config.h"
 #include "HTMLCanvasElement.h"
 
+#include "Blob.h"
+#include "BlobCallback.h"
 #include "CanvasGradient.h"
 #include "CanvasPattern.h"
 #include "CanvasRenderingContext2D.h"
@@ -50,9 +52,24 @@
 #include <wtf/RAMSize.h>
 #include <wtf/text/StringBuilder.h>
 
-#if ENABLE(WEBGL)    
+#if ENABLE(MEDIA_STREAM)
+#include "CanvasCaptureMediaStreamTrack.h"
+#include "MediaStream.h"
+#endif
+
+#if ENABLE(WEBGL)
 #include "WebGLContextAttributes.h"
 #include "WebGLRenderingContextBase.h"
+#endif
+
+#if ENABLE(WEBGPU)
+#include "WebGPURenderingContext.h"
+#endif
+
+#if PLATFORM(COCOA)
+#include "MediaSampleAVFObjC.h"
+
+#include "CoreMediaSoftLink.h"
 #endif
 
 namespace WebCore {
@@ -182,6 +199,11 @@ CanvasRenderingContext* HTMLCanvasElement::getContext(const String& type)
     if (HTMLCanvasElement::is2dType(type))
         return getContext2d(type);
 
+#if ENABLE(WEBGPU)
+    if (HTMLCanvasElement::isWebGPUType(type))
+        return getContextWebGPU(type);
+#endif
+
 #if ENABLE(WEBGL)
     if (HTMLCanvasElement::is3dType(type))
         return getContextWebGL(type);
@@ -204,8 +226,7 @@ CanvasRenderingContext* HTMLCanvasElement::getContext2d(const String& type)
     if (!m_context) {
         bool usesDashboardCompatibilityMode = false;
 #if ENABLE(DASHBOARD_SUPPORT)
-        if (Settings* settings = document().settings())
-            usesDashboardCompatibilityMode = settings->usesDashboardBackwardCompatibilityMode();
+        usesDashboardCompatibilityMode = document().settings().usesDashboardBackwardCompatibilityMode();
 #endif
 
         // Make sure we don't use more pixel memory than the system can support.
@@ -236,25 +257,22 @@ CanvasRenderingContext* HTMLCanvasElement::getContext2d(const String& type)
 #if ENABLE(WEBGL)
 static bool requiresAcceleratedCompositingForWebGL()
 {
-#if PLATFORM(GTK) || PLATFORM(EFL)
+#if PLATFORM(GTK)
     return false;
 #else
     return true;
 #endif
 
 }
-static bool shouldEnableWebGL(Settings* settings)
+static bool shouldEnableWebGL(const Settings& settings)
 {
-    if (!settings)
-        return false;
-
-    if (!settings->webGLEnabled())
+    if (!settings.webGLEnabled())
         return false;
 
     if (!requiresAcceleratedCompositingForWebGL())
         return true;
 
-    return settings->acceleratedCompositingEnabled();
+    return settings.acceleratedCompositingEnabled();
 }
 
 bool HTMLCanvasElement::is3dType(const String& type)
@@ -289,6 +307,31 @@ CanvasRenderingContext* HTMLCanvasElement::getContextWebGL(const String& type, W
 }
 #endif
 
+#if ENABLE(WEBGPU)
+bool HTMLCanvasElement::isWebGPUType(const String& type)
+{
+    return type == "webgpu";
+}
+
+CanvasRenderingContext* HTMLCanvasElement::getContextWebGPU(const String& type)
+{
+    ASSERT_UNUSED(type, HTMLCanvasElement::isWebGPUType(type));
+
+    if (m_context && !m_context->isGPU())
+        return nullptr;
+
+    if (!m_context) {
+        m_context = WebGPURenderingContext::create(*this);
+        if (m_context) {
+            // Need to make sure a RenderLayer and compositing layer get created for the Canvas
+            invalidateStyleAndLayerComposition();
+        }
+    }
+
+    return m_context.get();
+}
+#endif
+
 void HTMLCanvasElement::didDraw(const FloatRect& rect)
 {
     clearCopiedImage();
@@ -301,11 +344,10 @@ void HTMLCanvasElement::didDraw(const FloatRect& rect)
             dirtyRect.inflate(1);
         FloatRect r = mapRect(dirtyRect, FloatRect(0, 0, size().width(), size().height()), destRect);
         r.intersect(destRect);
-        if (r.isEmpty() || m_dirtyRect.contains(r))
-            return;
-
-        m_dirtyRect.unite(r);
-        ro->repaintRectangle(enclosingIntRect(m_dirtyRect));
+        if (!r.isEmpty() && !m_dirtyRect.contains(r)) {
+            m_dirtyRect.unite(r);
+            ro->repaintRectangle(enclosingIntRect(m_dirtyRect));
+        }
     }
     notifyObserversCanvasChanged(dirtyRect);
 }
@@ -346,6 +388,12 @@ void HTMLCanvasElement::reset()
     }
 
     setSurfaceSize(newSize);
+
+#if ENABLE(WEBGPU)
+    // FIXME: WebGPU needs something here too.
+    if (isGPU() && oldSize != size())
+        static_cast<WebGPURenderingContext*>(m_context.get())->reshape(width(), height());
+#endif
 
 #if ENABLE(WEBGL)
     if (is3D() && oldSize != size())
@@ -415,11 +463,23 @@ void HTMLCanvasElement::paint(GraphicsContext& context, const LayoutRect& r)
         }
     }
 
-#if ENABLE(WEBGL)    
+#if ENABLE(WEBGPU)
+    if (isGPU())
+        static_cast<WebGPURenderingContext*>(m_context.get())->markLayerComposited();
+#endif
+
+#if ENABLE(WEBGL)
     if (is3D())
         static_cast<WebGLRenderingContextBase*>(m_context.get())->markLayerComposited();
 #endif
 }
+
+#if ENABLE(WEBGPU)
+bool HTMLCanvasElement::isGPU() const
+{
+    return m_context && m_context->isGPU();
+}
+#endif
 
 #if ENABLE(WEBGL)
 bool HTMLCanvasElement::is3D() const
@@ -489,6 +549,42 @@ ExceptionOr<String> HTMLCanvasElement::toDataURL(const String& mimeType, std::op
     return buffer()->toDataURL(encodingMIMEType, quality);
 }
 
+ExceptionOr<void> HTMLCanvasElement::toBlob(ScriptExecutionContext& context, Ref<BlobCallback>&& callback, const String& mimeType, JSC::JSValue qualityValue)
+{
+    if (!m_originClean)
+        return Exception { SECURITY_ERR };
+
+    if (m_size.isEmpty() || !buffer()) {
+        callback->scheduleCallback(context, nullptr);
+        return { };
+    }
+
+    String encodingMIMEType = toEncodingMimeType(mimeType);
+    std::optional<double> quality;
+    if (qualityValue.isNumber())
+        quality = qualityValue.toNumber(context.execState());
+
+#if USE(CG)
+    if (auto imageData = getImageData()) {
+        RefPtr<Blob> blob;
+        Vector<uint8_t> blobData = data(*imageData, encodingMIMEType, quality);
+        if (!blobData.isEmpty())
+            blob = Blob::create(WTFMove(blobData), encodingMIMEType);
+        callback->scheduleCallback(context, WTFMove(blob));
+        return { };
+    }
+#endif
+
+    makeRenderingResultsAvailable();
+
+    RefPtr<Blob> blob;
+    Vector<uint8_t> blobData = buffer()->toData(encodingMIMEType, quality);
+    if (!blobData.isEmpty())
+        blob = Blob::create(WTFMove(blobData), encodingMIMEType);
+    callback->scheduleCallback(context, WTFMove(blob));
+    return { };
+}
+
 RefPtr<ImageData> HTMLCanvasElement::getImageData()
 {
 #if ENABLE(WEBGL)
@@ -502,6 +598,37 @@ RefPtr<ImageData> HTMLCanvasElement::getImageData()
     return nullptr;
 #endif
 }
+
+#if ENABLE(MEDIA_STREAM)
+
+RefPtr<MediaSample> HTMLCanvasElement::toMediaSample()
+{
+    auto* imageBuffer = buffer();
+    if (!imageBuffer)
+        return nullptr;
+
+#if PLATFORM(COCOA)
+    makeRenderingResultsAvailable();
+    return MediaSampleAVFObjC::createImageSample(imageBuffer->toBGRAData(), width(), height());
+#else
+    return nullptr;
+#endif
+}
+
+ExceptionOr<Ref<MediaStream>> HTMLCanvasElement::captureStream(ScriptExecutionContext& context, std::optional<double>&& frameRequestRate)
+{
+    if (!originClean())
+        return Exception(SECURITY_ERR, ASCIILiteral("Canvas is tainted"));
+
+    if (frameRequestRate && frameRequestRate.value() < 0)
+        return Exception(NOT_SUPPORTED_ERR, ASCIILiteral("frameRequestRate is negative"));
+    
+    auto track = CanvasCaptureMediaStreamTrack::create(context, *this, WTFMove(frameRequestRate));
+    auto stream =  MediaStream::create(context);
+    stream->addTrack(track);
+    return WTFMove(stream);
+}
+#endif
 
 FloatRect HTMLCanvasElement::convertLogicalToDevice(const FloatRect& logicalRect) const
 {
@@ -540,19 +667,25 @@ SecurityOrigin* HTMLCanvasElement::securityOrigin() const
 
 bool HTMLCanvasElement::shouldAccelerate(const IntSize& size) const
 {
+    auto& settings = document().settings();
+
+    auto area = size.area<RecordOverflow>();
+    if (area.hasOverflowed())
+        return false;
+
+    if (area > settings.maximumAccelerated2dCanvasSize())
+        return false;
+
 #if USE(IOSURFACE_CANVAS_BACKING_STORE)
-    UNUSED_PARAM(size);
-    return document().settings() && document().settings()->canvasUsesAcceleratedDrawing();
+    return settings.canvasUsesAcceleratedDrawing();
 #elif ENABLE(ACCELERATED_2D_CANVAS)
     if (m_context && !m_context->is2d())
         return false;
 
-    Settings* settings = document().settings();
-    if (!settings || !settings->accelerated2dCanvasEnabled())
+    if (!settings.accelerated2dCanvasEnabled())
         return false;
 
-    // Do not use acceleration for small canvas.
-    if (size.width() * size.height() < settings->minimumAccelerated2dCanvasSize())
+    if (area < settings.minimumAccelerated2dCanvasSize())
         return false;
 
     return true;
@@ -657,8 +790,6 @@ void HTMLCanvasElement::createImageBuffer() const
         return;
     m_imageBuffer->context().setShadowsIgnoreTransforms(true);
     m_imageBuffer->context().setImageInterpolationQuality(defaultInterpolationQuality);
-    if (document().settings() && !document().settings()->antialiased2dCanvasEnabled())
-        m_imageBuffer->context().setShouldAntialias(false);
     m_imageBuffer->context().setStrokeThickness(1);
     m_contextStateSaver = std::make_unique<GraphicsContextStateSaver>(m_imageBuffer->context());
 

@@ -64,8 +64,6 @@ namespace WebCore {
 // PlatformModule
 #if OS(WINDOWS)
 typedef HMODULE PlatformModule;
-#elif PLATFORM(EFL)
-typedef Eina_Module* PlatformModule;
 #elif USE(GLIB)
 typedef GModule* PlatformModule;
 #elif USE(CF)
@@ -98,7 +96,7 @@ typedef unsigned PlatformModuleVersion;
 #endif
 
 // PlatformFileHandle
-#if USE(GLIB) && !PLATFORM(EFL) && !PLATFORM(WIN)
+#if USE(GLIB) && !PLATFORM(WIN)
 typedef GFileIOStream* PlatformFileHandle;
 const PlatformFileHandle invalidPlatformFileHandle = 0;
 #elif OS(WINDOWS)
@@ -194,7 +192,7 @@ bool unloadModule(PlatformModule);
 WEBCORE_EXPORT String encodeForFileName(const String&);
 String decodeFromFilename(const String&);
 
-bool filesHaveSameVolume(const String&, const String&);
+WEBCORE_EXPORT bool filesHaveSameVolume(const String&, const String&);
 
 #if USE(CF)
 RetainPtr<CFURLRef> pathAsURL(const String&);

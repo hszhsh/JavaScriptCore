@@ -22,10 +22,13 @@
 #include "JSTestNode.h"
 
 #include "JSDOMBinding.h"
+#include "JSDOMBindingCaller.h"
 #include "JSDOMConstructor.h"
 #include "JSDOMConvert.h"
+#include "JSDOMExceptionHandling.h"
 #include "JSDOMIterator.h"
 #include "JSDOMPromise.h"
+#include "JSDOMWrapperCache.h"
 #include "RuntimeEnabledFeatures.h"
 #include <runtime/Error.h>
 #include <runtime/ObjectConstructor.h>
@@ -144,8 +147,7 @@ void JSTestNodePrototype::finishCreation(VM& vm)
         VM::DeletePropertyModeScope scope(vm, VM::DeletePropertyMode::IgnoreConfigurable);
         JSObject::deleteProperty(this, globalObject()->globalExec(), propertyName);
     }
-    if (RuntimeEnabledFeatures::sharedFeatures().domIteratorEnabled())
-        putDirect(vm, vm.propertyNames->iteratorSymbol, JSFunction::create(vm, globalObject(), 0, ASCIILiteral("[Symbol.Iterator]"), jsTestNodePrototypeFunctionSymbolIterator), DontEnum);
+    putDirect(vm, vm.propertyNames->iteratorSymbol, JSFunction::create(vm, globalObject(), 0, ASCIILiteral("[Symbol.Iterator]"), jsTestNodePrototypeFunctionSymbolIterator), DontEnum);
 }
 
 const ClassInfo JSTestNode::s_info = { "TestNode", &Base::s_info, 0, CREATE_METHOD_TABLE(JSTestNode) };
@@ -158,7 +160,7 @@ JSTestNode::JSTestNode(Structure* structure, JSDOMGlobalObject& globalObject, Re
 void JSTestNode::finishCreation(VM& vm)
 {
     Base::finishCreation(vm);
-    ASSERT(inherits(info()));
+    ASSERT(inherits(vm, info()));
 
 }
 
@@ -172,14 +174,14 @@ JSObject* JSTestNode::prototype(VM& vm, JSGlobalObject* globalObject)
     return getDOMPrototype<JSTestNode>(vm, globalObject);
 }
 
-template<> inline JSTestNode* BindingCaller<JSTestNode>::castForAttribute(ExecState&, EncodedJSValue thisValue)
+template<> inline JSTestNode* BindingCaller<JSTestNode>::castForAttribute(ExecState& state, EncodedJSValue thisValue)
 {
-    return jsDynamicDowncast<JSTestNode*>(JSValue::decode(thisValue));
+    return jsDynamicDowncast<JSTestNode*>(state.vm(), JSValue::decode(thisValue));
 }
 
 template<> inline JSTestNode* BindingCaller<JSTestNode>::castForOperation(ExecState& state)
 {
-    return jsDynamicDowncast<JSTestNode*>(state.thisValue());
+    return jsDynamicDowncast<JSTestNode*>(state.vm(), state.thisValue());
 }
 
 static inline JSValue jsTestNodeNameGetter(ExecState&, JSTestNode&, ThrowScope& throwScope);
@@ -202,7 +204,7 @@ EncodedJSValue jsTestNodeConstructor(ExecState* state, EncodedJSValue thisValue,
 {
     VM& vm = state->vm();
     auto throwScope = DECLARE_THROW_SCOPE(vm);
-    JSTestNodePrototype* domObject = jsDynamicDowncast<JSTestNodePrototype*>(JSValue::decode(thisValue));
+    JSTestNodePrototype* domObject = jsDynamicDowncast<JSTestNodePrototype*>(vm, JSValue::decode(thisValue));
     if (UNLIKELY(!domObject))
         return throwVMTypeError(state, throwScope);
     return JSValue::encode(JSTestNode::getConstructor(state->vm(), domObject->globalObject()));
@@ -213,7 +215,7 @@ bool setJSTestNodeConstructor(ExecState* state, EncodedJSValue thisValue, Encode
     VM& vm = state->vm();
     auto throwScope = DECLARE_THROW_SCOPE(vm);
     JSValue value = JSValue::decode(encodedValue);
-    JSTestNodePrototype* domObject = jsDynamicDowncast<JSTestNodePrototype*>(JSValue::decode(thisValue));
+    JSTestNodePrototype* domObject = jsDynamicDowncast<JSTestNodePrototype*>(vm, JSValue::decode(thisValue));
     if (UNLIKELY(!domObject)) {
         throwVMTypeError(state, throwScope);
         return false;
@@ -335,7 +337,7 @@ JSC::EncodedJSValue JSC_HOST_CALL jsTestNodePrototypeFunctionForEach(JSC::ExecSt
     return BindingCaller<JSTestNode>::callOperation<jsTestNodePrototypeFunctionForEachCaller>(state, "forEach");
 }
 
-static inline EncodedJSValue jsTestNodePrototypeFunctionToJSONCaller(ExecState* state, JSTestNode* thisObject, JSC::ThrowScope& throwScope)
+JSC::JSObject* JSTestNode::serialize(ExecState* state, JSTestNode* thisObject, ThrowScope& throwScope)
 {
     auto& vm = state->vm();
     auto* result = constructEmptyObject(state);
@@ -344,7 +346,12 @@ static inline EncodedJSValue jsTestNodePrototypeFunctionToJSONCaller(ExecState* 
     ASSERT(!throwScope.exception());
     result->putDirect(vm, Identifier::fromString(&vm, "name"), nameValue);
 
-    return JSValue::encode(result);
+    return result;
+}
+
+static inline EncodedJSValue jsTestNodePrototypeFunctionToJSONCaller(ExecState* state, JSTestNode* thisObject, JSC::ThrowScope& throwScope)
+{
+    return JSValue::encode(JSTestNode::serialize(state, thisObject, throwScope));
 }
 
 EncodedJSValue JSC_HOST_CALL jsTestNodePrototypeFunctionToJSON(ExecState* state)
@@ -357,7 +364,6 @@ void JSTestNode::visitChildren(JSCell* cell, SlotVisitor& visitor)
     auto* thisObject = jsCast<JSTestNode*>(cell);
     ASSERT_GC_OBJECT_INHERITS(thisObject, info());
     Base::visitChildren(thisObject, visitor);
-    thisObject->wrapped().visitJSEventListeners(visitor);
 }
 
 #if ENABLE(BINDING_INTEGRITY)

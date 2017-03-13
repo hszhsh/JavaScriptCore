@@ -854,15 +854,15 @@ def runFTLNoCJIT(*optionalTestSpecificOptions)
 end
 
 def runFTLNoCJITValidate(*optionalTestSpecificOptions)
-    run("ftl-no-cjit-validate-sampling-profiler", "--validateGraph=true", "--useSamplingProfiler=true", *(FTL_OPTIONS + NO_CJIT_OPTIONS + optionalTestSpecificOptions))
+    run("ftl-no-cjit-validate-sampling-profiler", "--validateGraph=true", "--useSamplingProfiler=true", "--airForceIRCAllocator=true", *(FTL_OPTIONS + NO_CJIT_OPTIONS + optionalTestSpecificOptions))
 end
 
 def runFTLNoCJITNoPutStackValidate(*optionalTestSpecificOptions)
-    run("ftl-no-cjit-no-put-stack-validate", "--validateGraph=true", "--usePutStackSinking=false", *(FTL_OPTIONS + NO_CJIT_OPTIONS + optionalTestSpecificOptions))
+    run("ftl-no-cjit-no-put-stack-validate", "--validateGraph=true", "--usePutStackSinking=false", "--airForceIRCAllocator=true", *(FTL_OPTIONS + NO_CJIT_OPTIONS + optionalTestSpecificOptions))
 end
 
 def runFTLNoCJITNoInlineValidate(*optionalTestSpecificOptions)
-    run("ftl-no-cjit-no-inline-validate", "--validateGraph=true", "--maximumInliningDepth=1", *(FTL_OPTIONS + NO_CJIT_OPTIONS + optionalTestSpecificOptions))
+    run("ftl-no-cjit-no-inline-validate", "--validateGraph=true", "--maximumInliningDepth=1", "--airForceBriggsAllocator=true", *(FTL_OPTIONS + NO_CJIT_OPTIONS + optionalTestSpecificOptions))
 end
 
 def runFTLNoCJITOSRValidation(*optionalTestSpecificOptions)
@@ -878,11 +878,11 @@ def runDFGEagerNoCJITValidate(*optionalTestSpecificOptions)
 end
 
 def runFTLEager(*optionalTestSpecificOptions)
-    run("ftl-eager", *(FTL_OPTIONS + EAGER_OPTIONS + COLLECT_CONTINUOUSLY_OPTIONS + optionalTestSpecificOptions))
+    run("ftl-eager", "--airForceBriggsAllocator=true", *(FTL_OPTIONS + EAGER_OPTIONS + COLLECT_CONTINUOUSLY_OPTIONS + optionalTestSpecificOptions))
 end
 
 def runFTLEagerNoCJITValidate(*optionalTestSpecificOptions)
-    run("ftl-eager-no-cjit", "--validateGraph=true", *(FTL_OPTIONS + NO_CJIT_OPTIONS + EAGER_OPTIONS + COLLECT_CONTINUOUSLY_OPTIONS + optionalTestSpecificOptions))
+    run("ftl-eager-no-cjit", "--validateGraph=true", "--airForceIRCAllocator=true", *(FTL_OPTIONS + NO_CJIT_OPTIONS + EAGER_OPTIONS + COLLECT_CONTINUOUSLY_OPTIONS + optionalTestSpecificOptions))
 end
 
 def runFTLEagerNoCJITOSRValidation(*optionalTestSpecificOptions)
@@ -1176,10 +1176,6 @@ end
 def runWebAssembly
     return if !$jitTests
     return if !$isFTLPlatform
-    # FIXME: The current WebAssembly implementation includes Darwin specific things.
-    # Once WebAssembly becomes ready to be ported, we will enable it on the other OSes (like Linux) and drop this workaround.
-    # https://bugs.webkit.org/show_bug.cgi?id=164032
-    return if $hostOS != "darwin"
     modules = Dir[WASMTESTS_PATH + "*.js"].map { |f| File.basename(f) }
     prepareExtraAbsoluteFiles(WASMTESTS_PATH, ["wasm.json"])
     prepareExtraRelativeFiles(modules.map { |f| "../" + f }, $collection)
@@ -1194,10 +1190,6 @@ def runWebAssemblySpecTest(mode)
 
     return if !$jitTests
     return if !$isFTLPlatform
-    # FIXME: The current WebAssembly implementation includes Darwin specific things.
-    # Once WebAssembly becomes ready to be ported, we will enable it on the other OSes (like Linux) and drop this workaround.
-    # https://bugs.webkit.org/show_bug.cgi?id=164032
-    return if $hostOS != "darwin"
     modules = Dir[WASMTESTS_PATH + "*.js"].map { |f| File.basename(f) }
     prepareExtraAbsoluteFiles(WASMTESTS_PATH, ["wasm.json"])
     prepareExtraRelativeFiles(modules.map { |f| "../../" + f }, $collection)
@@ -1468,11 +1460,11 @@ def runNoisyTestNoFTL
 end
 
 def runNoisyTestNoCJIT
-    runNoisyTest("ftl-no-cjit", "--validateBytecode=true", "--validateGraphAtEachPhase=true", *(FTL_OPTIONS + NO_CJIT_OPTIONS))
+    runNoisyTest("ftl-no-cjit", "--validateBytecode=true", "--validateGraphAtEachPhase=true", *(FTL_OPTIONS + NO_CJIT_OPTIONS + COLLECT_CONTINUOUSLY_OPTIONS))
 end
 
 def runNoisyTestEagerNoCJIT
-    runNoisyTest("ftl-eager-no-cjit", "--validateBytecode=true", "--validateGraphAtEachPhase=true", *(FTL_OPTIONS + NO_CJIT_OPTIONS + EAGER_OPTIONS))
+    runNoisyTest("ftl-eager-no-cjit", "--validateBytecode=true", "--validateGraphAtEachPhase=true", *(FTL_OPTIONS + NO_CJIT_OPTIONS + EAGER_OPTIONS + COLLECT_CONTINUOUSLY_OPTIONS))
 end
 
 def defaultRunNoisyTest

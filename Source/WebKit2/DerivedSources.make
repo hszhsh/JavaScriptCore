@@ -1,4 +1,4 @@
-# Copyright (C) 2010, 2011, 2012, 2013 Apple Inc. All rights reserved.
+# Copyright (C) 2010-2017 Apple Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,6 +28,7 @@ VPATH = \
     $(WebKit2)/NetworkProcess \
     $(WebKit2)/NetworkProcess/CustomProtocols \
     $(WebKit2)/NetworkProcess/mac \
+    $(WebKit2)/NetworkProcess/webrtc \
     $(WebKit2)/PluginProcess \
     $(WebKit2)/PluginProcess/mac \
     $(WebKit2)/Shared/Plugins \
@@ -45,6 +46,7 @@ VPATH = \
     $(WebKit2)/WebProcess/IconDatabase \
     $(WebKit2)/WebProcess/MediaCache \
     $(WebKit2)/WebProcess/Network \
+    $(WebKit2)/WebProcess/Network/webrtc \
     $(WebKit2)/WebProcess/Notifications \
     $(WebKit2)/WebProcess/OriginData \
     $(WebKit2)/WebProcess/Plugins \
@@ -86,8 +88,6 @@ endif
 MESSAGE_RECEIVERS = \
     AuthenticationManager \
     ChildProcess \
-    CustomProtocolManager \
-    CustomProtocolManagerProxy \
     DatabaseProcess \
     DatabaseProcessProxy \
     DatabaseToWebProcessConnection \
@@ -95,11 +95,16 @@ MESSAGE_RECEIVERS = \
     DrawingArea \
     DrawingAreaProxy \
     EventDispatcher \
+    LegacyCustomProtocolManager \
+    LegacyCustomProtocolManagerProxy \
     NPObjectMessageReceiver \
     NetworkConnectionToWebProcess \
     NetworkProcess \
     NetworkProcessConnection \
     NetworkProcessProxy \
+    NetworkRTCMonitor \
+    NetworkRTCProvider \
+    NetworkRTCSocket \
     NetworkResourceLoader \
     PluginControllerProxy \
     PluginProcess \
@@ -135,6 +140,7 @@ MESSAGE_RECEIVERS = \
     WebIconDatabase \
     WebIconDatabaseProxy \
     WebInspector \
+    WebInspectorInterruptDispatcher \
     WebInspectorProxy \
     WebInspectorUI \
     WebNotificationManager \
@@ -149,6 +155,9 @@ MESSAGE_RECEIVERS = \
     WebProcessConnection \
     WebProcessPool \
     WebProcessProxy \
+    WebRTCMonitor \
+    WebRTCResolver \
+    WebRTCSocket \
     WebResourceLoader \
     WebResourceLoadStatisticsStore \
     WebUserContentController \

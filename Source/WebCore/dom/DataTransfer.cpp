@@ -231,12 +231,12 @@ void DataTransfer::setDragImage(Element*, int, int)
 
 #else
 
-Ref<DataTransfer> DataTransfer::createForDragAndDrop()
+Ref<DataTransfer> DataTransfer::createForDrag()
 {
     return adoptRef(*new DataTransfer(DataTransferAccessPolicy::Writable, Pasteboard::createForDragAndDrop(), DragAndDrop));
 }
 
-Ref<DataTransfer> DataTransfer::createForDragAndDrop(DataTransferAccessPolicy policy, const DragData& dragData)
+Ref<DataTransfer> DataTransfer::createForDrop(DataTransferAccessPolicy policy, const DragData& dragData)
 {
     return adoptRef(*new DataTransfer(policy, Pasteboard::createForDragAndDrop(dragData), DragAndDrop, dragData.containsFiles()));
 }
@@ -256,7 +256,7 @@ void DataTransfer::setDragImage(Element* element, int x, int y)
         return;
 
     CachedImage* image = nullptr;
-    if (is<HTMLImageElement>(element) && !element->inDocument())
+    if (is<HTMLImageElement>(element) && !element->isConnected())
         image = downcast<HTMLImageElement>(*element).cachedImage();
 
     m_dragLocation = IntPoint(x, y);
@@ -283,14 +283,14 @@ void DataTransfer::updateDragImage()
         return;
 
     IntPoint computedHotSpot;
-    DragImageRef computedImage = createDragImage(computedHotSpot);
+    auto computedImage = DragImage { createDragImage(computedHotSpot) };
     if (!computedImage)
         return;
 
-    m_pasteboard->setDragImage(computedImage, computedHotSpot);
+    m_pasteboard->setDragImage(WTFMove(computedImage), computedHotSpot);
 }
 
-#if !PLATFORM(COCOA)
+#if !PLATFORM(MAC)
 
 DragImageRef DataTransfer::createDragImage(IntPoint& location) const
 {

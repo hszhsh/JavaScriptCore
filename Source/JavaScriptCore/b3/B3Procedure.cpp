@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -202,6 +202,8 @@ void Procedure::dump(PrintStream& out) const
         }
         dataLog("    ", deepDump(*this, value), "\n");
     }
+    if (hasQuirks())
+        out.print("Has Quirks: True\n");
     if (variables().size()) {
         out.print("Variables:\n");
         for (Variable* variable : variables())
@@ -254,6 +256,10 @@ void Procedure::deleteOrphans()
     for (Value* value : values()) {
         if (!valuesInBlocks.contains(value))
             toRemove.append(value);
+        else if (UpsilonValue* upsilon = value->as<UpsilonValue>()) {
+            if (!valuesInBlocks.contains(upsilon->phi()))
+                upsilon->replaceWithNop();
+        }
     }
 
     for (Value* value : toRemove)

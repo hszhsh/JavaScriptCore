@@ -13,6 +13,7 @@
 
 #include "webrtc/base/constructormagic.h"
 #include "webrtc/base/dscp.h"
+#include "webrtc/base/export.h"
 #include "webrtc/base/sigslot.h"
 #include "webrtc/base/socket.h"
 #include "webrtc/base/timeutils.h"
@@ -22,7 +23,7 @@ namespace rtc {
 // This structure holds the info needed to update the packet send time header
 // extension, including the information needed to update the authentication tag
 // after changing the value.
-struct PacketTimeUpdateParams {
+struct WEBRTC_DYLIB_EXPORT PacketTimeUpdateParams {
   PacketTimeUpdateParams();
   ~PacketTimeUpdateParams();
 
@@ -65,7 +66,7 @@ inline PacketTime CreatePacketTime(int64_t not_before) {
 
 // Provides the ability to receive packets asynchronously. Sends are not
 // buffered since it is acceptable to drop packets under high load.
-class AsyncPacketSocket : public sigslot::has_slots<> {
+class WEBRTC_DYLIB_EXPORT AsyncPacketSocket : public sigslot::has_slots<> {
  public:
   enum State {
     STATE_CLOSED,
@@ -78,7 +79,7 @@ class AsyncPacketSocket : public sigslot::has_slots<> {
   AsyncPacketSocket();
   ~AsyncPacketSocket() override;
 
-  // Returns current local address. Address may be set to NULL if the
+  // Returns current local address. Address may be set to null if the
   // socket is not bound yet (GetState() returns STATE_BINDING).
   virtual SocketAddress GetLocalAddress() const = 0;
 

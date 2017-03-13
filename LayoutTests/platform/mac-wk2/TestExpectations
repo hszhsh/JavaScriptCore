@@ -6,6 +6,7 @@
 #//////////////////////////////////////////////////////////////////////////////////////////
 
 tiled-drawing [ Pass ]
+tiled-drawing/ios [ Skip ]
 fast/visual-viewport/tiled-drawing [ Pass ]
 swipe [ Pass ]
 
@@ -21,9 +22,10 @@ fast/media/mq-inverted-colors-live-update-in-subframes.html [ Pass ]
 fast/media/mq-monochrome-live-update.html [ Pass ]
 fast/media/mq-prefers-reduced-motion-live-update.html [ Pass ]
 
-pointer-lock/lock-lost-on-esc-in-fullscreen.html [ Pass ]
-
 [ Sierra+ ] http/tests/ssl/applepay/ [ Pass ]
+
+fast/visual-viewport/rubberbanding-viewport-rects.html [ Pass ]
+fast/visual-viewport/rubberbanding-viewport-rects-header-footer.html  [ Pass ]
 
 #//////////////////////////////////////////////////////////////////////////////////////////
 # End platform-specific directories.
@@ -51,6 +53,7 @@ editing/pasteboard/drag-and-drop-image-contenteditable.html
 editing/pasteboard/drag-and-drop-inputimage-contenteditable.html
 editing/pasteboard/drag-and-drop-objectimage-contenteditable.html
 editing/pasteboard/drag-and-drop-attachment-contenteditable.html
+editing/pasteboard/drag-drop-copy-content.html
 editing/pasteboard/drag-drop-dead-frame.html
 editing/pasteboard/drag-drop-input-textarea.html
 editing/pasteboard/drag-drop-list.html
@@ -270,9 +273,11 @@ webkit.org/b/93980 http/tests/appcache/load-from-appcache-defer-resume-crash.htm
 webkit.org/b/136554 tiled-drawing/scrolling/frames/frameset-nested-frame-scrollability.html [ Pass Failure ]
 webkit.org/b/139901 tiled-drawing/scrolling/frames/frameset-frame-scrollability.html [ Pass Failure ]
 
+webkit.org/b/167661 tiled-drawing/scrolling/scroll-snap/scroll-snap-mandatory-mainframe-horizontal.html [ Pass Failure ]
 webkit.org/b/148407 tiled-drawing/scrolling/scroll-snap/scroll-snap-mandatory-mainframe-slow-horizontal.html [ Pass Failure ]
 webkit.org/b/148407 tiled-drawing/scrolling/scroll-snap/scroll-snap-mandatory-mainframe-slow-vertical.html [ Pass Failure ]
 webkit.org/b/165196 tiled-drawing/scrolling/scroll-snap/scroll-snap-iframe.html [ Pass Failure ]
+webkit.org/b/167321 tiled-drawing/scrolling/scroll-snap/scroll-snap-proximity-mainframe.html [ Pass Failure ]
 
 webkit.org/b/148408 tiled-drawing/scrolling/root-overflow-with-mousewheel.html [ Pass Failure Timeout ]
 
@@ -282,6 +287,7 @@ webkit.org/b/139820 fast/frames/lots-of-iframes.html [ Pass Timeout ]
 webkit.org/b/145432 media/video-transformed-by-javascript.html [ Failure ]
 
 # A lot of the disk-cache tests are flaky on mac-wk2
+webkit.org/b/169359 http/tests/cache/disk-cache/disk-cache-remove-several-pending-writes.html [ Pass Failure ]
 webkit.org/b/149087 http/tests/cache/disk-cache/disk-cache-validation-back-navigation-policy.html [ Pass Failure Timeout ]
 webkit.org/b/149087 http/tests/cache/disk-cache/disk-cache-validation-no-body.html [ Pass Failure Timeout ]
 webkit.org/b/149087 http/tests/cache/disk-cache/disk-cache-validation.html [ Pass Failure Timeout ]
@@ -317,6 +323,9 @@ webkit.org/b/155151 [ Debug ElCapitan ] media/track/track-cues-pause-on-exit.htm
 webkit.org/b/155312 inspector/heap/getPreview.html [ Pass Timeout ]
 
 webkit.org/b/156077 inspector/heap/getRemoteObject.html [ Pass Failure ]
+
+# Video fullscreen is not implemented for mac wk2 in webkittestrunner
+media/media-fullscreen-loop-inline.html [ Skip ]
 
 ### END OF (1) Classified failures with bug reports
 ########################################
@@ -456,7 +465,9 @@ webkit.org/b/145702 [ Debug Yosemite ] http/tests/misc/acid3.html [ Pass Timeout
 # Content Extensions tests must be enabled explicitly on mac-wk2.
 http/tests/contentextensions [ Pass Failure ]
 http/tests/websocket/tests/hybi/contentextensions [ Pass Failure ]
+webkit.org/b/168081 http/tests/contentextensions/async-xhr-onerror.html [ Pass Timeout ]
 webkit.org/b/146400 http/tests/contentextensions/character-set-basic-support.html [ Pass Failure ]
+webkit.org/b/168082 [ Sierra ] http/tests/contentextensions/invalid-selector.html [ Pass ImageOnlyFailure ]
 
 # WebKit1-only failure.
 webkit.org/b/103857 fast/events/mouse-cursor-change.html [ Pass ]
@@ -541,10 +552,9 @@ webkit.org/b/162638 [ Sierra+ ] fast/scrolling/rtl-scrollbars-alternate-iframe-b
 webkit.org/b/160445 [ Sierra+ ] http/tests/security/contentSecurityPolicy/upgrade-insecure-requests/upgrade-insecure-fetch-in-worker.html [ Failure ]
 webkit.org/b/160445 [ Sierra+ ] http/tests/security/contentSecurityPolicy/upgrade-insecure-requests/upgrade-insecure-fetch-in-main-frame.html [ Failure ]
 
-webkit.org/b/163932 inspector/css/pseudo-element-matches.html [ Pass Failure ]
-
-webkit.org/b/163604 inspector/debugger/breakpoint-action-eval.html [ Pass Timeout ]
 webkit.org/b/159447 [ Debug ] inspector/debugger/tail-deleted-frames-from-vm-entry.html [ Pass Failure ]
+
+webkit.org/b/167607 [ Debug ] http/tests/inspector/worker/blob-script-with-cross-domain-imported-scripts.html [ Pass Timeout ]
 
 webkit.org/b/159430 [ Debug Sierra+ ] media/restore-from-page-cache.html [ Pass Crash ]
 
@@ -559,6 +569,7 @@ webkit.org/b/159427 http/tests/loading/basic-credentials-sent-automatically.html
 webkit.org/b/160309 fast/dom/Window/child-window-focus.html [ Pass Failure ]
 
 webkit.org/b/161148 gamepad/gamepad-timestamp.html [ Pass Failure ]
+webkit.org/b/167517 gamepad/gamepad-visibility-1.html [ Pass Failure ]
 
 webkit.org/b/161633 [ Debug ] storage/indexeddb/objectstore-cursor.html [ Pass Timeout ]
 
@@ -587,11 +598,11 @@ webkit.org/b/162685 http/tests/cache/disk-cache/disk-cache-204-status-code.html 
 
 webkit.org/b/161649 http/tests/cache/disk-cache/resource-becomes-uncacheable.html [ Pass Failure ]
 
-webkit.org/b/163136 [ Release ] http/tests/xmlhttprequest/auth-reject-protection-space.html [ Pass Failure ]
+webkit.org/b/163136 http/tests/xmlhttprequest/auth-reject-protection-space.html [ Pass Failure ]
 
 webkit.org/b/163139 http/tests/loading/basic-auth-load-URL-with-consecutive-slashes.html [ Pass Failure ]
 
-webkit.org/b/162975 [ Debug ] http/tests/cache/disk-cache/memory-cache-revalidation-updates-disk-cache.html [ Pass Failure ]
+webkit.org/b/162975 http/tests/cache/disk-cache/memory-cache-revalidation-updates-disk-cache.html [ Pass Failure ]
 
 webkit.org/b/161653 [ Debug ] storage/indexeddb/key-generator.html [ Pass Timeout ]
 
@@ -600,11 +611,70 @@ webkit.org/b/163453 [ Sierra Release ] http/tests/security/contentSecurityPolicy
 webkit.org/b/163702 platform/mac-wk2/plugins/muted-state.html [ Failure ]
 
 webkit.org/b/164870 [ Debug ] imported/w3c/web-platform-tests/IndexedDB/idbcursor_iterating.htm [ Pass Failure ]
+webkit.org/b/164870 [ ElCapitan Release ] imported/w3c/web-platform-tests/IndexedDB/idbcursor_iterating.htm [ Pass Failure ]
 
 webkit.org/b/165352 fast/dom/Window/window-resize-contents.html [ Pass Timeout ]
 
 webkit.org/b/165392 [ ElCapitan Release ] imported/mathml-in-html5/mathml/presentation-markup/fractions/frac-parameters-1.html [ Pass Failure ]
 
-webkit.org/b/166765 [ Debug ] http/tests/pointer-lock/iframe-sandboxed-nested-allow-pointer-lock.html [ Skip ]
-webkit.org/b/166765 [ Debug ] http/tests/pointer-lock/pointerlockelement-same-origin.html [ Skip ]
-webkit.org/b/166765 [ Debug ] pointer-lock/lock-lost-on-alert.html [ Skip ]
+webkit.org/b/161887 [ ElCapitan ] swipe/main-frame-pinning-requirement.html [ Pass Timeout ]
+
+webkit.org/b/167653 http/tests/contentextensions/block-everything-unless-domain.html [ Pass Timeout ]
+
+webkit.org/b/167206 [ Sierra Release ] mathml/opentype/large-operators-displaystyle-dynamic.html [ Pass ImageOnlyFailure ]
+
+webkit.org/b/168065 inspector/unit-tests/heap-snapshot.html [ Pass Failure Timeout ]
+
+webkit.org/b/167538 [ Sierra ] fast/css-grid-layout/grid-simplified-layout-positioned.html [ Pass ImageOnlyFailure ]
+
+webkit.org/b/167965 pointer-lock/mouse-event-delivery.html [ Pass Failure ]
+
+webkit.org/b/168235 [ Debug ] imported/w3c/web-platform-tests/html/semantics/text-level-semantics/the-a-element/a-download-click.html [ Pass Failure ]
+
+webkit.org/b/168085 tiled-drawing/scrolling/latched-to-deleted-node.html [ Pass Failure ]
+
+webkit.org/b/168336 [ Debug ] imported/w3c/web-platform-tests/streams/readable-streams/garbage-collection.html [ Pass Timeout ]
+
+webkit.org/b/168089 [ Release ] animations/trigger-container-scroll-empty.html [ Pass Failure ]
+
+webkit.org/b/168391 [ ElCapitan Debug ] storage/indexeddb/modern/idbcursor-continue-primary-key-1.html [ Pass Timeout ]
+
+
+webkit.org/b/168380 [ ElCapitan Debug ] imported/w3c/web-platform-tests/IndexedDB/idb-binary-key-roundtrip.htm [ Pass Failure ]
+
+# Skipped because Mac doesn't have a key to show the context menu
+fast/events/context-activated-by-key-event.html [ Skip ]
+
+# <rdar://problem/30735372>
+[ Release ] fast/events/constructors/media-stream-event-constructor.html [ Skip ]
+[ Release ] fast/mediastream/RTCIceCandidate.html [ Skip ]
+[ Release ] fast/mediastream/RTCPeerConnection-add-removeTrack.html [ Skip ]
+[ Release ] fast/mediastream/RTCPeerConnection-addTransceiver.html [ Skip ]
+[ Release ] fast/mediastream/RTCPeerConnection-createAnswer.html [ Skip ]
+[ Release ] fast/mediastream/RTCPeerConnection-createOffer.html [ Skip ]
+[ Release ] fast/mediastream/RTCPeerConnection-datachannel.html [ Skip ]
+[ Release ] fast/mediastream/RTCPeerConnection-getConfiguration.html [ Skip ]
+[ Release ] fast/mediastream/RTCPeerConnection-have-local-offer.html [ Skip ]
+[ Release ] fast/mediastream/RTCPeerConnection-have-local-pranswer.html [ Skip ]
+[ Release ] fast/mediastream/RTCPeerConnection-have-remote-offer.html [ Skip ]
+[ Release ] fast/mediastream/RTCPeerConnection-have-remote-pranswer.html [ Skip ]
+[ Release ] fast/mediastream/RTCPeerConnection-inspect-answer.html [ Skip ]
+[ Release ] fast/mediastream/RTCPeerConnection-inspect-offer.html [ Skip ]
+[ Release ] fast/mediastream/RTCPeerConnection-localDescription.html [ Skip ]
+[ Release ] fast/mediastream/RTCPeerConnection-overloaded-operations.html [ Skip ]
+[ Release ] fast/mediastream/RTCPeerConnection-remoteDescription.html [ Skip ]
+[ Release ] fast/mediastream/RTCPeerConnection-stable.html [ Skip ]
+[ Release ] fast/mediastream/RTCPeerConnection.html [ Skip ]
+[ Release ] fast/mediastream/RTCSessionDescription.html [ Skip ]
+[ Release ] fast/mediastream/RTCTrackEvent-constructor.html [ Skip ]
+[ Release ] imported/w3c/web-platform-tests/webrtc/RTCDataChannelEvent-constructor.html [ Skip ]
+[ Release ] imported/w3c/web-platform-tests/webrtc/RTCPeerConnectionIceEvent-constructor.html [ Skip ]
+[ Release ] imported/w3c/web-platform-tests/webrtc/rtcpeerconnection/rtcpeerconnection-constructor.html [ Skip ]
+[ Release ] imported/w3c/web-platform-tests/webrtc/rtcpeerconnection/rtcpeerconnection-idl.html [ Skip ]
+[ Release ] js/dom/global-constructors-attributes.html [ Skip ]
+
+webkit.org/b/168933 fast/regions/inline-block-inside-anonymous-overflow-with-covered-controls.html [ Pass ImageOnlyFailure ]
+
+webkit.org/b/168346 [ Sierra Debug ] editing/selection/move-by-word-visually-multi-space.html [ Pass Timeout ]
+
+webkit.org/b/169481 [ Debug ] webrtc/libwebrtc/descriptionGetters.html [ Pass Failure ]

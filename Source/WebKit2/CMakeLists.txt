@@ -10,6 +10,7 @@ set(WebKit2_INCLUDE_DIRECTORIES
     "${WEBKIT2_DIR}/NetworkProcess/FileAPI"
     "${WEBKIT2_DIR}/NetworkProcess/cache"
     "${WEBKIT2_DIR}/NetworkProcess/capture"
+    "${WEBKIT2_DIR}/NetworkProcess/webrtc"
     "${WEBKIT2_DIR}/Platform"
     "${WEBKIT2_DIR}/Platform/IPC"
     "${WEBKIT2_DIR}/PluginProcess"
@@ -65,6 +66,7 @@ set(WebKit2_INCLUDE_DIRECTORIES
     "${WEBKIT2_DIR}/WebProcess/MediaCache"
     "${WEBKIT2_DIR}/WebProcess/MediaStream"
     "${WEBKIT2_DIR}/WebProcess/Network"
+    "${WEBKIT2_DIR}/WebProcess/Network/webrtc"
     "${WEBKIT2_DIR}/WebProcess/Notifications"
     "${WEBKIT2_DIR}/WebProcess/OriginData"
     "${WEBKIT2_DIR}/WebProcess/Plugins"
@@ -93,7 +95,7 @@ if (ENABLE_GRAPHICS_CONTEXT_3D)
 endif ()
 
 set(NetworkProcess_COMMON_SOURCES
-    NetworkProcess/CustomProtocols/CustomProtocolManager.cpp
+    NetworkProcess/CustomProtocols/LegacyCustomProtocolManager.cpp
 
     NetworkProcess/NetworkConnectionToWebProcess.cpp
     NetworkProcess/NetworkDataTask.cpp
@@ -271,6 +273,7 @@ set(WebKit2_SOURCES
 
     Shared/WebsiteData/WebsiteData.cpp
 
+    UIProcess/BackgroundProcessResponsivenessTimer.cpp
     UIProcess/ChildProcessProxy.cpp
     UIProcess/DrawingAreaProxy.cpp
     UIProcess/FrameLoadState.cpp
@@ -323,10 +326,14 @@ set(WebKit2_SOURCES
     UIProcess/WebProcessLifetimeTracker.cpp
     UIProcess/WebProcessPool.cpp
     UIProcess/WebProcessProxy.cpp
+    UIProcess/WebURLSchemeHandler.cpp
+    UIProcess/WebURLSchemeHandlerTask.cpp
     UIProcess/WebVibrationProvider.cpp
     UIProcess/WebVibrationProxy.cpp
     UIProcess/WebViewportAttributes.cpp
 
+    UIProcess/API/APIContentExtension.cpp
+    UIProcess/API/APIContentExtensionStore.cpp
     UIProcess/API/APIExperimentalFeature.cpp
     UIProcess/API/APIFrameInfo.cpp
     UIProcess/API/APIHitTestResult.cpp
@@ -336,8 +343,7 @@ set(WebKit2_SOURCES
     UIProcess/API/APIProcessPoolConfiguration.cpp
     UIProcess/API/APIOpenPanelParameters.cpp
     UIProcess/API/APISessionState.cpp
-    UIProcess/API/APIUserContentExtension.cpp
-    UIProcess/API/APIUserContentExtensionStore.cpp
+    UIProcess/API/APIURLSchemeHandlerTask.cpp
     UIProcess/API/APIUserContentWorld.cpp
     UIProcess/API/APIUserScript.cpp
     UIProcess/API/APIUserStyleSheet.cpp
@@ -417,6 +423,8 @@ set(WebKit2_SOURCES
 
     UIProcess/Launcher/ProcessLauncher.cpp
 
+    UIProcess/Network/CustomProtocols/LegacyCustomProtocolManagerProxy.cpp
+
     UIProcess/Network/NetworkProcessProxy.cpp
 
     UIProcess/Notifications/NotificationPermissionRequest.cpp
@@ -471,7 +479,6 @@ set(WebKit2_SOURCES
     WebProcess/InjectedBundle/InjectedBundleHitTestResult.cpp
     WebProcess/InjectedBundle/InjectedBundleNavigationAction.cpp
     WebProcess/InjectedBundle/InjectedBundlePageContextMenuClient.cpp
-    WebProcess/InjectedBundle/InjectedBundlePageDiagnosticLoggingClient.cpp
     WebProcess/InjectedBundle/InjectedBundlePageEditorClient.cpp
     WebProcess/InjectedBundle/InjectedBundlePageFormClient.cpp
     WebProcess/InjectedBundle/InjectedBundlePageFullScreenClient.cpp
@@ -568,15 +575,16 @@ set(WebKit2_SOURCES
     WebProcess/WebPage/WebDocumentLoader.cpp
     WebProcess/WebPage/WebFrame.cpp
     WebProcess/WebPage/WebInspector.cpp
+    WebProcess/WebPage/WebInspectorInterruptDispatcher.cpp
     WebProcess/WebPage/WebInspectorFrontendAPIDispatcher.cpp
     WebProcess/WebPage/WebInspectorUI.cpp
     WebProcess/WebPage/WebOpenPanelResultListener.cpp
     WebProcess/WebPage/WebPage.cpp
     WebProcess/WebPage/WebPageGroupProxy.cpp
     WebProcess/WebPage/WebPageOverlay.cpp
+    WebProcess/WebPage/WebURLSchemeHandlerProxy.cpp
+    WebProcess/WebPage/WebURLSchemeHandlerTaskProxy.cpp
     WebProcess/WebPage/WebUndoStep.cpp
-
-
 
     ${NetworkProcess_COMMON_SOURCES}
 )
@@ -587,11 +595,15 @@ set(WebKit2_MESSAGES_IN_FILES
 
     DatabaseProcess/IndexedDB/WebIDBConnectionToClient.messages.in
 
-    NetworkProcess/CustomProtocols/CustomProtocolManager.messages.in
+    NetworkProcess/CustomProtocols/LegacyCustomProtocolManager.messages.in
 
     NetworkProcess/NetworkConnectionToWebProcess.messages.in
     NetworkProcess/NetworkProcess.messages.in
     NetworkProcess/NetworkResourceLoader.messages.in
+
+    NetworkProcess/webrtc/NetworkRTCMonitor.messages.in
+    NetworkProcess/webrtc/NetworkRTCProvider.messages.in
+    NetworkProcess/webrtc/NetworkRTCSocket.messages.in
 
     PluginProcess/PluginControllerProxy.messages.in
     PluginProcess/PluginProcess.messages.in
@@ -627,7 +639,7 @@ set(WebKit2_MESSAGES_IN_FILES
 
     UIProcess/Network/NetworkProcessProxy.messages.in
 
-    UIProcess/Network/CustomProtocols/CustomProtocolManagerProxy.messages.in
+    UIProcess/Network/CustomProtocols/LegacyCustomProtocolManagerProxy.messages.in
 
     UIProcess/Plugins/PluginProcessProxy.messages.in
 
@@ -649,6 +661,10 @@ set(WebKit2_MESSAGES_IN_FILES
 
     WebProcess/IconDatabase/WebIconDatabaseProxy.messages.in
 
+    WebProcess/Network/webrtc/WebRTCMonitor.messages.in
+    WebProcess/Network/webrtc/WebRTCResolver.messages.in
+    WebProcess/Network/webrtc/WebRTCSocket.messages.in
+
     WebProcess/Network/NetworkProcessConnection.messages.in
     WebProcess/Network/WebResourceLoader.messages.in
 
@@ -667,6 +683,7 @@ set(WebKit2_MESSAGES_IN_FILES
     WebProcess/WebPage/RemoteWebInspectorUI.messages.in
     WebProcess/WebPage/VisitedLinkTableController.messages.in
     WebProcess/WebPage/WebInspector.messages.in
+    WebProcess/WebPage/WebInspectorInterruptDispatcher.messages.in
     WebProcess/WebPage/WebInspectorUI.messages.in
     WebProcess/WebPage/WebPage.messages.in
 )
@@ -722,6 +739,9 @@ macro(ADD_WEBKIT2_PREFIX_HEADER _target)
     endif ()
 endmacro()
 
+set(WebKit2_AUTOMATION_PROTOCOL_GENERATOR_EXTRA_FLAGS
+)
+
 WEBKIT_INCLUDE_CONFIG_FILES_IF_EXISTS()
 
 GENERATE_WEBKIT2_MESSAGE_SOURCES(WebKit2_DERIVED_SOURCES "${WebKit2_MESSAGES_IN_FILES}")
@@ -747,7 +767,7 @@ add_custom_command(
     OUTPUT ${DERIVED_SOURCES_WEBKIT2_DIR}/AutomationBackendDispatchers.h ${DERIVED_SOURCES_WEBKIT2_DIR}/AutomationBackendDispatchers.cpp ${DERIVED_SOURCES_WEBKIT2_DIR}/AutomationProtocolObjects.h ${DERIVED_SOURCES_WEBKIT2_DIR}/AutomationProtocolObjects.cpp
     MAIN_DEPENDENCY ${WebKit2_AUTOMATION_PROTOCOL_GENERATOR_INPUTS}
     DEPENDS ${WebKit2_AUTOMATION_PROTOCOL_GENERATOR_SCRIPTS}
-    COMMAND ${PYTHON_EXECUTABLE} ${PROTOCOL_GENERATOR_SCRIPTS_DIR}/generate-inspector-protocol-bindings.py --outputDir "${DERIVED_SOURCES_WEBKIT2_DIR}" --framework WebKit --backend ${WebKit2_AUTOMATION_PROTOCOL_GENERATOR_INPUTS}
+    COMMAND ${PYTHON_EXECUTABLE} ${PROTOCOL_GENERATOR_SCRIPTS_DIR}/generate-inspector-protocol-bindings.py --outputDir "${DERIVED_SOURCES_WEBKIT2_DIR}" --framework WebKit ${WebKit2_AUTOMATION_PROTOCOL_GENERATOR_EXTRA_FLAGS} --backend ${WebKit2_AUTOMATION_PROTOCOL_GENERATOR_INPUTS}
     VERBATIM)
 
 list(APPEND WebKit2_HEADERS

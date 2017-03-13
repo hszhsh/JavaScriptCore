@@ -67,6 +67,10 @@
 #include "CompiledContentExtension.h"
 #endif
 
+#if USE(QUICK_LOOK)
+#include "QuickLookHandleClient.h"
+#endif
+
 namespace WebCore {
 
 class UserMessageHandlerDescriptor;
@@ -116,7 +120,8 @@ class EmptyDatabaseProvider final : public DatabaseProvider {
 class EmptyDiagnosticLoggingClient final : public DiagnosticLoggingClient {
     void logDiagnosticMessage(const String&, const String&, ShouldSample) final { }
     void logDiagnosticMessageWithResult(const String&, const String&, DiagnosticLoggingResultType, ShouldSample) final { }
-    void logDiagnosticMessageWithValue(const String&, const String&, const String&, ShouldSample) final { }
+    void logDiagnosticMessageWithValue(const String&, const String&, double, unsigned, ShouldSample) final { }
+    void logDiagnosticMessageWithEnhancedPrivacy(const String&, const String&, ShouldSample) final { }
 };
 
 #if ENABLE(DRAG_SUPPORT)
@@ -126,7 +131,7 @@ class EmptyDragClient final : public DragClient {
     void willPerformDragSourceAction(DragSourceAction, const IntPoint&, DataTransfer&) final { }
     DragDestinationAction actionMaskForDrag(const DragData&) final { return DragDestinationActionNone; }
     DragSourceAction dragSourceActionMaskForPoint(const IntPoint&) final { return DragSourceActionNone; }
-    void startDrag(DragImageRef, const IntPoint&, const IntPoint&, DataTransfer&, Frame&, bool) final { }
+    void startDrag(DragImage, const IntPoint&, const IntPoint&, const FloatPoint&, DataTransfer&, Frame&, DragSourceAction) final { }
     void dragControllerDestroyed() final { }
 };
 
@@ -419,7 +424,7 @@ class EmptyFrameLoaderClient final : public FrameLoaderClient {
     ObjectContentType objectContentType(const URL&, const String&) final { return ObjectContentType::None; }
     String overrideMediaType() const final { return { }; }
 
-    void redirectDataToPlugin(Widget*) final { }
+    void redirectDataToPlugin(Widget&) final { }
     void dispatchDidClearWindowObjectInWorld(DOMWrapperWorld&) final { }
 
     void registerForIconNotification(bool) final { }
@@ -441,6 +446,10 @@ class EmptyFrameLoaderClient final : public FrameLoaderClient {
 
     bool isEmptyFrameLoaderClient() final { return true; }
     void prefetchDNS(const String&) final { }
+
+#if USE(QUICK_LOOK)
+    RefPtr<QuickLookHandleClient> createQuickLookHandleClient(const String&, const String&) final { return nullptr; }
+#endif
 };
 
 class EmptyFrameNetworkingContext final : public FrameNetworkingContext {
@@ -481,10 +490,10 @@ class EmptyPaymentCoordinatorClient final : public PaymentCoordinatorClient {
     void openPaymentSetup(const String&, const String&, std::function<void(bool)> completionHandler) final { callOnMainThread([completionHandler] { completionHandler(false); }); }
     bool showPaymentUI(const URL&, const Vector<URL>&, const PaymentRequest&) final { return false; }
     void completeMerchantValidation(const PaymentMerchantSession&) final { }
-    void completeShippingMethodSelection(PaymentAuthorizationStatus, std::optional<PaymentRequest::TotalAndLineItems>) final { }
-    void completeShippingContactSelection(PaymentAuthorizationStatus, const Vector<PaymentRequest::ShippingMethod>&, std::optional<PaymentRequest::TotalAndLineItems>) final { }
-    void completePaymentMethodSelection(std::optional<WebCore::PaymentRequest::TotalAndLineItems>) final { }
-    void completePaymentSession(PaymentAuthorizationStatus) final { }
+    void completeShippingMethodSelection(std::optional<ShippingMethodUpdate>&&) final { }
+    void completeShippingContactSelection(std::optional<ShippingContactUpdate>&&) final { }
+    void completePaymentMethodSelection(std::optional<PaymentMethodUpdate>&&) final { }
+    void completePaymentSession(std::optional<PaymentAuthorizationResult>&&) final { }
     void abortPaymentSession() final { }
     void paymentCoordinatorDestroyed() final { }
 };
@@ -572,19 +581,19 @@ class EmptyVisitedLinkStore final : public VisitedLinkStore {
     void addVisitedLink(Page&, LinkHash) final { }
 };
 
-RefPtr<PopupMenu> EmptyChromeClient::createPopupMenu(PopupMenuClient*) const
+RefPtr<PopupMenu> EmptyChromeClient::createPopupMenu(PopupMenuClient&) const
 {
     return adoptRef(*new EmptyPopupMenu);
 }
 
-RefPtr<SearchPopupMenu> EmptyChromeClient::createSearchPopupMenu(PopupMenuClient*) const
+RefPtr<SearchPopupMenu> EmptyChromeClient::createSearchPopupMenu(PopupMenuClient&) const
 {
     return adoptRef(*new EmptySearchPopupMenu);
 }
 
 #if ENABLE(INPUT_TYPE_COLOR)
 
-std::unique_ptr<ColorChooser> EmptyChromeClient::createColorChooser(ColorChooserClient*, const Color&)
+std::unique_ptr<ColorChooser> EmptyChromeClient::createColorChooser(ColorChooserClient&, const Color&)
 {
     return nullptr;
 }

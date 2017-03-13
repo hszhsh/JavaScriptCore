@@ -27,6 +27,7 @@
 #define SoupNetworkSession_h
 
 #include <functional>
+#include <glib-object.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/Vector.h>
 #include <wtf/glib/GRefPtr.h>
@@ -57,9 +58,6 @@ public:
 
     static void clearOldSoupCache(const String& cacheDirectory);
 
-#if PLATFORM(EFL)
-    static void setProxySettingsFromEnvironment();
-#endif
     static void setProxySettings(const SoupNetworkProxySettings&);
     void setupProxy();
 
@@ -69,6 +67,9 @@ public:
     static void setShouldIgnoreTLSErrors(bool);
     static void checkTLSErrors(SoupRequest*, SoupMessage*, std::function<void (const ResourceError&)>&&);
     static void allowSpecificHTTPSCertificateForHost(const CertificateInfo&, const String& host);
+
+    static void setCustomProtocolRequestType(GType);
+    void setupCustomProtocols();
 
 private:
     void setupLogger();

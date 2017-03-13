@@ -28,8 +28,8 @@
 #include "FrameView.h"
 
 #include "AXObjectCache.h"
-#include "AnimationController.h"
 #include "BackForwardController.h"
+#include "CSSAnimationController.h"
 #include "CachedImage.h"
 #include "CachedResourceLoader.h"
 #include "Chrome.h"
@@ -63,7 +63,6 @@
 #include "Logging.h"
 #include "MainFrame.h"
 #include "MemoryCache.h"
-#include "MemoryPressureHandler.h"
 #include "OverflowEvent.h"
 #include "Page.h"
 #include "PageCache.h"
@@ -98,6 +97,7 @@
 #include "WheelEventTestTrigger.h"
 
 #include <wtf/CurrentTime.h>
+#include <wtf/MemoryPressureHandler.h>
 #include <wtf/Ref.h>
 #include <wtf/SetForScope.h>
 #include <wtf/SystemTracing.h>
@@ -608,9 +608,6 @@ void FrameView::updateCanHaveScrollbars()
 
 Ref<Scrollbar> FrameView::createScrollbar(ScrollbarOrientation orientation)
 {
-    if (!frame().settings().allowCustomScrollbarInMainFrame() && frame().isMainFrame())
-        return ScrollView::createScrollbar(orientation);
-
     // FIXME: We need to update the scrollbar dynamically as documents change (or as doc elements and bodies get discovered that have custom styles).
     Document* doc = frame().document();
 
@@ -677,7 +674,7 @@ void FrameView::setContentsSize(const IntSize& size)
 
     updateScrollableAreaSet();
 
-    page->chrome().contentsSizeChanged(&frame(), size); // Notify only.
+    page->chrome().contentsSizeChanged(frame(), size); // Notify only.
 
     if (frame().isMainFrame()) {
         frame().mainFrame().pageOverlayController().didChangeDocumentSize();
@@ -1536,7 +1533,7 @@ void FrameView::layout(bool allowSubtree)
 
     m_layoutCount++;
 
-#if PLATFORM(COCOA) || PLATFORM(WIN) || PLATFORM(GTK) || PLATFORM(EFL)
+#if PLATFORM(COCOA) || PLATFORM(WIN) || PLATFORM(GTK)
     if (AXObjectCache* cache = root->document().existingAXObjectCache())
         cache->postNotification(root, AXObjectCache::AXLayoutComplete);
 #endif
@@ -1809,28 +1806,47 @@ void FrameView::removeViewportConstrainedObject(RenderElement* object)
 }
 
 // visualViewport and layoutViewport are both in content coordinates (unzoomed).
-LayoutPoint FrameView::computeLayoutViewportOrigin(const LayoutRect& visualViewport, const LayoutPoint& stableLayoutViewportOriginMin, const LayoutPoint& stableLayoutViewportOriginMax, const LayoutRect& layoutViewport)
+LayoutPoint FrameView::computeLayoutViewportOrigin(const LayoutRect& visualViewport, const LayoutPoint& stableLayoutViewportOriginMin, const LayoutPoint& stableLayoutViewportOriginMax, const LayoutRect& layoutViewport, ScrollBehaviorForFixedElements fixedBehavior)
 {
     LayoutPoint layoutViewportOrigin = layoutViewport.location();
+    bool allowRubberBanding = fixedBehavior == StickToViewportBounds;
 
     if (visualViewport.width() > layoutViewport.width())
         layoutViewportOrigin.setX(visualViewport.x());
     else {
-        if (visualViewport.x() < layoutViewport.x() || visualViewport.x() < stableLayoutViewportOriginMin.x())
+        bool rubberbandingAtLeft = allowRubberBanding && visualViewport.x() < stableLayoutViewportOriginMin.x();
+        bool rubberbandingAtRight = allowRubberBanding && (visualViewport.maxX() - layoutViewport.width()) > stableLayoutViewportOriginMax.x();
+
+        if (visualViewport.x() < layoutViewport.x() || rubberbandingAtLeft)
             layoutViewportOrigin.setX(visualViewport.x());
 
-        if (visualViewport.maxX() > layoutViewport.maxX() || (visualViewport.maxX() - layoutViewport.width()) > stableLayoutViewportOriginMax.x())
+        if (visualViewport.maxX() > layoutViewport.maxX() || rubberbandingAtRight)
             layoutViewportOrigin.setX(visualViewport.maxX() - layoutViewport.width());
+        
+        if (!rubberbandingAtLeft && layoutViewportOrigin.x() < stableLayoutViewportOriginMin.x())
+            layoutViewportOrigin.setX(stableLayoutViewportOriginMin.x());
+        
+        if (!rubberbandingAtRight && layoutViewportOrigin.x() > stableLayoutViewportOriginMax.x())
+            layoutViewportOrigin.setX(stableLayoutViewportOriginMax.x());
     }
 
     if (visualViewport.height() > layoutViewport.height())
         layoutViewportOrigin.setY(visualViewport.y());
     else {
-        if (visualViewport.y() < layoutViewport.y() || visualViewport.y() < stableLayoutViewportOriginMin.y())
+        bool rubberbandingAtTop = allowRubberBanding && visualViewport.y() < stableLayoutViewportOriginMin.y();
+        bool rubberbandingAtBottom = allowRubberBanding && (visualViewport.maxY() - layoutViewport.height()) > stableLayoutViewportOriginMax.y();
+
+        if (visualViewport.y() < layoutViewport.y() || rubberbandingAtTop)
             layoutViewportOrigin.setY(visualViewport.y());
 
-        if (visualViewport.maxY() > layoutViewport.maxY() || (visualViewport.maxY() - layoutViewport.height()) > stableLayoutViewportOriginMax.y())
+        if (visualViewport.maxY() > layoutViewport.maxY() || rubberbandingAtBottom)
             layoutViewportOrigin.setY(visualViewport.maxY() - layoutViewport.height());
+        
+        if (!rubberbandingAtTop && layoutViewportOrigin.y() < stableLayoutViewportOriginMin.y())
+            layoutViewportOrigin.setY(stableLayoutViewportOriginMin.y());
+        
+        if (!rubberbandingAtBottom && layoutViewportOrigin.y() > stableLayoutViewportOriginMax.y())
+            layoutViewportOrigin.setY(stableLayoutViewportOriginMax.y());
     }
 
     return layoutViewportOrigin;
@@ -1890,12 +1906,12 @@ void FrameView::updateLayoutViewport()
 
     LayoutRect layoutViewport = layoutViewportRect();
 
-    LOG_WITH_STREAM(Scrolling, stream << "\nFrameView " << this << " updateLayoutViewport() totalContentSize " << totalContentsSize() << " unscaledDocumentRect " << (renderView() ? renderView()->unscaledDocumentRect() : IntRect()) << " header height " << headerHeight() << " footer height " << footerHeight());
+    LOG_WITH_STREAM(Scrolling, stream << "\nFrameView " << this << " updateLayoutViewport() totalContentSize " << totalContentsSize() << " unscaledDocumentRect " << (renderView() ? renderView()->unscaledDocumentRect() : IntRect()) << " header height " << headerHeight() << " footer height " << footerHeight() << " fixed behavior " << scrollBehaviorForFixedElements());
     LOG_WITH_STREAM(Scrolling, stream << "layoutViewport: " << layoutViewport);
     LOG_WITH_STREAM(Scrolling, stream << "visualViewport: " << visualViewportRect());
     LOG_WITH_STREAM(Scrolling, stream << "scroll positions: min: " << unscaledMinimumScrollPosition() << " max: "<< unscaledMaximumScrollPosition());
 
-    LayoutPoint newLayoutViewportOrigin = computeLayoutViewportOrigin(visualViewportRect(), minStableLayoutViewportOrigin(), maxStableLayoutViewportOrigin(), layoutViewport);
+    LayoutPoint newLayoutViewportOrigin = computeLayoutViewportOrigin(visualViewportRect(), minStableLayoutViewportOrigin(), maxStableLayoutViewportOrigin(), layoutViewport, scrollBehaviorForFixedElements());
     if (newLayoutViewportOrigin != m_layoutViewportOrigin) {
         setBaseLayoutViewportOrigin(newLayoutViewportOrigin);
         LOG_WITH_STREAM(Scrolling, stream << "layoutViewport changed to " << layoutViewportRect());
@@ -1937,16 +1953,19 @@ LayoutRect FrameView::layoutViewportRect() const
 // On iOS, pageScaleFactor is always 1 here, and we never have headers and footers.
 LayoutRect FrameView::visibleDocumentRect(const FloatRect& visibleContentRect, float headerHeight, float footerHeight, const FloatSize& totalContentsSize, float pageScaleFactor)
 {
-    FloatRect visibleDocumentRect = visibleContentRect;
-
     float contentsHeight = totalContentsSize.height() - headerHeight - footerHeight;
 
-    float visibleScaledDocumentTop = std::max<float>(visibleContentRect.y() - headerHeight, 0);
-    float visibleScaledDocumentBottom = std::min<float>(visibleContentRect.maxY() - headerHeight, contentsHeight);
+    float rubberBandTop = std::min<float>(visibleContentRect.y(), 0);
+    float visibleScaledDocumentTop = std::max<float>(visibleContentRect.y() - headerHeight, 0) + rubberBandTop;
+    
+    float rubberBandBottom = std::min<float>((totalContentsSize.height() - visibleContentRect.y()) - visibleContentRect.height(), 0);
+    float visibleScaledDocumentBottom = std::min<float>(visibleContentRect.maxY() - headerHeight, contentsHeight) - rubberBandBottom;
 
+    FloatRect visibleDocumentRect = visibleContentRect;
     visibleDocumentRect.setY(visibleScaledDocumentTop);
     visibleDocumentRect.setHeight(std::max<float>(visibleScaledDocumentBottom - visibleScaledDocumentTop, 0));
     visibleDocumentRect.scale(1 / pageScaleFactor);
+    
     return LayoutRect(visibleDocumentRect);
 }
 
@@ -2316,8 +2335,10 @@ bool FrameView::scrollToFragment(const URL& url)
     // OTOH If CSS target was set previously, we want to set it to 0, recalc
     // and possibly repaint because :target pseudo class may have been
     // set (see bug 11321).
-    if (!url.hasFragmentIdentifier() && !frame().document()->cssTarget())
+    if (!url.hasFragmentIdentifier()) {
+        frame().document()->setCSSTarget(nullptr);
         return false;
+    }
 
     String fragmentIdentifier = url.fragmentIdentifier();
     if (scrollToAnchor(fragmentIdentifier))
@@ -2354,7 +2375,7 @@ bool FrameView::scrollToAnchor(const String& name)
                 return true;
         }
     }
-  
+
     // Implement the rule that "" and "top" both mean top of page as in other browsers.
     if (!anchorElement && !(name.isEmpty() || equalLettersIgnoringASCIICase(name, "top")))
         return false;
@@ -2418,9 +2439,9 @@ void FrameView::setScrollPosition(const ScrollPosition& scrollPosition)
 
 void FrameView::contentsResized()
 {
-    // For non-delegated scrolling, adjustTiledBackingScrollability() is called via addedOrRemovedScrollbar() which occurs less often.
+    // For non-delegated scrolling, updateTiledBackingAdaptiveSizing() is called via addedOrRemovedScrollbar() which occurs less often.
     if (delegatesScrolling())
-        adjustTiledBackingScrollability();
+        updateTiledBackingAdaptiveSizing();
 }
 
 void FrameView::delegatesScrollingDidChange()
@@ -2542,8 +2563,12 @@ void FrameView::updateScriptedAnimationsAndTimersThrottlingState(const IntRect& 
     // We don't throttle zero-size or display:none frames because those are usually utility frames.
     bool shouldThrottle = visibleRect.isEmpty() && !m_size.isEmpty() && frame().ownerRenderer();
 
-    if (auto* scriptedAnimationController = document->scriptedAnimationController())
-        scriptedAnimationController->setThrottled(shouldThrottle);
+    if (auto* scriptedAnimationController = document->scriptedAnimationController()) {
+        if (shouldThrottle)
+            scriptedAnimationController->addThrottlingReason(ScriptedAnimationController::ThrottlingReason::OutsideViewport);
+        else
+            scriptedAnimationController->removeThrottlingReason(ScriptedAnimationController::ThrottlingReason::OutsideViewport);
+    }
 
     document->setTimerThrottlingEnabled(shouldThrottle);
 }
@@ -2761,28 +2786,30 @@ void FrameView::addedOrRemovedScrollbar()
             renderView->compositor().frameViewDidAddOrRemoveScrollbars();
     }
 
-    adjustTiledBackingScrollability();
+    updateTiledBackingAdaptiveSizing();
 }
 
-void FrameView::adjustTiledBackingScrollability()
+TiledBacking::Scrollability FrameView::computeScrollability() const
 {
-    auto* tiledBacking = this->tiledBacking();
-    if (!tiledBacking)
-        return;
-    
+    auto* page = frame().page();
+
+    // Use smaller square tiles if the Window is not active to facilitate app napping.
+    if (!page || !page->isWindowActive())
+        return TiledBacking::HorizontallyScrollable | TiledBacking::VerticallyScrollable;
+
     bool horizontallyScrollable;
     bool verticallyScrollable;
     bool clippedByAncestorView = static_cast<bool>(m_viewExposedRect);
 
 #if PLATFORM(IOS)
-    if (Page* page = frame().page())
+    if (page)
         clippedByAncestorView |= page->enclosedInScrollableAncestorView();
 #endif
 
     if (delegatesScrolling()) {
         IntSize documentSize = contentsSize();
         IntSize visibleSize = this->visibleSize();
-        
+
         horizontallyScrollable = clippedByAncestorView || documentSize.width() > visibleSize.width();
         verticallyScrollable = clippedByAncestorView || documentSize.height() > visibleSize.height();
     } else {
@@ -2797,14 +2824,23 @@ void FrameView::adjustTiledBackingScrollability()
     if (verticallyScrollable)
         scrollability |= TiledBacking::VerticallyScrollable;
 
-    tiledBacking->setScrollability(scrollability);
+    return scrollability;
+}
+
+void FrameView::updateTiledBackingAdaptiveSizing()
+{
+    auto* tiledBacking = this->tiledBacking();
+    if (!tiledBacking)
+        return;
+
+    tiledBacking->setScrollability(computeScrollability());
 }
 
 #if PLATFORM(IOS)
 
 void FrameView::unobscuredContentSizeChanged()
 {
-    adjustTiledBackingScrollability();
+    updateTiledBackingAdaptiveSizing();
 }
 
 #endif
@@ -4552,6 +4588,10 @@ bool FrameView::qualifiesAsVisuallyNonEmpty() const
     if (!frame().document()->parsing() && frame().loader().stateMachine().committedFirstRealDocumentLoad())
         return true;
 
+    // FIXME: We should also ignore renderers with non-final style.
+    if (frame().document()->styleScope().hasPendingSheetsBeforeBody())
+        return false;
+
     // Require the document to grow a bit.
     // Using a value of 48 allows the header on Google's search page to render immediately before search results populate later.
     static const int documentHeightThreshold = 48;
@@ -5094,7 +5134,7 @@ void FrameView::fireLayoutRelatedMilestonesIfNeeded()
     updateIsVisuallyNonEmpty();
 
     // If the layout was done with pending sheets, we are not in fact visually non-empty yet.
-    if (m_isVisuallyNonEmpty && !frame().document()->didLayoutWithPendingStylesheets() && m_firstVisuallyNonEmptyLayoutCallbackPending) {
+    if (m_isVisuallyNonEmpty &&m_firstVisuallyNonEmptyLayoutCallbackPending) {
         m_firstVisuallyNonEmptyLayoutCallbackPending = false;
         if (requestedMilestones & DidFirstVisuallyNonEmptyLayout)
             milestonesAchieved |= DidFirstVisuallyNonEmptyLayout;
@@ -5225,7 +5265,7 @@ void FrameView::setViewExposedRect(std::optional<FloatRect> viewExposedRect)
 
     if (TiledBacking* tiledBacking = this->tiledBacking()) {
         if (hasRectChanged)
-            adjustTiledBackingScrollability();
+            updateTiledBackingAdaptiveSizing();
         adjustTiledBackingCoverage();
         tiledBacking->setTiledScrollingIndicatorPosition(m_viewExposedRect ? m_viewExposedRect.value().location() : FloatPoint());
     }

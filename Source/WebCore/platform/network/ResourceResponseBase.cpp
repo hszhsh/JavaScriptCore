@@ -71,7 +71,7 @@ ResourceResponseBase::CrossThreadData ResourceResponseBase::crossThreadData() co
     data.httpVersion = httpVersion().isolatedCopy();
 
     data.httpHeaderFields = httpHeaderFields().isolatedCopy();
-    data.networkLoadTiming = m_networkLoadTiming.isolatedCopy();
+    data.networkLoadMetrics = m_networkLoadMetrics.isolatedCopy();
     data.type = m_type;
     data.isRedirected = m_isRedirected;
 
@@ -92,7 +92,7 @@ ResourceResponse ResourceResponseBase::fromCrossThreadData(CrossThreadData&& dat
     response.setHTTPVersion(data.httpVersion);
 
     response.m_httpHeaderFields = WTFMove(data.httpHeaderFields);
-    response.m_networkLoadTiming = data.networkLoadTiming;
+    response.m_networkLoadMetrics = data.networkLoadMetrics;
     response.m_type = data.type;
     response.m_isRedirected = data.isRedirected;
 
@@ -222,6 +222,19 @@ void ResourceResponseBase::includeCertificateInfo() const
 String ResourceResponseBase::suggestedFilename() const
 {
     return static_cast<const ResourceResponse*>(this)->platformSuggestedFilename();
+}
+
+String ResourceResponseBase::sanitizeSuggestedFilename(const String& suggestedFilename)
+{
+    if (suggestedFilename.isEmpty())
+        return suggestedFilename;
+
+    ResourceResponse response(URL(ParsedURLString, "http://example.com/"), String(), -1, String());
+    response.setHTTPStatusCode(200);
+    String escapedSuggestedFilename = String(suggestedFilename).replace('\\', "\\\\").replace('"', "\\\"");
+    String value = makeString("attachment; filename=\"", escapedSuggestedFilename, '"');
+    response.setHTTPHeaderField(HTTPHeaderName::ContentDisposition, value);
+    return response.suggestedFilename();
 }
 
 bool ResourceResponseBase::isSuccessful() const
@@ -425,6 +438,13 @@ bool ResourceResponseBase::cacheControlContainsMustRevalidate() const
         parseCacheControlDirectives();
     return m_cacheControlDirectives.mustRevalidate;
 }
+    
+bool ResourceResponseBase::cacheControlContainsImmutable() const
+{
+    if (!m_haveParsedCacheControlHeader)
+        parseCacheControlDirectives();
+    return m_cacheControlDirectives.immutable;
+}
 
 bool ResourceResponseBase::hasCacheValidatorFields() const
 {
@@ -545,11 +565,6 @@ ResourceResponseBase::Source ResourceResponseBase::source() const
     return m_source;
 }
 
-void ResourceResponseBase::setSource(Source source)
-{
-    m_source = source;
-}
-
 void ResourceResponseBase::lazyInit(InitLevel initLevel) const
 {
     const_cast<ResourceResponse*>(static_cast<const ResourceResponse*>(this))->platformLazyInit(initLevel);
@@ -575,7 +590,7 @@ bool ResourceResponseBase::compare(const ResourceResponse& a, const ResourceResp
         return false;
     if (a.httpHeaderFields() != b.httpHeaderFields())
         return false;
-    if (a.networkLoadTiming() != b.networkLoadTiming())
+    if (a.deprecatedNetworkLoadMetrics() != b.deprecatedNetworkLoadMetrics())
         return false;
     return ResourceResponse::platformCompare(a, b);
 }

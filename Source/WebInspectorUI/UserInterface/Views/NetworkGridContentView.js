@@ -32,33 +32,52 @@ WebInspector.NetworkGridContentView = class NetworkGridContentView extends WebIn
 
         super(representedObject);
 
+        WebInspector.Frame.addEventListener(WebInspector.Frame.Event.MainResourceDidChange, this._mainResourceDidChange, this);
+
         this._networkSidebarPanel = extraArguments.networkSidebarPanel;
 
         this._contentTreeOutline = this._networkSidebarPanel.contentTreeOutline;
         this._contentTreeOutline.addEventListener(WebInspector.TreeOutline.Event.SelectionDidChange, this._treeSelectionDidChange, this);
 
-        var columns = {domain: {}, type: {}, method: {}, scheme: {}, statusCode: {}, cached: {}, size: {}, transferSize: {}, requestSent: {}, latency: {}, duration: {}, graph: {}};
+        let columns = {domain: {}, type: {}, method: {}, scheme: {}, statusCode: {}, cached: {}, protocol: {}, priority: {}, remoteAddress: {}, connectionIdentifier: {}, size: {}, transferSize: {}, requestSent: {}, latency: {}, duration: {}, graph: {}};
 
         columns.domain.title = WebInspector.UIString("Domain");
         columns.domain.width = "10%";
 
         columns.type.title = WebInspector.UIString("Type");
-        columns.type.width = "8%";
+        columns.type.width = "6%";
 
         columns.method.title = WebInspector.UIString("Method");
-        columns.method.width = "6%";
+        columns.method.width = "5%";
 
         columns.scheme.title = WebInspector.UIString("Scheme");
-        columns.scheme.width = "6%";
+        columns.scheme.width = "5%";
 
         columns.statusCode.title = WebInspector.UIString("Status");
-        columns.statusCode.width = "6%";
+        columns.statusCode.width = "5%";
 
         columns.cached.title = WebInspector.UIString("Cached");
-        columns.cached.width = "6%";
+        columns.cached.width = "8%";
+
+        columns.protocol.title = WebInspector.UIString("Protocol");
+        columns.protocol.width = "5%";
+        columns.protocol.hidden = true;
+
+        columns.priority.title = WebInspector.UIString("Priority");
+        columns.priority.width = "5%";
+        columns.priority.hidden = true;
+
+        columns.remoteAddress.title = WebInspector.UIString("Remote Address");
+        columns.remoteAddress.width = "8%";
+        columns.remoteAddress.hidden = true;
+
+        columns.connectionIdentifier.title = WebInspector.UIString("Connection");
+        columns.connectionIdentifier.width = "5%";
+        columns.connectionIdentifier.hidden = true;
+        columns.connectionIdentifier.aligned = "right";
 
         columns.size.title = WebInspector.UIString("Size");
-        columns.size.width = "8%";
+        columns.size.width = "6%";
         columns.size.aligned = "right";
 
         columns.transferSize.title = WebInspector.UIString("Transferred");
@@ -77,16 +96,24 @@ WebInspector.NetworkGridContentView = class NetworkGridContentView extends WebIn
         columns.duration.width = "9%";
         columns.duration.aligned = "right";
 
-        for (var column in columns)
+        for (let column in columns)
             columns[column].sortable = true;
 
         this._timelineRuler = new WebInspector.TimelineRuler;
         this._timelineRuler.allowsClippedLabels = true;
 
         columns.graph.title = WebInspector.UIString("Timeline");
-        columns.graph.width = "15%";
+        columns.graph.width = "20%";
         columns.graph.headerView = this._timelineRuler;
         columns.graph.sortable = false;
+
+        // COMPATIBILITY(iOS 10.3): Network load metrics were not previously available.
+        if (!NetworkAgent.hasEventParameter("loadingFinished", "metrics")) {
+            delete columns.protocol;
+            delete columns.priority;
+            delete columns.remoteAddress;
+            delete columns.connectionIdentifier;
+        }
 
         this._dataGrid = new WebInspector.TimelineDataGrid(columns, this._contentTreeOutline);
         this._dataGrid.addEventListener(WebInspector.DataGrid.Event.SelectedNodeChanged, this._dataGridNodeSelected, this);
@@ -97,11 +124,12 @@ WebInspector.NetworkGridContentView = class NetworkGridContentView extends WebIn
         this.element.classList.add("network-grid");
         this.addSubview(this._dataGrid);
 
-        var networkTimeline = WebInspector.timelineManager.persistentNetworkTimeline;
+        let networkTimeline = WebInspector.timelineManager.persistentNetworkTimeline;
         networkTimeline.addEventListener(WebInspector.Timeline.Event.RecordAdded, this._networkTimelineRecordAdded, this);
         networkTimeline.addEventListener(WebInspector.Timeline.Event.Reset, this._networkTimelineReset, this);
 
-        this._clearNetworkItemsNavigationItem = new WebInspector.ButtonNavigationItem("clear-network-items", WebInspector.UIString("Clear Network Items (%s)").format(WebInspector.clearKeyboardShortcut.displayName), "Images/NavigationItemTrash.svg", 15, 15);
+        let clearImageDimensions = WebInspector.Platform.name === "mac" ? 16 : 15;
+        this._clearNetworkItemsNavigationItem = new WebInspector.ButtonNavigationItem("clear-network-items", WebInspector.UIString("Clear Network Items (%s)").format(WebInspector.clearKeyboardShortcut.displayName), "Images/NavigationItemClear.svg", clearImageDimensions, clearImageDimensions);
         this._clearNetworkItemsNavigationItem.addEventListener(WebInspector.ButtonNavigationItem.Event.Clicked, () => this.reset());
 
         this._pendingRecords = [];
@@ -222,6 +250,15 @@ WebInspector.NetworkGridContentView = class NetworkGridContentView extends WebIn
         this.reset();
     }
 
+    hasRepresentedObject(representedObject)
+    {
+        const comparator = (dataGridNode) => dataGridNode.resource === representedObject;
+        const skipHidden = true;
+        const stayWithin = false;
+        const dontPopulate = true;
+        return this._dataGrid.findNode(comparator, skipHidden, stayWithin, dontPopulate);
+    }
+
     // Private
 
     _processPendingRecords()
@@ -245,6 +282,16 @@ WebInspector.NetworkGridContentView = class NetworkGridContentView extends WebIn
         }
 
         this._pendingRecords = [];
+    }
+
+    _mainResourceDidChange(event)
+    {
+        let frame = event.target;
+        if (!frame.isMainFrame() || WebInspector.settings.clearNetworkOnNavigate.value)
+            return;
+
+        for (let dataGridNode of this._dataGrid.children)
+            dataGridNode.element.classList.add("preserved");
     }
 
     _networkTimelineReset(event)

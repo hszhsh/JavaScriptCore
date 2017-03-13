@@ -36,12 +36,8 @@
 #include <wtf/RetainPtr.h>
 #include <wtf/text/WTFString.h>
 
-#if PLATFORM(GTK)
+#if USE(GLIB)
 typedef struct _GModule GModule;
-#endif
-
-#if PLATFORM(EFL)
-#include <Eina.h>
 #endif
 
 #if USE(FOUNDATION)
@@ -65,10 +61,8 @@ namespace WebKit {
 
 #if USE(FOUNDATION)
 typedef NSBundle *PlatformBundle;
-#elif PLATFORM(GTK)
+#elif USE(GLIB)
 typedef ::GModule* PlatformBundle;
-#elif PLATFORM(EFL)
-typedef Eina_Module* PlatformBundle;
 #endif
 
 class InjectedBundleScriptWorld;

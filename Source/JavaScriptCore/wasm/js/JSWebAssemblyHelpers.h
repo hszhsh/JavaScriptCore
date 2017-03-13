@@ -29,6 +29,8 @@
 
 #include "JSArrayBuffer.h"
 #include "JSCJSValue.h"
+#include "WebAssemblyFunction.h"
+#include "WebAssemblyWrapperFunction.h"
 
 namespace JSC {
 
@@ -52,8 +54,8 @@ ALWAYS_INLINE uint8_t* getWasmBufferFromValue(ExecState* exec, JSValue value, si
     VM& vm = exec->vm();
     auto throwScope = DECLARE_THROW_SCOPE(vm);
     // If the given bytes argument is not a BufferSource, a TypeError exception is thrown.
-    JSArrayBuffer* arrayBuffer = value.getObject() ? jsDynamicCast<JSArrayBuffer*>(value.getObject()) : nullptr;
-    JSArrayBufferView* arrayBufferView = value.getObject() ? jsDynamicCast<JSArrayBufferView*>(value.getObject()) : nullptr;
+    JSArrayBuffer* arrayBuffer = value.getObject() ? jsDynamicCast<JSArrayBuffer*>(vm, value.getObject()) : nullptr;
+    JSArrayBufferView* arrayBufferView = value.getObject() ? jsDynamicCast<JSArrayBufferView*>(vm, value.getObject()) : nullptr;
     if (!(arrayBuffer || arrayBufferView)) {
         throwException(exec, throwScope, createTypeError(exec,
             ASCIILiteral("first argument must be an ArrayBufferView or an ArrayBuffer"), defaultSourceAppender, runtimeTypeForValue(value)));
@@ -69,6 +71,36 @@ ALWAYS_INLINE uint8_t* getWasmBufferFromValue(ExecState* exec, JSValue value, si
     byteOffset = arrayBufferView ? arrayBufferView->byteOffset() : 0;
     byteSize = arrayBufferView ? arrayBufferView->length() : arrayBuffer->impl()->byteLength();
     return arrayBufferView ? static_cast<uint8_t*>(arrayBufferView->vector()) : static_cast<uint8_t*>(arrayBuffer->impl()->data());
+}
+
+ALWAYS_INLINE bool isWebAssemblyHostFunction(VM& vm, JSObject* object, WebAssemblyFunction*& wasmFunction, WebAssemblyWrapperFunction*& wasmWrapperFunction)
+{
+    if (object->inherits(vm, WebAssemblyFunction::info())) {
+        wasmFunction = jsCast<WebAssemblyFunction*>(object);
+        wasmWrapperFunction = nullptr;
+        return true;
+    }
+    if (object->inherits(vm, WebAssemblyWrapperFunction::info())) {
+        wasmWrapperFunction = jsCast<WebAssemblyWrapperFunction*>(object);
+        wasmFunction = nullptr;
+        return true;
+    }
+    return false;
+}
+
+ALWAYS_INLINE bool isWebAssemblyHostFunction(VM& vm, JSValue value, WebAssemblyFunction*& wasmFunction, WebAssemblyWrapperFunction*& wasmWrapperFunction)
+{
+    if (!value.isObject())
+        return false;
+    return isWebAssemblyHostFunction(vm, jsCast<JSObject*>(value), wasmFunction, wasmWrapperFunction);
+}
+
+
+ALWAYS_INLINE bool isWebAssemblyHostFunction(VM& vm, JSObject* object)
+{
+    WebAssemblyFunction* unused;
+    WebAssemblyWrapperFunction* unused2;
+    return isWebAssemblyHostFunction(vm, object, unused, unused2);
 }
 
 } // namespace JSC

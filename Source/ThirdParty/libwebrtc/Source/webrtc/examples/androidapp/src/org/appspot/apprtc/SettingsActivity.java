@@ -35,6 +35,7 @@ public class SettingsActivity extends Activity implements OnSharedPreferenceChan
   private String keyPrefVideoCodec;
   private String keyprefHwCodec;
   private String keyprefCaptureToTexture;
+  private String keyprefFlexfec;
 
   private String keyprefStartAudioBitrateType;
   private String keyprefStartAudioBitrateValue;
@@ -52,6 +53,14 @@ public class SettingsActivity extends Activity implements OnSharedPreferenceChan
   private String keyPrefDisplayHud;
   private String keyPrefTracing;
 
+  private String keyprefEnableDataChannel;
+  private String keyprefOrdered;
+  private String keyprefMaxRetransmitTimeMs;
+  private String keyprefMaxRetransmits;
+  private String keyprefDataProtocol;
+  private String keyprefNegotiated;
+  private String keyprefDataId;
+
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
@@ -66,6 +75,7 @@ public class SettingsActivity extends Activity implements OnSharedPreferenceChan
     keyPrefVideoCodec = getString(R.string.pref_videocodec_key);
     keyprefHwCodec = getString(R.string.pref_hwcodec_key);
     keyprefCaptureToTexture = getString(R.string.pref_capturetotexture_key);
+    keyprefFlexfec = getString(R.string.pref_flexfec_key);
 
     keyprefStartAudioBitrateType = getString(R.string.pref_startaudiobitrate_key);
     keyprefStartAudioBitrateValue = getString(R.string.pref_startaudiobitratevalue_key);
@@ -78,6 +88,14 @@ public class SettingsActivity extends Activity implements OnSharedPreferenceChan
     keyprefDisableBuiltInNS = getString(R.string.pref_disable_built_in_ns_key);
     keyprefEnableLevelControl = getString(R.string.pref_enable_level_control_key);
     keyprefSpeakerphone = getString(R.string.pref_speakerphone_key);
+
+    keyprefEnableDataChannel = getString(R.string.pref_enable_datachannel_key);
+    keyprefOrdered = getString(R.string.pref_ordered_key);
+    keyprefMaxRetransmitTimeMs = getString(R.string.pref_max_retransmit_time_ms_key);
+    keyprefMaxRetransmits = getString(R.string.pref_max_retransmits_key);
+    keyprefDataProtocol = getString(R.string.pref_data_protocol_key);
+    keyprefNegotiated = getString(R.string.pref_negotiated_key);
+    keyprefDataId = getString(R.string.pref_data_id_key);
 
     keyPrefRoomServerUrl = getString(R.string.pref_room_server_url_key);
     keyPrefDisplayHud = getString(R.string.pref_displayhud_key);
@@ -110,6 +128,7 @@ public class SettingsActivity extends Activity implements OnSharedPreferenceChan
     updateSummary(sharedPreferences, keyPrefVideoCodec);
     updateSummaryB(sharedPreferences, keyprefHwCodec);
     updateSummaryB(sharedPreferences, keyprefCaptureToTexture);
+    updateSummaryB(sharedPreferences, keyprefFlexfec);
 
     updateSummary(sharedPreferences, keyprefStartAudioBitrateType);
     updateSummaryBitrate(sharedPreferences, keyprefStartAudioBitrateValue);
@@ -123,6 +142,15 @@ public class SettingsActivity extends Activity implements OnSharedPreferenceChan
     updateSummaryB(sharedPreferences, keyprefDisableBuiltInNS);
     updateSummaryB(sharedPreferences, keyprefEnableLevelControl);
     updateSummaryList(sharedPreferences, keyprefSpeakerphone);
+
+    updateSummaryB(sharedPreferences, keyprefEnableDataChannel);
+    updateSummaryB(sharedPreferences, keyprefOrdered);
+    updateSummary(sharedPreferences, keyprefMaxRetransmitTimeMs);
+    updateSummary(sharedPreferences, keyprefMaxRetransmits);
+    updateSummary(sharedPreferences, keyprefDataProtocol);
+    updateSummaryB(sharedPreferences, keyprefNegotiated);
+    updateSummary(sharedPreferences, keyprefDataId);
+    setDataChannelEnable(sharedPreferences);
 
     updateSummary(sharedPreferences, keyPrefRoomServerUrl);
     updateSummaryB(sharedPreferences, keyPrefDisplayHud);
@@ -182,7 +210,11 @@ public class SettingsActivity extends Activity implements OnSharedPreferenceChan
         || key.equals(keyPrefVideoCodec)
         || key.equals(keyprefStartAudioBitrateType)
         || key.equals(keyPrefAudioCodec)
-        || key.equals(keyPrefRoomServerUrl)) {
+        || key.equals(keyPrefRoomServerUrl)
+        || key.equals(keyprefMaxRetransmitTimeMs)
+        || key.equals(keyprefMaxRetransmits)
+        || key.equals(keyprefDataProtocol)
+        || key.equals(keyprefDataId)) {
       updateSummary(sharedPreferences, key);
     } else if (key.equals(keyprefMaxVideoBitrateValue)
         || key.equals(keyprefStartAudioBitrateValue)) {
@@ -194,6 +226,7 @@ public class SettingsActivity extends Activity implements OnSharedPreferenceChan
         || key.equals(keyprefCaptureQualitySlider)
         || key.equals(keyprefHwCodec)
         || key.equals(keyprefCaptureToTexture)
+        || key.equals(keyprefFlexfec)
         || key.equals(keyprefNoAudioProcessing)
         || key.equals(keyprefAecDump)
         || key.equals(keyprefOpenSLES)
@@ -201,7 +234,10 @@ public class SettingsActivity extends Activity implements OnSharedPreferenceChan
         || key.equals(keyprefDisableBuiltInAGC)
         || key.equals(keyprefDisableBuiltInNS)
         || key.equals(keyprefEnableLevelControl)
-        || key.equals(keyPrefDisplayHud)) {
+        || key.equals(keyPrefDisplayHud)
+        || key.equals(keyprefEnableDataChannel)
+        || key.equals(keyprefOrdered)
+        || key.equals(keyprefNegotiated)) {
       updateSummaryB(sharedPreferences, key);
     } else if (key.equals(keyprefSpeakerphone)) {
       updateSummaryList(sharedPreferences, key);
@@ -212,6 +248,9 @@ public class SettingsActivity extends Activity implements OnSharedPreferenceChan
     }
     if (key.equals(keyprefStartAudioBitrateType)) {
       setAudioBitrateEnable(sharedPreferences);
+    }
+    if (key.equals(keyprefEnableDataChannel)) {
+      setDataChannelEnable(sharedPreferences);
     }
   }
 
@@ -262,5 +301,15 @@ public class SettingsActivity extends Activity implements OnSharedPreferenceChan
     } else {
       bitratePreferenceValue.setEnabled(true);
     }
+  }
+
+  private void setDataChannelEnable(SharedPreferences sharedPreferences) {
+    boolean enabled = sharedPreferences.getBoolean(keyprefEnableDataChannel, true);
+    settingsFragment.findPreference(keyprefOrdered).setEnabled(enabled);
+    settingsFragment.findPreference(keyprefMaxRetransmitTimeMs).setEnabled(enabled);
+    settingsFragment.findPreference(keyprefMaxRetransmits).setEnabled(enabled);
+    settingsFragment.findPreference(keyprefDataProtocol).setEnabled(enabled);
+    settingsFragment.findPreference(keyprefNegotiated).setEnabled(enabled);
+    settingsFragment.findPreference(keyprefDataId).setEnabled(enabled);
   }
 }

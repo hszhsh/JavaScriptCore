@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -269,6 +269,7 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case ProfileType:
     case ProfileControlFlow:
     case CheckTypeInfoFlags:
+    case ParseInt:
     case OverridesHasInstance:
     case InstanceOf:
     case InstanceOfCustom:
@@ -316,7 +317,7 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case ThrowStaticError:
     case CountExecution:
     case ForceOSRExit:
-    case CheckWatchdogTimer:
+    case CheckTraps:
     case LogShadowChickenPrologue:
     case LogShadowChickenTail:
     case StringFromCharCode:
@@ -425,7 +426,7 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case AllocatePropertyStorage:
     case ReallocatePropertyStorage:
         return state.forNode(node->child1()).m_structure.isSubsetOf(
-            StructureSet(node->transition()->previous));
+            RegisteredStructureSet(node->transition()->previous));
         
     case GetByOffset:
     case GetGetterSetterByOffset:
@@ -433,7 +434,7 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
         PropertyOffset offset = node->storageAccessData().offset;
 
         if (state.structureClobberState() == StructuresAreWatched) {
-            if (JSObject* knownBase = node->child1()->dynamicCastConstant<JSObject*>()) {
+            if (JSObject* knownBase = node->child1()->dynamicCastConstant<JSObject*>(graph.m_vm)) {
                 if (graph.isSafeToLoad(knownBase, offset))
                     return true;
             }

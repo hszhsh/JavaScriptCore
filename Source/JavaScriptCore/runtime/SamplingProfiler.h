@@ -51,21 +51,27 @@ public:
             , verifiedCodeBlock(codeBlock)
             , callSiteIndex(callSiteIndex)
         { }
+
+        UnprocessedStackFrame(void* pc)
+            : cCodePC(pc)
+        { }
+
         UnprocessedStackFrame()
         {
             unverifiedCallee = JSValue::encode(JSValue());
-            verifiedCodeBlock = nullptr;
         }
 
+        void* cCodePC { nullptr };
         EncodedJSValue unverifiedCallee;
-        CodeBlock* verifiedCodeBlock;
+        CodeBlock* verifiedCodeBlock { nullptr };
         CallSiteIndex callSiteIndex;
     };
 
     enum class FrameType { 
         Executable,
         Host,
-        Unknown 
+        C,
+        Unknown
     };
 
     struct StackFrame {
@@ -78,29 +84,48 @@ public:
         { }
 
         FrameType frameType { FrameType::Unknown };
+        void* cCodePC { nullptr };
         ExecutableBase* executable { nullptr };
         JSObject* callee { nullptr };
-        // These attempt to be expression-level line and column number.
-        unsigned lineNumber { std::numeric_limits<unsigned>::max() };
-        unsigned columnNumber { std::numeric_limits<unsigned>::max() };
-        unsigned bytecodeIndex { std::numeric_limits<unsigned>::max() };
-        CodeBlockHash codeBlockHash;
-        JITCode::JITType jitType { JITCode::None };
 
-        bool hasExpressionInfo() const
+        struct CodeLocation {
+            bool hasCodeBlockHash() const
+            {
+                return codeBlockHash.isSet();
+            }
+
+            bool hasBytecodeIndex() const
+            {
+                return bytecodeIndex != std::numeric_limits<unsigned>::max();
+            }
+
+            bool hasExpressionInfo() const
+            {
+                return lineNumber != std::numeric_limits<unsigned>::max()
+                    && columnNumber != std::numeric_limits<unsigned>::max();
+            }
+
+            // These attempt to be expression-level line and column number.
+            unsigned lineNumber { std::numeric_limits<unsigned>::max() };
+            unsigned columnNumber { std::numeric_limits<unsigned>::max() };
+            unsigned bytecodeIndex { std::numeric_limits<unsigned>::max() };
+            CodeBlockHash codeBlockHash;
+            JITCode::JITType jitType { JITCode::None };
+        };
+
+        CodeLocation semanticLocation;
+        std::optional<std::pair<CodeLocation, Strong<CodeBlock>>> machineLocation; // This is non-null if we were inlined. It represents the machine frame we were inlined into.
+
+        bool hasExpressionInfo() const { return semanticLocation.hasExpressionInfo(); }
+        unsigned lineNumber() const
         {
-            return lineNumber != std::numeric_limits<unsigned>::max()
-                && columnNumber != std::numeric_limits<unsigned>::max();
+            ASSERT(hasExpressionInfo());
+            return semanticLocation.lineNumber;
         }
-
-        bool hasBytecodeIndex() const
+        unsigned columnNumber() const
         {
-            return bytecodeIndex != std::numeric_limits<unsigned>::max();
-        }
-
-        bool hasCodeBlockHash() const
-        {
-            return codeBlockHash.isSet();
+            ASSERT(hasExpressionInfo());
+            return semanticLocation.columnNumber;
         }
 
         // These are function-level data.
@@ -141,15 +166,15 @@ public:
     Lock& getLock() { return m_lock; }
     void setTimingInterval(std::chrono::microseconds interval) { m_timingInterval = interval; }
     JS_EXPORT_PRIVATE void start();
-    void start(const LockHolder&);
-    Vector<StackTrace> releaseStackTraces(const LockHolder&);
+    void start(const AbstractLocker&);
+    Vector<StackTrace> releaseStackTraces(const AbstractLocker&);
     JS_EXPORT_PRIVATE String stackTracesAsJSON();
     JS_EXPORT_PRIVATE void noticeCurrentThreadAsJSCExecutionThread();
-    void noticeCurrentThreadAsJSCExecutionThread(const LockHolder&);
+    void noticeCurrentThreadAsJSCExecutionThread(const AbstractLocker&);
     void processUnverifiedStackTraces(); // You should call this only after acquiring the lock.
-    void setStopWatch(const LockHolder&, Ref<Stopwatch>&& stopwatch) { m_stopwatch = WTFMove(stopwatch); }
-    void pause(const LockHolder&);
-    void clearData(const LockHolder&);
+    void setStopWatch(const AbstractLocker&, Ref<Stopwatch>&& stopwatch) { m_stopwatch = WTFMove(stopwatch); }
+    void pause(const AbstractLocker&);
+    void clearData(const AbstractLocker&);
 
     // Used for debugging in the JSC shell/DRT.
     void registerForReportAtExit();
@@ -160,9 +185,9 @@ public:
     JS_EXPORT_PRIVATE void reportTopBytecodes(PrintStream&);
 
 private:
-    void createThreadIfNecessary(const LockHolder&);
+    void createThreadIfNecessary(const AbstractLocker&);
     void timerLoop();
-    void takeSample(const LockHolder&, std::chrono::microseconds& stackTraceProcessingTime);
+    void takeSample(const AbstractLocker&, std::chrono::microseconds& stackTraceProcessingTime);
 
     VM& m_vm;
     RefPtr<Stopwatch> m_stopwatch;

@@ -336,7 +336,7 @@ void InspectorInstrumentation::willSendXMLHttpRequestImpl(InstrumentingAgents& i
         domDebuggerAgent->willSendXMLHttpRequest(url);
 }
 
-void InspectorInstrumentation::didInstallTimerImpl(InstrumentingAgents& instrumentingAgents, int timerId, std::chrono::milliseconds timeout, bool singleShot, ScriptExecutionContext& context)
+void InspectorInstrumentation::didInstallTimerImpl(InstrumentingAgents& instrumentingAgents, int timerId, Seconds timeout, bool singleShot, ScriptExecutionContext& context)
 {
     pauseOnNativeEventIfNeeded(instrumentingAgents, false, setTimerEventName, true);
     didScheduleAsyncCall(instrumentingAgents, AsyncCallTypeTimer, timerId, context, singleShot);
@@ -564,12 +564,6 @@ void InspectorInstrumentation::continueAfterPingLoaderImpl(InstrumentingAgents& 
     willSendRequestImpl(instrumentingAgents, identifier, loader, request, response);
 }
 
-void InspectorInstrumentation::markResourceAsCachedImpl(InstrumentingAgents& instrumentingAgents, unsigned long identifier)
-{
-    if (InspectorNetworkAgent* networkAgent = instrumentingAgents.inspectorNetworkAgent())
-        networkAgent->markResourceAsCached(identifier);
-}
-
 void InspectorInstrumentation::didLoadResourceFromMemoryCacheImpl(InstrumentingAgents& instrumentingAgents, DocumentLoader* loader, CachedResource* cachedResource)
 {
     if (!instrumentingAgents.inspectorEnvironment().developerExtrasEnabled())
@@ -605,13 +599,13 @@ void InspectorInstrumentation::didReceiveDataImpl(InstrumentingAgents& instrumen
         networkAgent->didReceiveData(identifier, data, dataLength, encodedDataLength);
 }
 
-void InspectorInstrumentation::didFinishLoadingImpl(InstrumentingAgents& instrumentingAgents, unsigned long identifier, DocumentLoader* loader, double finishTime)
+void InspectorInstrumentation::didFinishLoadingImpl(InstrumentingAgents& instrumentingAgents, unsigned long identifier, DocumentLoader* loader, const NetworkLoadMetrics& networkLoadMetrics)
 {
     if (!loader)
         return;
 
     if (InspectorNetworkAgent* networkAgent = instrumentingAgents.inspectorNetworkAgent())
-        networkAgent->didFinishLoading(identifier, *loader, finishTime);
+        networkAgent->didFinishLoading(identifier, *loader, networkLoadMetrics);
 }
 
 void InspectorInstrumentation::didFailLoadingImpl(InstrumentingAgents& instrumentingAgents, unsigned long identifier, DocumentLoader* loader, const ResourceError& error)
@@ -672,6 +666,9 @@ void InspectorInstrumentation::domContentLoadedEventFiredImpl(InstrumentingAgent
 
     if (InspectorDOMAgent* domAgent = instrumentingAgents.inspectorDOMAgent())
         domAgent->mainFrameDOMContentLoaded();
+
+    if (InspectorDOMDebuggerAgent* domDebuggerAgent = instrumentingAgents.inspectorDOMDebuggerAgent())
+        domDebuggerAgent->mainFrameDOMContentLoaded();
 
     if (InspectorPageAgent* pageAgent = instrumentingAgents.inspectorPageAgent())
         pageAgent->domContentEventFired();
@@ -838,10 +835,10 @@ void InspectorInstrumentation::addMessageToConsoleImpl(InstrumentingAgents& inst
     }
 }
 
-void InspectorInstrumentation::consoleCountImpl(InstrumentingAgents& instrumentingAgents, JSC::ExecState* state, RefPtr<ScriptArguments>&& arguments)
+void InspectorInstrumentation::consoleCountImpl(InstrumentingAgents& instrumentingAgents, JSC::ExecState* state, Ref<ScriptArguments>&& arguments)
 {
     if (WebConsoleAgent* consoleAgent = instrumentingAgents.webConsoleAgent())
-        consoleAgent->count(state, arguments);
+        consoleAgent->count(state, WTFMove(arguments));
 }
 
 void InspectorInstrumentation::takeHeapSnapshotImpl(InstrumentingAgents& instrumentingAgents, const String& title)
@@ -864,21 +861,21 @@ void InspectorInstrumentation::startConsoleTimingImpl(InstrumentingAgents& instr
         consoleAgent->startTiming(title);
 }
 
-void InspectorInstrumentation::stopConsoleTimingImpl(InstrumentingAgents& instrumentingAgents, Frame& frame, const String& title, RefPtr<ScriptCallStack>&& stack)
+void InspectorInstrumentation::stopConsoleTimingImpl(InstrumentingAgents& instrumentingAgents, Frame& frame, const String& title, Ref<ScriptCallStack>&& stack)
 {
     if (WebConsoleAgent* consoleAgent = instrumentingAgents.webConsoleAgent())
-        consoleAgent->stopTiming(title, stack);
+        consoleAgent->stopTiming(title, WTFMove(stack));
     if (InspectorTimelineAgent* timelineAgent = instrumentingAgents.inspectorTimelineAgent())
         timelineAgent->timeEnd(frame, title);
 }
 
-void InspectorInstrumentation::stopConsoleTimingImpl(InstrumentingAgents& instrumentingAgents, const String& title, RefPtr<ScriptCallStack>&& stack)
+void InspectorInstrumentation::stopConsoleTimingImpl(InstrumentingAgents& instrumentingAgents, const String& title, Ref<ScriptCallStack>&& stack)
 {
     if (WebConsoleAgent* consoleAgent = instrumentingAgents.webConsoleAgent())
-        consoleAgent->stopTiming(title, stack);
+        consoleAgent->stopTiming(title, WTFMove(stack));
 }
 
-void InspectorInstrumentation::consoleTimeStampImpl(InstrumentingAgents& instrumentingAgents, Frame& frame, RefPtr<ScriptArguments>&& arguments)
+void InspectorInstrumentation::consoleTimeStampImpl(InstrumentingAgents& instrumentingAgents, Frame& frame, Ref<ScriptArguments>&& arguments)
 {
     if (InspectorTimelineAgent* timelineAgent = instrumentingAgents.inspectorTimelineAgent()) {
         String message;

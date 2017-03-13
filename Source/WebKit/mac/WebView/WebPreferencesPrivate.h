@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2016 Apple Inc.  All rights reserved.
+ * Copyright (C) 2005-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -224,8 +224,14 @@ extern NSString *WebPreferencesCacheModelChangedInternalNotification;
 - (BOOL)acceleratedCompositingEnabled;
 - (void)setAcceleratedCompositingEnabled:(BOOL)enabled;
 
+- (BOOL)subpixelAntialiasedLayerTextEnabled;
+- (void)setSubpixelAntialiasedLayerTextEnabled:(BOOL)enabled;
+
 - (BOOL)showDebugBorders;
 - (void)setShowDebugBorders:(BOOL)show;
+
+- (BOOL)simpleLineLayoutEnabled;
+- (void)setSimpleLineLayoutEnabled:(BOOL)enabled;
 
 - (BOOL)simpleLineLayoutDebugBordersEnabled;
 - (void)setSimpleLineLayoutDebugBordersEnabled:(BOOL)enabled;
@@ -248,8 +254,11 @@ extern NSString *WebPreferencesCacheModelChangedInternalNotification;
 - (BOOL)forceSoftwareWebGLRendering;
 - (void)setForceSoftwareWebGLRendering:(BOOL)forced;
 
-- (BOOL)preferLowPowerWebGLRendering;
-- (void)setPreferLowPowerWebGLRendering:(BOOL)preferLowPower;
+- (BOOL)forceLowPowerGPUForWebGL;
+- (void)setForceWebGLUsesLowPower:(BOOL)forceLowPower;
+
+- (BOOL)webGPUEnabled;
+- (void)setWebGPUEnabled:(BOOL)enabled;
 
 - (BOOL)accelerated2dCanvasEnabled;
 - (void)setAccelerated2dCanvasEnabled:(BOOL)enabled;
@@ -490,6 +499,12 @@ extern NSString *WebPreferencesCacheModelChangedInternalNotification;
 - (void)setMockCaptureDevicesEnabled:(BOOL)flag;
 - (BOOL)mockCaptureDevicesEnabled;
 
+- (void)setEnumeratingAllNetworkInterfacesEnabled:(BOOL)flag;
+- (BOOL)enumeratingAllNetworkInterfacesEnabled;
+
+- (void)setIceCandidateFilteringEnabled:(BOOL)flag;
+- (BOOL)iceCandidateFilteringEnabled;
+
 - (void)setMediaCaptureRequiresSecureConnection:(BOOL)flag;
 - (BOOL)mediaCaptureRequiresSecureConnection;
 
@@ -514,6 +529,9 @@ extern NSString *WebPreferencesCacheModelChangedInternalNotification;
 - (void)setModernMediaControlsEnabled:(BOOL)flag;
 - (BOOL)modernMediaControlsEnabled;
 
+- (void)setCredentialManagementEnabled:(BOOL)flag;
+- (BOOL)credentialManagementEnabled;
+
 @property (nonatomic) BOOL visualViewportEnabled;
 @property (nonatomic) BOOL largeImageAsyncDecodingEnabled;
 @property (nonatomic) BOOL animatedImageAsyncDecodingEnabled;
@@ -522,5 +540,13 @@ extern NSString *WebPreferencesCacheModelChangedInternalNotification;
 @property (nonatomic) BOOL attachmentElementEnabled;
 @property (nonatomic) BOOL allowsInlineMediaPlaybackAfterFullscreen;
 @property (nonatomic) BOOL intersectionObserverEnabled;
+@property (nonatomic) BOOL userTimingEnabled;
+@property (nonatomic) BOOL resourceTimingEnabled;
+@property (nonatomic) BOOL linkPreloadEnabled;
+@property (nonatomic) BOOL credentialManagementEnabled;
+
+#if TARGET_OS_IPHONE
+@property (nonatomic) BOOL quickLookDocumentSavingEnabled;
+#endif
 
 @end

@@ -36,9 +36,7 @@ messages -> WebProcess LegacyReceiver {
     RegisterURLSchemeAsNoAccess(String scheme)
     RegisterURLSchemeAsDisplayIsolated(String scheme)
     RegisterURLSchemeAsCORSEnabled(String scheme)
-#if ENABLE(CACHE_PARTITIONING)
     RegisterURLSchemeAsCachePartitioned(String scheme)
-#endif
     SetDefaultRequestTimeoutInterval(double timeoutInterval)
     SetAlwaysUsesComplexTextCodePath(bool alwaysUseComplexText)
     SetShouldUseFontSmoothing(bool useFontSmoothing)
@@ -81,7 +79,7 @@ messages -> WebProcess LegacyReceiver {
     DeleteWebsiteData(WebCore::SessionID sessionID, OptionSet<WebKit::WebsiteDataType> websiteDataTypes, std::chrono::system_clock::time_point modifiedSince) -> ()
     DeleteWebsiteDataForOrigins(WebCore::SessionID sessionID, OptionSet<WebKit::WebsiteDataType> websiteDataTypes, Vector<WebCore::SecurityOriginData> origins) -> ()
 
-    SetHiddenPageTimerThrottlingIncreaseLimit(int milliseconds)
+    SetHiddenPageDOMTimerThrottlingIncreaseLimit(int milliseconds)
     SetProcessSuppressionEnabled(bool flag)
 #if PLATFORM(COCOA)
     SetQOS(int latencyQOS, int throughputQOS)

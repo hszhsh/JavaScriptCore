@@ -85,6 +85,8 @@ TEST(WTF, MediaTime)
     EXPECT_EQ(MediaTime(1, 1) != MediaTime(2, 1), true);
     EXPECT_EQ(MediaTime(2, 1) == MediaTime(2, 1), true);
     EXPECT_EQ(MediaTime(2, 1) == MediaTime(4, 2), true);
+    EXPECT_TRUE((bool)MediaTime(1, 1));
+    EXPECT_TRUE(!MediaTime(0, 1));
 
     // Addition Operators
     EXPECT_EQ(MediaTime::positiveInfiniteTime() + MediaTime::positiveInfiniteTime(), MediaTime::positiveInfiniteTime());
@@ -158,8 +160,6 @@ TEST(WTF, MediaTime)
     EXPECT_EQ(abs(MediaTime::invalidTime()), MediaTime::invalidTime());
     EXPECT_EQ(abs(MediaTime(1, 1)), MediaTime(1, 1));
     EXPECT_EQ(abs(MediaTime(-1, 1)), MediaTime(1, 1));
-    EXPECT_EQ(abs(MediaTime(-1, -1)), MediaTime(-1, -1));
-    EXPECT_EQ(abs(MediaTime(1, -1)), MediaTime(-1, -1));
 
     // Floating Point Functions
     EXPECT_EQ(MediaTime::createWithFloat(1.0f), MediaTime(1, 1));
@@ -200,18 +200,92 @@ TEST(WTF, MediaTime)
     // Overflow Behavior
     EXPECT_EQ(MediaTime::createWithFloat(pow(2.0f, 64.0f)), MediaTime::positiveInfiniteTime());
     EXPECT_EQ(MediaTime::createWithFloat(-pow(2.0f, 64.0f)), MediaTime::negativeInfiniteTime());
-    EXPECT_EQ(MediaTime::createWithFloat(pow(2.0f, 63.0f), 2).timeScale(), 1);
-    EXPECT_EQ(MediaTime::createWithFloat(pow(2.0f, 63.0f), 3).timeScale(), 1);
+    EXPECT_EQ(MediaTime::createWithFloat(pow(2.0f, 63.0f), 2).timeScale(), 1U);
+    EXPECT_EQ(MediaTime::createWithFloat(pow(2.0f, 63.0f), 3).timeScale(), 1U);
     EXPECT_EQ(MediaTime::createWithDouble(pow(2.0, 64.0)), MediaTime::positiveInfiniteTime());
     EXPECT_EQ(MediaTime::createWithDouble(-pow(2.0, 64.0)), MediaTime::negativeInfiniteTime());
-    EXPECT_EQ(MediaTime::createWithDouble(pow(2.0, 63.0), 2).timeScale(), 1);
-    EXPECT_EQ(MediaTime::createWithDouble(pow(2.0, 63.0), 3).timeScale(), 1);
-    EXPECT_EQ((MediaTime(numeric_limits<int64_t>::max(), 2) + MediaTime(numeric_limits<int64_t>::max(), 2)).timeScale(), 1);
-    EXPECT_EQ((MediaTime(numeric_limits<int64_t>::min(), 2) - MediaTime(numeric_limits<int64_t>::max(), 2)).timeScale(), 1);
+    EXPECT_EQ(MediaTime::createWithDouble(pow(2.0, 63.0), 2).timeScale(), 1U);
+    EXPECT_EQ(MediaTime::createWithDouble(pow(2.0, 63.0), 3).timeScale(), 1U);
+    EXPECT_EQ((MediaTime(numeric_limits<int64_t>::max(), 2) + MediaTime(numeric_limits<int64_t>::max(), 2)).timeScale(), 1U);
+    EXPECT_EQ((MediaTime(numeric_limits<int64_t>::min(), 2) - MediaTime(numeric_limits<int64_t>::max(), 2)).timeScale(), 1U);
     EXPECT_EQ(MediaTime(numeric_limits<int64_t>::max(), 1) + MediaTime(numeric_limits<int64_t>::max(), 1), MediaTime::positiveInfiniteTime());
     EXPECT_EQ(MediaTime(numeric_limits<int64_t>::min(), 1) + MediaTime(numeric_limits<int64_t>::min(), 1), MediaTime::negativeInfiniteTime());
     EXPECT_EQ(MediaTime(numeric_limits<int64_t>::min(), 1) - MediaTime(numeric_limits<int64_t>::max(), 1), MediaTime::negativeInfiniteTime());
     EXPECT_EQ(MediaTime(numeric_limits<int64_t>::max(), 1) - MediaTime(numeric_limits<int64_t>::min(), 1), MediaTime::positiveInfiniteTime());
+
+    // Rounding
+    EXPECT_EQ(MediaTime(1, 1).toTimeScale(2).timeValue(), 2);
+    EXPECT_EQ(MediaTime(1, 3).toTimeScale(6).timeValue(), 2);
+    EXPECT_EQ(MediaTime(2, 2).toTimeScale(1).timeValue(), 1);
+    EXPECT_EQ(MediaTime(2, 6).toTimeScale(3).timeValue(), 1);
+    EXPECT_EQ(MediaTime(1, 2).toTimeScale(1).hasBeenRounded(), true);
+    EXPECT_EQ(MediaTime(1, 2).toTimeScale(1, MediaTime::RoundingFlags::HalfAwayFromZero).timeValue(), 1);
+    EXPECT_EQ(MediaTime(51, 100).toTimeScale(1, MediaTime::RoundingFlags::HalfAwayFromZero).timeValue(), 1);
+    EXPECT_EQ(MediaTime(49, 100).toTimeScale(1, MediaTime::RoundingFlags::HalfAwayFromZero).timeValue(), 0);
+    EXPECT_EQ(MediaTime(3, 2).toTimeScale(1, MediaTime::RoundingFlags::HalfAwayFromZero).timeValue(), 2);
+    EXPECT_EQ(MediaTime(151, 100).toTimeScale(1, MediaTime::RoundingFlags::HalfAwayFromZero).timeValue(), 2);
+    EXPECT_EQ(MediaTime(149, 100).toTimeScale(1, MediaTime::RoundingFlags::HalfAwayFromZero).timeValue(), 1);
+    EXPECT_EQ(MediaTime(-1, 2).toTimeScale(1, MediaTime::RoundingFlags::HalfAwayFromZero).timeValue(), -1);
+    EXPECT_EQ(MediaTime(-51, 100).toTimeScale(1, MediaTime::RoundingFlags::HalfAwayFromZero).timeValue(), -1);
+    EXPECT_EQ(MediaTime(-49, 100).toTimeScale(1, MediaTime::RoundingFlags::HalfAwayFromZero).timeValue(), 0);
+    EXPECT_EQ(MediaTime(-3, 2).toTimeScale(1, MediaTime::RoundingFlags::HalfAwayFromZero).timeValue(), -2);
+    EXPECT_EQ(MediaTime(-151, 100).toTimeScale(1, MediaTime::RoundingFlags::HalfAwayFromZero).timeValue(), -2);
+    EXPECT_EQ(MediaTime(-149, 100).toTimeScale(1, MediaTime::RoundingFlags::HalfAwayFromZero).timeValue(), -1);
+    EXPECT_EQ(MediaTime(1, 2).toTimeScale(1, MediaTime::RoundingFlags::TowardZero).timeValue(), 0);
+    EXPECT_EQ(MediaTime(-1, 2).toTimeScale(1, MediaTime::RoundingFlags::TowardZero).timeValue(), 0);
+    EXPECT_EQ(MediaTime(3, 2).toTimeScale(1, MediaTime::RoundingFlags::TowardZero).timeValue(), 1);
+    EXPECT_EQ(MediaTime(151, 100).toTimeScale(1, MediaTime::RoundingFlags::TowardZero).timeValue(), 1);
+    EXPECT_EQ(MediaTime(149, 100).toTimeScale(1, MediaTime::RoundingFlags::TowardZero).timeValue(), 1);
+    EXPECT_EQ(MediaTime(-1, 2).toTimeScale(1, MediaTime::RoundingFlags::TowardZero).timeValue(), 0);
+    EXPECT_EQ(MediaTime(-51, 100).toTimeScale(1, MediaTime::RoundingFlags::TowardZero).timeValue(), 0);
+    EXPECT_EQ(MediaTime(-49, 100).toTimeScale(1, MediaTime::RoundingFlags::TowardZero).timeValue(), 0);
+    EXPECT_EQ(MediaTime(-3, 2).toTimeScale(1, MediaTime::RoundingFlags::TowardZero).timeValue(), -1);
+    EXPECT_EQ(MediaTime(-151, 100).toTimeScale(1, MediaTime::RoundingFlags::TowardZero).timeValue(), -1);
+    EXPECT_EQ(MediaTime(-149, 100).toTimeScale(1, MediaTime::RoundingFlags::TowardZero).timeValue(), -1);
+    EXPECT_EQ(MediaTime(1, 2).toTimeScale(1, MediaTime::RoundingFlags::AwayFromZero).timeValue(), 1);
+    EXPECT_EQ(MediaTime(-1, 2).toTimeScale(1, MediaTime::RoundingFlags::AwayFromZero).timeValue(), -1);
+    EXPECT_EQ(MediaTime(3, 2).toTimeScale(1, MediaTime::RoundingFlags::AwayFromZero).timeValue(), 2);
+    EXPECT_EQ(MediaTime(151, 100).toTimeScale(1, MediaTime::RoundingFlags::AwayFromZero).timeValue(), 2);
+    EXPECT_EQ(MediaTime(149, 100).toTimeScale(1, MediaTime::RoundingFlags::AwayFromZero).timeValue(), 2);
+    EXPECT_EQ(MediaTime(-1, 2).toTimeScale(1, MediaTime::RoundingFlags::AwayFromZero).timeValue(), -1);
+    EXPECT_EQ(MediaTime(-51, 100).toTimeScale(1, MediaTime::RoundingFlags::AwayFromZero).timeValue(), -1);
+    EXPECT_EQ(MediaTime(-49, 100).toTimeScale(1, MediaTime::RoundingFlags::AwayFromZero).timeValue(), -1);
+    EXPECT_EQ(MediaTime(-3, 2).toTimeScale(1, MediaTime::RoundingFlags::AwayFromZero).timeValue(), -2);
+    EXPECT_EQ(MediaTime(-151, 100).toTimeScale(1, MediaTime::RoundingFlags::AwayFromZero).timeValue(), -2);
+    EXPECT_EQ(MediaTime(-149, 100).toTimeScale(1, MediaTime::RoundingFlags::AwayFromZero).timeValue(), -2);
+    EXPECT_EQ(MediaTime(1, 2).toTimeScale(1, MediaTime::RoundingFlags::TowardPositiveInfinity).timeValue(), 1);
+    EXPECT_EQ(MediaTime(-1, 2).toTimeScale(1, MediaTime::RoundingFlags::TowardPositiveInfinity).timeValue(), 0);
+    EXPECT_EQ(MediaTime(3, 2).toTimeScale(1, MediaTime::RoundingFlags::TowardPositiveInfinity).timeValue(), 2);
+    EXPECT_EQ(MediaTime(151, 100).toTimeScale(1, MediaTime::RoundingFlags::TowardPositiveInfinity).timeValue(), 2);
+    EXPECT_EQ(MediaTime(149, 100).toTimeScale(1, MediaTime::RoundingFlags::TowardPositiveInfinity).timeValue(), 2);
+    EXPECT_EQ(MediaTime(-1, 2).toTimeScale(1, MediaTime::RoundingFlags::TowardPositiveInfinity).timeValue(), 0);
+    EXPECT_EQ(MediaTime(-51, 100).toTimeScale(1, MediaTime::RoundingFlags::TowardPositiveInfinity).timeValue(), 0);
+    EXPECT_EQ(MediaTime(-49, 100).toTimeScale(1, MediaTime::RoundingFlags::TowardPositiveInfinity).timeValue(), 0);
+    EXPECT_EQ(MediaTime(-3, 2).toTimeScale(1, MediaTime::RoundingFlags::TowardPositiveInfinity).timeValue(), -1);
+    EXPECT_EQ(MediaTime(-151, 100).toTimeScale(1, MediaTime::RoundingFlags::TowardPositiveInfinity).timeValue(), -1);
+    EXPECT_EQ(MediaTime(-149, 100).toTimeScale(1, MediaTime::RoundingFlags::TowardPositiveInfinity).timeValue(), -1);
+    EXPECT_EQ(MediaTime(1, 2).toTimeScale(1, MediaTime::RoundingFlags::TowardNegativeInfinity).timeValue(), 0);
+    EXPECT_EQ(MediaTime(-1, 2).toTimeScale(1, MediaTime::RoundingFlags::TowardNegativeInfinity).timeValue(), -1);
+    EXPECT_EQ(MediaTime(3, 2).toTimeScale(1, MediaTime::RoundingFlags::TowardNegativeInfinity).timeValue(), 1);
+    EXPECT_EQ(MediaTime(151, 100).toTimeScale(1, MediaTime::RoundingFlags::TowardNegativeInfinity).timeValue(), 1);
+    EXPECT_EQ(MediaTime(149, 100).toTimeScale(1, MediaTime::RoundingFlags::TowardNegativeInfinity).timeValue(), 1);
+    EXPECT_EQ(MediaTime(-1, 2).toTimeScale(1, MediaTime::RoundingFlags::TowardNegativeInfinity).timeValue(), -1);
+    EXPECT_EQ(MediaTime(-51, 100).toTimeScale(1, MediaTime::RoundingFlags::TowardNegativeInfinity).timeValue(), -1);
+    EXPECT_EQ(MediaTime(-49, 100).toTimeScale(1, MediaTime::RoundingFlags::TowardNegativeInfinity).timeValue(), -1);
+    EXPECT_EQ(MediaTime(-3, 2).toTimeScale(1, MediaTime::RoundingFlags::TowardNegativeInfinity).timeValue(), -2);
+    EXPECT_EQ(MediaTime(-151, 100).toTimeScale(1, MediaTime::RoundingFlags::TowardNegativeInfinity).timeValue(), -2);
+    EXPECT_EQ(MediaTime(-149, 100).toTimeScale(1, MediaTime::RoundingFlags::TowardNegativeInfinity).timeValue(), -2);
+    EXPECT_EQ(MediaTime(numeric_limits<int64_t>::max(), 1).toTimeScale(2), MediaTime::positiveInfiniteTime());
+    EXPECT_EQ(MediaTime(numeric_limits<int64_t>::min(), 1).toTimeScale(2), MediaTime::negativeInfiniteTime());
+    int64_t maxInt32 = numeric_limits<int32_t>::max();
+    EXPECT_EQ(MediaTime(maxInt32 * 2, 1).toTimeScale(2).timeValue(), maxInt32 * 4);
+    int64_t bigInt = 1LL << 62;
+    EXPECT_EQ(MediaTime(bigInt, 1U << 31).toTimeScale(1U << 30).timeValue(), bigInt / 2);
+    EXPECT_EQ(MediaTime(bigInt + 1, 1U << 31).toTimeScale(1U << 30, MediaTime::RoundingFlags::TowardZero).timeValue(), bigInt / 2);
+    EXPECT_EQ(MediaTime(bigInt + 1, 1U << 31).toTimeScale(1U << 30).hasBeenRounded(), true);
+    EXPECT_EQ(MediaTime(bigInt - 2, MediaTime::MaximumTimeScale).toTimeScale(MediaTime::MaximumTimeScale - 1).hasBeenRounded(), true);
+    EXPECT_EQ(MediaTime(bigInt, 1).toTimeScale(MediaTime::MaximumTimeScale), MediaTime::positiveInfiniteTime());
+    EXPECT_EQ(MediaTime(-bigInt, 1).toTimeScale(MediaTime::MaximumTimeScale), MediaTime::negativeInfiniteTime());
 }
 
 }

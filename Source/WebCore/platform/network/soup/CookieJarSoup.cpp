@@ -144,33 +144,6 @@ void deleteCookie(const NetworkStorageSession& session, const URL& url, const St
     }
 }
 
-static SoupDate* msToSoupDate(double ms)
-{
-    int year = msToYear(ms);
-    int dayOfYear = dayInYear(ms, year);
-    bool leapYear = isLeapYear(year);
-    return soup_date_new(year, monthFromDayInYear(dayOfYear, leapYear), dayInMonthFromDayInYear(dayOfYear, leapYear), msToHours(ms), msToMinutes(ms), static_cast<int>(ms / 1000) % 60);
-}
-
-static SoupCookie* toSoupCookie(const Cookie& cookie)
-{
-    SoupCookie* soupCookie = soup_cookie_new(cookie.name.utf8().data(), cookie.value.utf8().data(),
-        cookie.domain.utf8().data(), cookie.path.utf8().data(), -1);
-    soup_cookie_set_http_only(soupCookie, cookie.httpOnly);
-    soup_cookie_set_secure(soupCookie, cookie.secure);
-    if (!cookie.session) {
-        SoupDate* date = msToSoupDate(cookie.expires);
-        soup_cookie_set_expires(soupCookie, date);
-        soup_date_free(date);
-    }
-    return soupCookie;
-}
-
-void addCookie(const NetworkStorageSession& session, const URL&, const Cookie& cookie)
-{
-    soup_cookie_jar_add_cookie(session.cookieStorage(), toSoupCookie(cookie));
-}
-
 void getHostnamesWithCookies(const NetworkStorageSession& session, HashSet<String>& hostnames)
 {
     GUniquePtr<GSList> cookies(soup_cookie_jar_all_cookies(session.cookieStorage()));
@@ -210,8 +183,13 @@ void deleteAllCookies(const NetworkStorageSession& session)
     }
 }
 
-void deleteAllCookiesModifiedSince(const NetworkStorageSession&, std::chrono::system_clock::time_point)
+void deleteAllCookiesModifiedSince(const NetworkStorageSession& session, std::chrono::system_clock::time_point timestamp)
 {
+    // FIXME: Add support for deleting cookies modified since the given timestamp. It should probably be added to libsoup.
+    if (timestamp == std::chrono::system_clock::from_time_t(0))
+        deleteAllCookies(session);
+    else
+        g_warning("Deleting cookies modified since a given time span is not supported yet");
 }
 
 }

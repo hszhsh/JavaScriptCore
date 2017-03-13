@@ -34,6 +34,9 @@
 #include "NetworkLoad.h"
 #include "NetworkProcess.h"
 #include "NetworkProcessConnectionMessages.h"
+#include "NetworkRTCMonitorMessages.h"
+#include "NetworkRTCProviderMessages.h"
+#include "NetworkRTCSocketMessages.h"
 #include "NetworkResourceLoadParameters.h"
 #include "NetworkResourceLoader.h"
 #include "NetworkResourceLoaderMessages.h"
@@ -68,6 +71,10 @@ NetworkConnectionToWebProcess::NetworkConnectionToWebProcess(IPC::Connection::Id
 
 NetworkConnectionToWebProcess::~NetworkConnectionToWebProcess()
 {
+#if USE(LIBWEBRTC)
+    if (m_rtcProvider)
+        m_rtcProvider->close();
+#endif
 }
 
 void NetworkConnectionToWebProcess::didCleanupResourceLoader(NetworkResourceLoader& loader)
@@ -76,7 +83,7 @@ void NetworkConnectionToWebProcess::didCleanupResourceLoader(NetworkResourceLoad
 
     m_networkResourceLoaders.remove(loader.identifier());
 }
-    
+
 void NetworkConnectionToWebProcess::didReceiveMessage(IPC::Connection& connection, IPC::Decoder& decoder)
 {
     if (decoder.messageReceiverName() == Messages::NetworkConnectionToWebProcess::messageReceiverName()) {
@@ -85,14 +92,38 @@ void NetworkConnectionToWebProcess::didReceiveMessage(IPC::Connection& connectio
     }
 
     if (decoder.messageReceiverName() == Messages::NetworkResourceLoader::messageReceiverName()) {
-        HashMap<ResourceLoadIdentifier, RefPtr<NetworkResourceLoader>>::iterator loaderIterator = m_networkResourceLoaders.find(decoder.destinationID());
+        auto loaderIterator = m_networkResourceLoaders.find(decoder.destinationID());
         if (loaderIterator != m_networkResourceLoaders.end())
             loaderIterator->value->didReceiveNetworkResourceLoaderMessage(connection, decoder);
         return;
     }
-    
+
+#if USE(LIBWEBRTC)
+    if (decoder.messageReceiverName() == Messages::NetworkRTCSocket::messageReceiverName()) {
+        rtcProvider().didReceiveNetworkRTCSocketMessage(connection, decoder);
+        return;
+    }
+    if (decoder.messageReceiverName() == Messages::NetworkRTCMonitor::messageReceiverName()) {
+        rtcProvider().didReceiveNetworkRTCMonitorMessage(connection, decoder);
+        return;
+    }
+    if (decoder.messageReceiverName() == Messages::NetworkRTCProvider::messageReceiverName()) {
+        rtcProvider().didReceiveMessage(connection, decoder);
+        return;
+    }
+#endif
+
     ASSERT_NOT_REACHED();
 }
+
+#if USE(LIBWEBRTC)
+NetworkRTCProvider& NetworkConnectionToWebProcess::rtcProvider()
+{
+    if (!m_rtcProvider)
+        m_rtcProvider = NetworkRTCProvider::create(*this);
+    return *m_rtcProvider;
+}
+#endif
 
 void NetworkConnectionToWebProcess::didReceiveSyncMessage(IPC::Connection& connection, IPC::Decoder& decoder, std::unique_ptr<IPC::Encoder>& reply)
 {
@@ -116,6 +147,13 @@ void NetworkConnectionToWebProcess::didClose(IPC::Connection&)
 
     NetworkBlobRegistry::singleton().connectionToWebProcessDidClose(this);
     NetworkProcess::singleton().removeNetworkConnectionToWebProcess(this);
+
+#if USE(LIBWEBRTC)
+    if (m_rtcProvider) {
+        m_rtcProvider->close();
+        m_rtcProvider = nullptr;
+    }
+#endif
 }
 
 void NetworkConnectionToWebProcess::didReceiveInvalidMessage(IPC::Connection&, IPC::StringReference, IPC::StringReference)
@@ -239,11 +277,6 @@ void NetworkConnectionToWebProcess::getRawCookies(SessionID sessionID, const URL
 void NetworkConnectionToWebProcess::deleteCookie(SessionID sessionID, const URL& url, const String& cookieName)
 {
     WebCore::deleteCookie(storageSession(sessionID), url, cookieName);
-}
-
-void NetworkConnectionToWebProcess::addCookie(SessionID sessionID, const URL& url, const Cookie& cookie)
-{
-    WebCore::addCookie(storageSession(sessionID), url, cookie);
 }
 
 void NetworkConnectionToWebProcess::registerFileBlobURL(const URL& url, const String& path, const SandboxExtension::Handle& extensionHandle, const String& contentType)

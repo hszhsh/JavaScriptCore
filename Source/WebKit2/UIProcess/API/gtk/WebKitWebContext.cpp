@@ -28,9 +28,7 @@
 #include "TextChecker.h"
 #include "TextCheckerState.h"
 #include "WebCertificateInfo.h"
-#include "WebCookieManagerProxy.h"
 #include "WebGeolocationManagerProxy.h"
-#include "WebKitCookieManagerPrivate.h"
 #include "WebKitCustomProtocolManagerClient.h"
 #include "WebKitDownloadClient.h"
 #include "WebKitDownloadPrivate.h"
@@ -79,11 +77,9 @@ using namespace WebKit;
  * You can define the #WebKitCacheModel and #WebKitProcessModel with
  * webkit_web_context_set_cache_model() and
  * webkit_web_context_set_process_model(), depending on the needs of
- * your application. You can access the #WebKitCookieManager or the
- * #WebKitSecurityManager to specify the behaviour of your application
- * regarding cookies and security, using
- * webkit_web_context_get_cookie_manager() and
- * webkit_web_context_get_security_manager() for that.
+ * your application. You can access the #WebKitSecurityManager to specify
+ * the behaviour of your application regarding security using
+ * webkit_web_context_get_security_manager().
  *
  * It is also possible to change your preferred language or enable
  * spell checking, using webkit_web_context_set_preferred_languages(),
@@ -157,7 +153,6 @@ struct _WebKitWebContextPrivate {
     RefPtr<WebProcessPool> processPool;
     bool clientsDetached;
 
-    GRefPtr<WebKitCookieManager> cookieManager;
     GRefPtr<WebKitFaviconDatabase> faviconDatabase;
     GRefPtr<WebKitSecurityManager> securityManager;
     URISchemeHandlerMap uriSchemeHandlers;
@@ -176,6 +171,7 @@ struct _WebKitWebContextPrivate {
     unsigned processCountLimit;
 
     HashMap<uint64_t, WebKitWebView*> webViews;
+    unsigned ephemeralPageCount;
 
     CString webExtensionsDirectory;
     GRefPtr<GVariant> webExtensionsInitializationUserData;
@@ -258,7 +254,7 @@ static void webkitWebContextConstructed(GObject* object)
 
     WebKitWebContext* webContext = WEBKIT_WEB_CONTEXT(object);
     WebKitWebContextPrivate* priv = webContext->priv;
-    if (priv->websiteDataManager) {
+    if (priv->websiteDataManager && !webkit_website_data_manager_is_ephemeral(priv->websiteDataManager.get())) {
         configuration.setLocalStorageDirectory(WebCore::stringFromFileSystemRepresentation(webkit_website_data_manager_get_local_storage_directory(priv->websiteDataManager.get())));
         configuration.setDiskCacheDirectory(WebCore::pathByAppendingComponent(WebCore::stringFromFileSystemRepresentation(webkit_website_data_manager_get_disk_cache_directory(priv->websiteDataManager.get())), networkCacheSubdirectory));
         configuration.setApplicationCacheDirectory(WebCore::stringFromFileSystemRepresentation(webkit_website_data_manager_get_offline_application_cache_directory(priv->websiteDataManager.get())));
@@ -271,6 +267,8 @@ static void webkitWebContextConstructed(GObject* object)
 
     if (!priv->websiteDataManager)
         priv->websiteDataManager = adoptGRef(webkitWebsiteDataManagerCreate(websiteDataStoreConfigurationForWebProcessPoolConfiguration(configuration)));
+
+    webkitWebsiteDataManagerAddProcessPool(priv->websiteDataManager.get(), *priv->processPool);
 
     priv->tlsErrorsPolicy = WEBKIT_TLS_ERRORS_POLICY_FAIL;
     priv->processPool->setIgnoreTLSErrors(false);
@@ -299,7 +297,12 @@ static void webkitWebContextDispose(GObject* object)
         priv->clientsDetached = true;
         priv->processPool->initializeInjectedBundleClient(nullptr);
         priv->processPool->setDownloadClient(nullptr);
-        priv->processPool->setCustomProtocolManagerClient(nullptr);
+        priv->processPool->setLegacyCustomProtocolManagerClient(nullptr);
+    }
+
+    if (priv->websiteDataManager) {
+        webkitWebsiteDataManagerRemoveProcessPool(priv->websiteDataManager.get(), *priv->processPool);
+        priv->websiteDataManager = nullptr;
     }
 
     G_OBJECT_CLASS(webkit_web_context_parent_class)->dispose(object);
@@ -449,6 +452,26 @@ WebKitWebContext* webkit_web_context_new(void)
 }
 
 /**
+ * webkit_web_context_new_ephemeral:
+ *
+ * Create a new ephemeral #WebKitWebContext. An ephemeral #WebKitWebContext is a context
+ * created with an ephemeral #WebKitWebsiteDataManager. This is just a convenient method
+ * to create ephemeral contexts without having to create your own #WebKitWebsiteDataManager.
+ * All #WebKitWebView<!-- -->s associated with this context will also be ephemeral. Websites will
+ * not store any data in the client storage.
+ * This is normally used to implement private instances.
+ *
+ * Returns: (transfer full): a new ephemeral #WebKitWebContext.
+ *
+ * Since: 2.16
+ */
+WebKitWebContext* webkit_web_context_new_ephemeral()
+{
+    GRefPtr<WebKitWebsiteDataManager> manager = adoptGRef(webkit_website_data_manager_new_ephemeral());
+    return WEBKIT_WEB_CONTEXT(g_object_new(WEBKIT_TYPE_WEB_CONTEXT, "website-data-manager", manager.get(), nullptr));
+}
+
+/**
  * webkit_web_context_new_with_website_data_manager:
  * @manager: a #WebKitWebsiteDataManager
  *
@@ -480,6 +503,23 @@ WebKitWebsiteDataManager* webkit_web_context_get_website_data_manager(WebKitWebC
     g_return_val_if_fail(WEBKIT_IS_WEB_CONTEXT(context), nullptr);
 
     return context->priv->websiteDataManager.get();
+}
+
+/**
+ * webkit_web_context_is_ephemeral:
+ * @context: the #WebKitWebContext
+ *
+ * Get whether a #WebKitWebContext is ephemeral.
+ *
+ * Returns: %TRUE if @context is ephemeral or %FALSE otherwise.
+ *
+ * Since: 2.16
+ */
+gboolean webkit_web_context_is_ephemeral(WebKitWebContext* context)
+{
+    g_return_val_if_fail(WEBKIT_IS_WEB_CONTEXT(context), FALSE);
+
+    return webkit_website_data_manager_is_ephemeral(context->priv->websiteDataManager.get());
 }
 
 /**
@@ -635,7 +675,7 @@ static DownloadsMap& downloadsMap()
  * starting a download from a particular #WebKitWebView use
  * webkit_web_view_download_uri() instead.
  *
- * Returns: (transfer full): a new #WebKitDownload representing the
+ * Returns: (transfer full): a new #WebKitDownload representing
  *    the download operation.
  */
 WebKitDownload* webkit_web_context_download_uri(WebKitWebContext* context, const gchar* uri)
@@ -651,19 +691,15 @@ WebKitDownload* webkit_web_context_download_uri(WebKitWebContext* context, const
  * webkit_web_context_get_cookie_manager:
  * @context: a #WebKitWebContext
  *
- * Get the #WebKitCookieManager of @context.
+ * Get the #WebKitCookieManager of the @context's #WebKitWebsiteDataManager.
  *
  * Returns: (transfer none): the #WebKitCookieManager of @context.
  */
 WebKitCookieManager* webkit_web_context_get_cookie_manager(WebKitWebContext* context)
 {
-    g_return_val_if_fail(WEBKIT_IS_WEB_CONTEXT(context), 0);
+    g_return_val_if_fail(WEBKIT_IS_WEB_CONTEXT(context), nullptr);
 
-    WebKitWebContextPrivate* priv = context->priv;
-    if (!priv->cookieManager)
-        priv->cookieManager = adoptGRef(webkitCookieManagerCreate(priv->processPool->supplement<WebCookieManagerProxy>()));
-
-    return priv->cookieManager.get();
+    return webkit_website_data_manager_get_cookie_manager(context->priv->websiteDataManager.get());
 }
 
 static void ensureFaviconDatabase(WebKitWebContext* context)
@@ -673,6 +709,31 @@ static void ensureFaviconDatabase(WebKitWebContext* context)
         return;
 
     priv->faviconDatabase = adoptGRef(webkitFaviconDatabaseCreate(priv->processPool->iconDatabase()));
+}
+
+static void webkitWebContextEnableIconDatabasePrivateBrowsingIfNeeded(WebKitWebContext* context, WebKitWebView* webView)
+{
+    if (webkit_web_context_is_ephemeral(context))
+        return;
+    if (!webkit_web_view_is_ephemeral(webView))
+        return;
+
+    if (!context->priv->ephemeralPageCount)
+        context->priv->processPool->iconDatabase()->setPrivateBrowsingEnabled(true);
+    context->priv->ephemeralPageCount++;
+}
+
+static void webkitWebContextDisableIconDatabasePrivateBrowsingIfNeeded(WebKitWebContext* context, WebKitWebView* webView)
+{
+    if (webkit_web_context_is_ephemeral(context))
+        return;
+    if (!webkit_web_view_is_ephemeral(webView))
+        return;
+
+    ASSERT(context->priv->ephemeralPageCount);
+    context->priv->ephemeralPageCount--;
+    if (!context->priv->ephemeralPageCount)
+        context->priv->processPool->iconDatabase()->setPrivateBrowsingEnabled(false);
 }
 
 /**
@@ -713,6 +774,9 @@ void webkit_web_context_set_favicon_database_directory(WebKitWebContext* context
 
     // Setting the path will cause the icon database to be opened.
     priv->processPool->setIconDatabasePath(WebCore::stringFromFileSystemRepresentation(faviconDatabasePath.get()));
+
+    if (webkit_web_context_is_ephemeral(context))
+        priv->processPool->iconDatabase()->setPrivateBrowsingEnabled(true);
 }
 
 /**
@@ -1369,14 +1433,14 @@ GVariant* webkitWebContextInitializeWebExtensions(WebKitWebContext* context)
         context->priv->webExtensionsInitializationUserData.get());
 }
 
-WebProcessPool* webkitWebContextGetProcessPool(WebKitWebContext* context)
+WebProcessPool& webkitWebContextGetProcessPool(WebKitWebContext* context)
 {
     g_assert(WEBKIT_IS_WEB_CONTEXT(context));
 
-    return context->priv->processPool.get();
+    return *context->priv->processPool;
 }
 
-void webkitWebContextStartLoadingCustomProtocol(WebKitWebContext* context, uint64_t customProtocolID, const WebCore::ResourceRequest& resourceRequest, CustomProtocolManagerProxy& manager)
+void webkitWebContextStartLoadingCustomProtocol(WebKitWebContext* context, uint64_t customProtocolID, const WebCore::ResourceRequest& resourceRequest, LegacyCustomProtocolManagerProxy& manager)
 {
     GRefPtr<WebKitURISchemeRequest> request = adoptGRef(webkitURISchemeRequestCreate(customProtocolID, context, resourceRequest, manager));
     String scheme(String::fromUTF8(webkit_uri_scheme_request_get_scheme(request.get())));
@@ -1397,7 +1461,7 @@ void webkitWebContextStopLoadingCustomProtocol(WebKitWebContext* context, uint64
     webkitURISchemeRequestCancel(request.get());
 }
 
-void webkitWebContextInvalidateCustomProtocolRequests(WebKitWebContext* context, CustomProtocolManagerProxy& manager)
+void webkitWebContextInvalidateCustomProtocolRequests(WebKitWebContext* context, LegacyCustomProtocolManagerProxy& manager)
 {
     Vector<GRefPtr<WebKitURISchemeRequest>> requests;
     copyValuesToVector(context->priv->uriSchemeRequests, requests);
@@ -1421,12 +1485,20 @@ void webkitWebContextCreatePageForWebView(WebKitWebContext* context, WebKitWebVi
 {
     WebKitWebViewBase* webViewBase = WEBKIT_WEB_VIEW_BASE(webView);
 
+    // FIXME: icon database private mode is global, not per page, so while there are
+    // pages in private mode we need to enable the private mode in the icon database.
+    webkitWebContextEnableIconDatabasePrivateBrowsingIfNeeded(context, webView);
+
     auto pageConfiguration = API::PageConfiguration::create();
     pageConfiguration->setProcessPool(context->priv->processPool.get());
     pageConfiguration->setPreferences(webkitSettingsGetPreferences(webkit_web_view_get_settings(webView)));
     pageConfiguration->setRelatedPage(relatedView ? webkitWebViewBaseGetPage(WEBKIT_WEB_VIEW_BASE(relatedView)) : nullptr);
     pageConfiguration->setUserContentController(userContentManager ? webkitUserContentManagerGetUserContentControllerProxy(userContentManager) : nullptr);
-    pageConfiguration->setWebsiteDataStore(&webkitWebsiteDataManagerGetDataStore(context->priv->websiteDataManager.get()));
+
+    WebKitWebsiteDataManager* manager = webkitWebViewGetWebsiteDataManager(webView);
+    if (!manager)
+        manager = context->priv->websiteDataManager.get();
+    pageConfiguration->setWebsiteDataStore(&webkitWebsiteDataManagerGetDataStore(manager));
     pageConfiguration->setSessionID(pageConfiguration->websiteDataStore()->websiteDataStore().sessionID());
     webkitWebViewBaseCreateWebPage(webViewBase, WTFMove(pageConfiguration));
 
@@ -1436,6 +1508,7 @@ void webkitWebContextCreatePageForWebView(WebKitWebContext* context, WebKitWebVi
 
 void webkitWebContextWebViewDestroyed(WebKitWebContext* context, WebKitWebView* webView)
 {
+    webkitWebContextDisableIconDatabasePrivateBrowsingIfNeeded(context, webView);
     WebPageProxy* page = webkitWebViewBaseGetPage(WEBKIT_WEB_VIEW_BASE(webView));
     context->priv->webViews.remove(page->pageID());
 }

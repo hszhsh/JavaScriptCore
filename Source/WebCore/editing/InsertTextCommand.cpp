@@ -27,13 +27,13 @@
 #include "InsertTextCommand.h"
 
 #include "Document.h"
+#include "Editing.h"
 #include "Editor.h"
 #include "Frame.h"
 #include "HTMLElement.h"
 #include "HTMLInterchange.h"
 #include "Text.h"
 #include "VisibleUnits.h"
-#include "htmlediting.h"
 
 namespace WebCore {
 
@@ -176,7 +176,7 @@ void InsertTextCommand::doApply()
     // and so deleteInsignificantText could remove it.  Save the position before the node in case that happens.
     Position positionBeforeStartNode(positionInParentBeforeNode(startPosition.containerNode()));
     deleteInsignificantText(startPosition.upstream(), startPosition.downstream());
-    if (!startPosition.anchorNode()->inDocument())
+    if (!startPosition.anchorNode()->isConnected())
         startPosition = positionBeforeStartNode;
     if (!startPosition.isCandidate())
         startPosition = startPosition.downstream();

@@ -30,6 +30,7 @@
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
 #include <wtf/SHA1.h>
+#include <wtf/Seconds.h>
 #include <wtf/Vector.h>
 #include <wtf/persistence/Decoder.h>
 #include <wtf/persistence/Encoder.h>
@@ -257,6 +258,40 @@ template<typename KeyArg, typename HashArg, typename KeyTraitsArg> struct Coder<
         }
 
         hashSet.swap(tempHashSet);
+        return true;
+    }
+};
+
+template<> struct Coder<std::chrono::system_clock::time_point> {
+    static void encode(Encoder& encoder, const std::chrono::system_clock::time_point& timePoint)
+    {
+        encoder << static_cast<int64_t>(timePoint.time_since_epoch().count());
+    }
+    
+    static bool decode(Decoder& decoder, std::chrono::system_clock::time_point& result)
+    {
+        int64_t time;
+        if (!decoder.decode(time))
+            return false;
+
+        result = std::chrono::system_clock::time_point(std::chrono::system_clock::duration(static_cast<std::chrono::system_clock::rep>(time)));
+        return true;
+    }
+};
+
+template<> struct Coder<Seconds> {
+    static void encode(Encoder& encoder, const Seconds& seconds)
+    {
+        encoder << seconds.value();
+    }
+
+    static bool decode(Decoder& decoder, Seconds& result)
+    {
+        double value;
+        if (!decoder.decode(value))
+            return false;
+
+        result = Seconds(value);
         return true;
     }
 };

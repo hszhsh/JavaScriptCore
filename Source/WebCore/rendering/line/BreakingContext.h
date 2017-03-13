@@ -687,9 +687,7 @@ inline void tryHyphenating(RenderText& text, const FontCascade& font, const Atom
     int hyphenWidth = measureHyphenWidth(text, font);
 
     float maxPrefixWidth = availableWidth - xPos - hyphenWidth - lastSpaceWordSpacing;
-    // If the maximum width available for the prefix before the hyphen is small, then it is very unlikely
-    // that an hyphenation opportunity exists, so do not bother to look for it.
-    if (maxPrefixWidth <= font.pixelSize() * 5 / 4)
+    if (!enoughWidthForHyphenation(maxPrefixWidth, font.pixelSize()))
         return;
 
     const RenderStyle& style = text.style();
@@ -806,7 +804,8 @@ inline bool BreakingContext::handleText(WordMeasurements& wordMeasurements, bool
     bool breakAll = m_currentStyle->wordBreak() == BreakAllWordBreak && m_autoWrap;
     bool keepAllWords = m_currentStyle->wordBreak() == KeepAllWordBreak;
     float hyphenWidth = 0;
-    bool isLooseCJKMode = false;
+    auto iteratorMode = mapLineBreakToIteratorMode(m_blockStyle.lineBreak());
+    bool canUseLineBreakShortcut = iteratorMode == LineBreakIteratorMode::Default;
     bool isLineEmpty = m_lineInfo.isEmpty();
 
     if (isSVGText) {
@@ -819,8 +818,7 @@ inline bool BreakingContext::handleText(WordMeasurements& wordMeasurements, bool
         m_renderTextInfo.text = &renderText;
         m_renderTextInfo.font = &font;
         m_renderTextInfo.layout = font.createLayout(renderText, m_width.currentWidth(), m_collapseWhiteSpace);
-        m_renderTextInfo.lineBreakIterator.resetStringAndReleaseIterator(renderText.text(), style.locale(), mapLineBreakToIteratorMode(m_blockStyle.lineBreak()));
-        isLooseCJKMode = m_renderTextInfo.lineBreakIterator.isLooseCJKMode();
+        m_renderTextInfo.lineBreakIterator.resetStringAndReleaseIterator(renderText.text(), style.locale(), iteratorMode);
     } else if (m_renderTextInfo.layout && m_renderTextInfo.font != &font) {
         m_renderTextInfo.font = &font;
         m_renderTextInfo.layout = font.createLayout(renderText, m_width.currentWidth(), m_collapseWhiteSpace);
@@ -871,7 +869,7 @@ inline bool BreakingContext::handleText(WordMeasurements& wordMeasurements, bool
         }
 
         std::optional<unsigned> nextBreakablePosition = m_current.nextBreakablePosition();
-        bool betweenWords = c == '\n' || (m_currWS != PRE && !m_atStart && isBreakable(m_renderTextInfo.lineBreakIterator, m_current.offset(), nextBreakablePosition, breakNBSP, isLooseCJKMode, keepAllWords)
+        bool betweenWords = c == '\n' || (m_currWS != PRE && !m_atStart && isBreakable(m_renderTextInfo.lineBreakIterator, m_current.offset(), nextBreakablePosition, breakNBSP, canUseLineBreakShortcut, keepAllWords)
             && (style.hyphens() != HyphensNone || (m_current.previousInSameNode() != softHyphen)));
         m_current.setNextBreakablePosition(nextBreakablePosition);
         
@@ -1334,10 +1332,10 @@ inline InlineIterator BreakingContext::optimalLineBreakLocationForTrailingWord()
     // Don't even bother measuring if our remaining line has many characters
     if (renderText.textLength() == lineBreak.offset() || renderText.textLength() - lineBreak.offset() > longTrailingWordLength)
         return lineBreak;
-    bool isLooseCJKMode = m_renderTextInfo.text != &renderText && m_renderTextInfo.lineBreakIterator.isLooseCJKMode();
+    bool canUseLineBreakShortcut = m_renderTextInfo.lineBreakIterator.mode() == LineBreakIteratorMode::Default;
     bool breakNBSP = m_autoWrap && m_currentStyle->nbspMode() == SPACE;
     std::optional<unsigned> nextBreakablePosition = lineBreak.nextBreakablePosition();
-    isBreakable(m_renderTextInfo.lineBreakIterator, lineBreak.offset() + 1, nextBreakablePosition, breakNBSP, isLooseCJKMode, m_currentStyle->wordBreak() == KeepAllWordBreak);
+    isBreakable(m_renderTextInfo.lineBreakIterator, lineBreak.offset() + 1, nextBreakablePosition, breakNBSP, canUseLineBreakShortcut, m_currentStyle->wordBreak() == KeepAllWordBreak);
     if (!nextBreakablePosition || nextBreakablePosition.value() != renderText.textLength())
         return lineBreak;
     const RenderStyle& style = lineStyle(renderText, m_lineInfo);

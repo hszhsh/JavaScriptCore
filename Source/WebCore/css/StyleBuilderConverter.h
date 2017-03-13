@@ -40,6 +40,7 @@
 #include "CSSImageValue.h"
 #include "CSSPrimitiveValue.h"
 #include "CSSReflectValue.h"
+#include "FontSelectionValueInlines.h"
 #include "Frame.h"
 #include "LayoutUnit.h"
 #include "Length.h"
@@ -96,12 +97,10 @@ public:
     static ScrollSnapType convertScrollSnapType(StyleResolver&, const CSSValue&);
     static ScrollSnapAlign convertScrollSnapAlign(StyleResolver&, const CSSValue&);
 #endif
-#if ENABLE(CSS_GRID_LAYOUT)
     static GridTrackSize convertGridTrackSize(StyleResolver&, const CSSValue&);
     static Vector<GridTrackSize> convertGridTrackSizeList(StyleResolver&, const CSSValue&);
     static std::optional<GridPosition> convertGridPosition(StyleResolver&, const CSSValue&);
     static GridAutoFlow convertGridAutoFlow(StyleResolver&, const CSSValue&);
-#endif // ENABLE(CSS_GRID_LAYOUT)
     static std::optional<Length> convertWordSpacing(StyleResolver&, const CSSValue&);
     static std::optional<float> convertPerspective(StyleResolver&, const CSSValue&);
     static std::optional<Length> convertMarqueeIncrement(StyleResolver&, const CSSValue&);
@@ -116,6 +115,9 @@ public:
     static bool convertOverflowScrolling(StyleResolver&, const CSSValue&);
 #endif
     static FontFeatureSettings convertFontFeatureSettings(StyleResolver&, const CSSValue&);
+    static FontSelectionValue convertFontWeight(StyleResolver&, const CSSValue&);
+    static FontSelectionValue convertFontStretch(StyleResolver&, const CSSValue&);
+    static FontSelectionValue convertFontStyle(StyleResolver&, const CSSValue&);
 #if ENABLE(VARIATION_FONTS)
     static FontVariationSettings convertFontVariationSettings(StyleResolver&, const CSSValue&);
 #endif
@@ -160,14 +162,12 @@ private:
     static Length convertTo100PercentMinusLength(const Length&);
     template<CSSValueID, CSSValueID> static Length convertPositionComponent(StyleResolver&, const CSSPrimitiveValue&);
 
-#if ENABLE(CSS_GRID_LAYOUT)
     static GridLength createGridTrackBreadth(const CSSPrimitiveValue&, StyleResolver&);
     static GridTrackSize createGridTrackSize(const CSSValue&, StyleResolver&);
     struct TracksData;
     static bool createGridTrackList(const CSSValue&, TracksData&, StyleResolver&);
     static bool createGridPosition(const CSSValue&, GridPosition&);
     static void createImplicitNamedGridLinesFromGridArea(const NamedGridAreaMap&, NamedGridLinesMap&, GridTrackSizingDirection);
-#endif // ENABLE(CSS_GRID_LAYOUT)
     static CSSToLengthConversionData csstoLengthConversionDataWithTextZoomFactor(StyleResolver&);
 };
 
@@ -558,10 +558,9 @@ inline EResize StyleBuilderConverter::convertResize(StyleResolver& styleResolver
     auto& primitiveValue = downcast<CSSPrimitiveValue>(value);
 
     EResize resize = RESIZE_NONE;
-    if (primitiveValue.valueID() == CSSValueAuto) {
-        if (Settings* settings = styleResolver.document().settings())
-            resize = settings->textAreasAreResizable() ? RESIZE_BOTH : RESIZE_NONE;
-    } else
+    if (primitiveValue.valueID() == CSSValueAuto)
+        resize = styleResolver.settings().textAreasAreResizable() ? RESIZE_BOTH : RESIZE_NONE;
+    else
         resize = primitiveValue;
 
     return resize;
@@ -834,7 +833,6 @@ inline ScrollSnapAlign StyleBuilderConverter::convertScrollSnapAlign(StyleResolv
 
 #endif
 
-#if ENABLE(CSS_GRID_LAYOUT)
 inline GridLength StyleBuilderConverter::createGridTrackBreadth(const CSSPrimitiveValue& primitiveValue, StyleResolver& styleResolver)
 {
     if (primitiveValue.valueID() == CSSValueWebkitMinContent)
@@ -1067,7 +1065,6 @@ inline GridAutoFlow StyleBuilderConverter::convertGridAutoFlow(StyleResolver&, c
 
     return autoFlow;
 }
-#endif // ENABLE(CSS_GRID_LAYOUT)
 
 inline CSSToLengthConversionData StyleBuilderConverter::csstoLengthConversionDataWithTextZoomFactor(StyleResolver& styleResolver)
 {
@@ -1160,6 +1157,60 @@ inline FontFeatureSettings StyleBuilderConverter::convertFontFeatureSettings(Sty
     return settings;
 }
 
+inline FontSelectionValue StyleBuilderConverter::convertFontWeight(StyleResolver& styleResolver, const CSSValue& value)
+{
+    ASSERT(is<CSSPrimitiveValue>(value));
+    auto& primitiveValue = downcast<CSSPrimitiveValue>(value);
+
+    if (primitiveValue.isNumber())
+        return FontSelectionValue::clampFloat(primitiveValue.floatValue());
+
+    ASSERT(primitiveValue.isValueID());
+    switch (primitiveValue.valueID()) {
+    case CSSValueNormal:
+        return normalWeightValue();
+    case CSSValueBold:
+        return boldWeightValue();
+    case CSSValueBolder:
+        return FontCascadeDescription::bolderWeight(styleResolver.parentStyle()->fontDescription().weight());
+    case CSSValueLighter:
+        return FontCascadeDescription::lighterWeight(styleResolver.parentStyle()->fontDescription().weight());
+    default:
+        ASSERT_NOT_REACHED();
+        return normalWeightValue();
+    }
+}
+
+inline FontSelectionValue StyleBuilderConverter::convertFontStretch(StyleResolver&, const CSSValue& value)
+{
+    ASSERT(is<CSSPrimitiveValue>(value));
+    const auto& primitiveValue = downcast<CSSPrimitiveValue>(value);
+
+    if (primitiveValue.isPercentage() || primitiveValue.isNumber())
+        return FontSelectionValue::clampFloat(primitiveValue.floatValue());
+
+    ASSERT(primitiveValue.isValueID());
+    if (auto value = fontStretchValue(primitiveValue.valueID()))
+        return value.value();
+    ASSERT_NOT_REACHED();
+    return normalStretchValue();
+}
+
+inline FontSelectionValue StyleBuilderConverter::convertFontStyle(StyleResolver&, const CSSValue& value)
+{
+    ASSERT(is<CSSPrimitiveValue>(value));
+    const auto& primitiveValue = downcast<CSSPrimitiveValue>(value);
+
+    if (primitiveValue.isAngle() || primitiveValue.isNumber() || primitiveValue.isCalculated())
+        return FontSelectionValue::clampFloat(primitiveValue.floatValue(CSSPrimitiveValue::CSS_DEG));
+
+    ASSERT(primitiveValue.isValueID());
+    if (auto value = fontStyleValue(primitiveValue.valueID()))
+        return value.value();
+    ASSERT_NOT_REACHED();
+    return normalItalicValue();
+}
+
 #if ENABLE(VARIATION_FONTS)
 inline FontVariationSettings StyleBuilderConverter::convertFontVariationSettings(StyleResolver&, const CSSValue& value)
 {
@@ -1229,20 +1280,20 @@ inline PaintOrder StyleBuilderConverter::convertPaintOrder(StyleResolver&, const
 {
     if (is<CSSPrimitiveValue>(value)) {
         ASSERT(downcast<CSSPrimitiveValue>(value).valueID() == CSSValueNormal);
-        return PaintOrderNormal;
+        return PaintOrder::Normal;
     }
 
     auto& orderTypeList = downcast<CSSValueList>(value);
     switch (downcast<CSSPrimitiveValue>(*orderTypeList.itemWithoutBoundsCheck(0)).valueID()) {
     case CSSValueFill:
-        return orderTypeList.length() > 1 ? PaintOrderFillMarkers : PaintOrderFill;
+        return orderTypeList.length() > 1 ? PaintOrder::FillMarkers : PaintOrder::Fill;
     case CSSValueStroke:
-        return orderTypeList.length() > 1 ? PaintOrderStrokeMarkers : PaintOrderStroke;
+        return orderTypeList.length() > 1 ? PaintOrder::StrokeMarkers : PaintOrder::Stroke;
     case CSSValueMarkers:
-        return orderTypeList.length() > 1 ? PaintOrderMarkersStroke : PaintOrderMarkers;
+        return orderTypeList.length() > 1 ? PaintOrder::MarkersStroke : PaintOrder::Markers;
     default:
         ASSERT_NOT_REACHED();
-        return PaintOrderNormal;
+        return PaintOrder::Normal;
     }
 }
 
@@ -1290,7 +1341,6 @@ inline StyleSelfAlignmentData StyleBuilderConverter::convertSelfOrDefaultAlignme
 inline StyleContentAlignmentData StyleBuilderConverter::convertContentAlignmentData(StyleResolver&, const CSSValue& value)
 {
     StyleContentAlignmentData alignmentData = RenderStyle::initialContentAlignment();
-#if ENABLE(CSS_GRID_LAYOUT)
     if (RuntimeEnabledFeatures::sharedFeatures().isCSSGridLayoutEnabled()) {
         if (!is<CSSContentDistributionValue>(value))
             return alignmentData;
@@ -1303,7 +1353,6 @@ inline StyleContentAlignmentData StyleBuilderConverter::convertContentAlignmentD
             alignmentData.setOverflow(contentValue.overflow().get());
         return alignmentData;
     }
-#endif
     if (!is<CSSPrimitiveValue>(value))
         return alignmentData;
     auto& primitiveValue = downcast<CSSPrimitiveValue>(value);

@@ -75,9 +75,10 @@ public:
 #if ENABLE(CONTENT_EXTENSIONS)
     void applyBlockedStatus(const ContentExtensions::BlockedStatus&);
 #endif
-#if ENABLE(CACHE_PARTITIONING)
     void setDomainForCachePartition(Document&);
-#endif
+    void setDomainForCachePartition(const String&);
+    bool isLinkPreload() const { return m_isLinkPreload; }
+    void setIsLinkPreload() { m_isLinkPreload = true; }
 
     void setOrigin(Ref<SecurityOrigin>&& origin) { m_origin = WTFMove(origin); }
     RefPtr<SecurityOrigin> releaseOrigin() { return WTFMove(m_origin); }
@@ -97,6 +98,7 @@ private:
     AtomicString m_initiatorName;
     RefPtr<SecurityOrigin> m_origin;
     String m_fragmentIdentifier;
+    bool m_isLinkPreload { false };
 };
 
 void upgradeInsecureResourceRequestIfNeeded(ResourceRequest&, Document&);

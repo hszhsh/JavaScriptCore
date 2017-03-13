@@ -1,3 +1,1083 @@
+2017-03-10  Saam Barati  <sbarati@apple.com>
+
+        WebAssembly: Make more demos run
+        https://bugs.webkit.org/show_bug.cgi?id=165510
+        <rdar://problem/29760310>
+
+        Reviewed by Keith Miller.
+
+        * wasm/Builder.js:
+        (export.default.Builder.prototype._registerSectionBuilders.const.section.in.WASM.description.section.switch.section.case.string_appeared_here.this.section):
+        * wasm/js-api/wrapper-function.js: Added.
+        (exportImport):
+        (return.new.WebAssembly.Module):
+        (assert.throws.makeInstance):
+        (assert.throws.Bar):
+        (assert.throws):
+
+2017-03-10  Mark Lam  <mark.lam@apple.com>
+
+        JSC: BindingNode::bindValue doesn't increase the scope's reference count.
+        https://bugs.webkit.org/show_bug.cgi?id=168546
+        <rdar://problem/30589551>
+
+        Reviewed by Saam Barati.
+
+        * stress/regress-168546.js: Added.
+
+2017-03-09  Caio Lima  <ticaiolima@gmail.com>
+
+        [ESnext] Implement Object Rest - Implementing Object Rest Destructuring
+        https://bugs.webkit.org/show_bug.cgi?id=167962
+
+        Reviewed by Keith Miller.
+
+        * stress/object-rest-deconstruct.js: Added.
+        (let.assert):
+        (let.assertPropDescriptor):
+        (catch):
+        (get 3):
+        (foo):
+        (let.src.get y):
+        (let.src.set y):
+        (let.gen):
+
+2017-03-09  Saam Barati  <sbarati@apple.com>
+
+        WebAssembly: Make the Unity AngryBots demo run
+        https://bugs.webkit.org/show_bug.cgi?id=169268
+
+        Reviewed by Keith Miller.
+
+        * wasm/function-tests/many-arguments-to-function.js: Added.
+        (import.Builder.from.string_appeared_here.import.as.assert.from.string_appeared_here.I32Const.0.I32Const.1.I32Const.2.I32Const.3.I32Const.4.I32Const.5.I32Const.6.I32Const.7.I32Const.8.I32Const.9.I32Const.10.I32Const.11.I32Const.12.I32Const.13.I32Const.14.I32Const.15.I32Const.16.I32Const.17.Call.0.Return.End.End.foo):
+        (i.instance.exports.f0.F32Const.F32Const.F32Const.F32Const.F32Const.F32Const.F32Const.F32Const.F32Const.F32Const.F32Const.F32Const.F32Const.F32Const.F32Const.F32Const.F32Const.F32Const.Call.Return.End.End.foo):
+        (i.instance.exports.f0):
+        (instance.exports.f0.GetLocal.GetLocal.GetLocal.GetLocal.GetLocal.GetLocal.GetLocal.GetLocal.GetLocal.GetLocal.GetLocal.GetLocal.GetLocal.GetLocal.GetLocal.GetLocal.GetLocal.GetLocal.Call.Return.End.End.foo):
+        (instance.exports.f0):
+
+2017-03-08  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [GTK] JSC test stress/arity-check-ftl-throw.js.ftl-no-cjit-validate-sampling-profiler crashing on GTK bot
+        https://bugs.webkit.org/show_bug.cgi?id=160124
+
+        Reviewed by Mark Lam.
+
+        * stress/spread-forward-call-varargs-stack-overflow.js:
+
+2017-03-06  Saam Barati  <sbarati@apple.com>
+
+        WebAssembly: Implement the WebAssembly.instantiate API
+        https://bugs.webkit.org/show_bug.cgi?id=165982
+        <rdar://problem/29760110>
+
+        Reviewed by Keith Miller.
+
+        * wasm/js-api/web-assembly-instantiate.js: Added.
+        (assert.eq.async.test):
+        (assert.eq):
+        (assert.truthy.async.test):
+        (assert.truthy):
+
+2017-03-06  Saam Barati  <sbarati@apple.com>
+
+        Unreviewed. Fix test expected error message.
+
+        * wasm/js-api/element.js:
+        (assert.throws):
+
+2017-03-06  Caio Lima  <ticaiolima@gmail.com>
+
+        op_get_by_id_with_this should use inline caching
+        https://bugs.webkit.org/show_bug.cgi?id=162124
+
+        Reviewed by Saam Barati.
+
+        * microbenchmarks/super-getter.js: Added.
+        (A.prototype.get f):
+        (A):
+        (B.prototype.get f):
+        (B):
+        * stress/super-force-ic-fail.js: Added.
+        (let.assert):
+        (let.aObj.get foo):
+        (let.obj.jaz):
+        (let.bObj.get foo):
+        (let.obj2.foo):
+        * stress/super-get-by-id.js: Added.
+        (assert):
+        (Base):
+        (Base.prototype.get name):
+        (Base.prototype.set name):
+        (Subclass.prototype.get name):
+        (Subclass):
+        (getterName):
+        (getterValue):
+        (PolymorphicSubclass.prototype.get value):
+        (PolymorphicSubclass):
+        (i.let.BaseCode):
+        (i.get value):
+        (MegamorphicSubclass.prototype.get value):
+        (MegamorphicSubclass):
+        (let.subObj.get value):
+        (i.catch):
+        (subObj.get value):
+        (BaseException):
+        (BaseException.prototype.get name):
+        (SubclassException.prototype.get name):
+        (SubclassException):
+        (prototype.foo):
+        (prototype.get name):
+        (SubclassExceptionComplex.prototype.get name):
+        (SubclassExceptionComplex):
+        * stress/super-getter-reset-ic.js: Added.
+        (let.assert):
+        (let.B.f):
+
+2017-03-06  Saam Barati  <sbarati@apple.com>
+
+        WebAssembly: implement init_expr for Element
+        https://bugs.webkit.org/show_bug.cgi?id=165888
+        <rdar://problem/29760199>
+
+        Reviewed by Keith Miller.
+
+        * wasm/Builder_WebAssemblyBinary.js:
+        (const.emitters.Element):
+        * wasm/assert.js:
+        * wasm/js-api/element.js:
+        (assert.throws):
+        (badInstantiation.makeModule):
+        (badInstantiation.test):
+        (badInstantiation):
+        * wasm/js-api/global-error.js:
+
+2017-03-06  Carlos Alberto Lopez Perez  <clopez@igalia.com>
+
+        [JSC] [Linux] Test stress/spread-forward-call-varargs-stack-overflow.js fails
+        https://bugs.webkit.org/show_bug.cgi?id=169206
+
+        Unreviewed test gardening.
+
+        * stress/spread-forward-call-varargs-stack-overflow.js: Skip on Linux platforms.
+
+2017-03-06  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [JSC] Allow indexed module namespace object fields
+        https://bugs.webkit.org/show_bug.cgi?id=168870
+
+        Reviewed by Saam Barati.
+
+        * wasm/spec-tests/names.wast.js:
+
+2017-03-06  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        Null pointer crash when loading module with unresolved import also as a script file
+        https://bugs.webkit.org/show_bug.cgi?id=168971
+
+        Reviewed by Saam Barati.
+
+        * stress/re-execute-error-module.js: Added.
+        (shouldBe):
+        (async):
+        * stress/resources/error-module.js: Added.
+
+2017-03-02  Keith Miller  <keith_miller@apple.com>
+
+        WebAssemblyFunction should have Function.prototype as its prototype
+        https://bugs.webkit.org/show_bug.cgi?id=169101
+
+        Reviewed by Filip Pizlo.
+
+        * wasm/js-api/web-assembly-function.js: Added.
+
+2017-02-28  Oleksandr Skachkov  <gskachkov@gmail.com>
+
+        Use of arguments in arrow function is slow
+        https://bugs.webkit.org/show_bug.cgi?id=168829
+
+        Reviewed by Saam Barati.
+
+        * microbenchmarks/arrowfunciton-direct-arguments.js: Added.
+        (fn):
+        * microbenchmarks/arrowfunciton-reference-arguments.js: Added.
+        (fn):
+
+2017-02-27  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r213019.
+        https://bugs.webkit.org/show_bug.cgi?id=168925
+
+        "It broke 32-bit jsc tests in debug builds" (Requested by
+        saamyjoon on #webkit).
+
+        Reverted changeset:
+
+        "op_get_by_id_with_this should use inline caching"
+        https://bugs.webkit.org/show_bug.cgi?id=162124
+        http://trac.webkit.org/changeset/213019
+
+2017-02-27  JF Bastien  <jfbastien@apple.com>
+
+        WebAssembly: miscellaneous spec fixes part deux
+        https://bugs.webkit.org/show_bug.cgi?id=168861
+
+        Reviewed by Keith Miller.
+
+        * wasm.yaml: more passing tests
+        * wasm/Builder.js: use a Map instead of an Object for the function
+        index space, because Number entries such as 0 were colliding with
+        string entries such as "0". This in turn requires some hashing of
+        objects which are inserted, because Map uses Object's insertion
+        order when comparing.
+        (export.default.Builder):
+        (export.default.Builder.prototype._functionIndexSpaceKeyHash):
+        (export.default.Builder.prototype._registerFunctionToIndexSpace):
+        (export.default.Builder.prototype._getFunctionFromIndexSpace):
+        * wasm/js-api/test_Instance.js: add a FIXME test
+        * wasm/spec-tests/memory.wast.js:
+        (assert_unlinkable):
+        * wasm/spec-tests/names.wast.js:
+
+2017-02-26  Caio Lima  <ticaiolima@gmail.com>
+
+        op_get_by_id_with_this should use inline caching
+        https://bugs.webkit.org/show_bug.cgi?id=162124
+
+        Reviewed by Saam Barati.
+
+        * microbenchmarks/super-getter.js: Added.
+        (A.prototype.get f):
+        (A):
+        (B.prototype.get f):
+        (B):
+        * stress/super-force-ic-fail.js: Added.
+        (let.assert):
+        (let.aObj.get foo):
+        (let.obj.jaz):
+        (let.bObj.get foo):
+        (let.obj2.foo):
+        * stress/super-get-by-id.js: Added.
+        (assert):
+        (Base):
+        (Base.prototype.get name):
+        (Base.prototype.set name):
+        (Subclass.prototype.get name):
+        (Subclass):
+        (getterName):
+        (getterValue):
+        (PolymorphicSubclass.prototype.get value):
+        (PolymorphicSubclass):
+        (i.let.BaseCode):
+        (i.get value):
+        (MegamorphicSubclass.prototype.get value):
+        (MegamorphicSubclass):
+        (let.subObj.get value):
+        (i.catch):
+        (subObj.get value):
+        (BaseException):
+        (BaseException.prototype.get name):
+        (SubclassException.prototype.get name):
+        (SubclassException):
+        (prototype.foo):
+        (prototype.get name):
+        (SubclassExceptionComplex.prototype.get name):
+        (SubclassExceptionComplex):
+        * stress/super-getter-reset-ic.js: Added.
+        (let.assert):
+        (let.B.f):
+
+2017-02-24  JF Bastien  <jfbastien@apple.com>
+
+        WebAssembly: miscellaneous spec fixes
+        https://bugs.webkit.org/show_bug.cgi?id=168822
+
+        Reviewed by Saam Barati.
+
+        * wasm.yaml: mark some skip tests as normal, now that they pass
+        * wasm/Builder.js: error message was wrong, causing extra error if hit
+        * wasm/js-api/global-error.js: new tests
+        (assert.throws):
+        * wasm/spec-tests/call.wast.js: comment out stack check tests
+        * wasm/spec-tests/call_indirect.wast.js: comment out stack check tests
+        * wasm/spec-tests/fac.wast.js: comment out stack check tests
+        * wasm/spec-tests/float_exprs.wast.js: wabt is wrong, bug reported, we should update
+        * wasm/spec-tests/imports.wast.js: bug in old wabt, fixed in recent wabt
+        (assert_unlinkable):
+
+2017-02-23  Saam Barati  <sbarati@apple.com>
+
+        Intrinsicify parseInt
+        https://bugs.webkit.org/show_bug.cgi?id=168627
+
+        Reviewed by Filip Pizlo.
+
+        * stress/parse-int-intrinsic.js: Added.
+        (assert):
+        (testIntrinsic.let.s):
+        (testIntrinsic):
+        (testIntrinsic2.baz):
+        (testIntrinsic2):
+        (testIntrinsic3.foo):
+        (testIntrinsic3):
+        (testIntrinsic4.foo):
+        (testIntrinsic4):
+        (testIntrinsic5.foo):
+        (testIntrinsic5):
+        (testIntrinsic6.foo):
+        (testIntrinsic6):
+        (testIntrinsic7.foo):
+        (testIntrinsic7):
+
+2017-02-23  JF Bastien  <jfbastien@apple.com>
+
+        WebAssembly: support 0x1 version
+        https://bugs.webkit.org/show_bug.cgi?id=168672
+
+        Reviewed by Keith Miller.
+
+        Update the version number for all the tests. Note that the spec
+        tests are only updated with a new version number because spec+wabt
+        aren't ready for 0x1 yet. This is tracked by bug #168784.
+
+        * wasm/import-spec-tests.rb: use the new spec repository layout
+        * wasm/js-api/test_basic_api.js:
+        * wasm/self-test/test_BuilderWebAssembly.js:
+        (EmptyModule):
+        (CustomSection):
+        * wasm/spec-tests/address.wast.js:
+        * wasm/spec-tests/binary.wast.js:
+        * wasm/spec-tests/block.wast.js:
+        * wasm/spec-tests/br.wast.js:
+        * wasm/spec-tests/br_if.wast.js:
+        * wasm/spec-tests/br_table.wast.js:
+        * wasm/spec-tests/break-drop.wast.js:
+        * wasm/spec-tests/call.wast.js:
+        * wasm/spec-tests/call_indirect.wast.js:
+        * wasm/spec-tests/comments.wast.js:
+        * wasm/spec-tests/conversions.wast.js:
+        * wasm/spec-tests/custom_section.wast.js:
+        * wasm/spec-tests/endianness.wast.js:
+        * wasm/spec-tests/exports.wast.js:
+        * wasm/spec-tests/f32.wast.js:
+        * wasm/spec-tests/f32_cmp.wast.js:
+        * wasm/spec-tests/f64.wast.js:
+        * wasm/spec-tests/f64_cmp.wast.js:
+        * wasm/spec-tests/fac.wast.js:
+        * wasm/spec-tests/float_exprs.wast.js:
+        * wasm/spec-tests/float_literals.wast.js:
+        * wasm/spec-tests/float_memory.wast.js:
+        * wasm/spec-tests/float_misc.wast.js:
+        * wasm/spec-tests/forward.wast.js:
+        * wasm/spec-tests/func.wast.js:
+        * wasm/spec-tests/func_ptrs.wast.js:
+        * wasm/spec-tests/get_local.wast.js:
+        * wasm/spec-tests/globals.wast.js:
+        * wasm/spec-tests/i32.wast.js:
+        * wasm/spec-tests/i64.wast.js:
+        * wasm/spec-tests/imports.wast.js:
+        * wasm/spec-tests/int_exprs.wast.js:
+        * wasm/spec-tests/int_literals.wast.js:
+        * wasm/spec-tests/left-to-right.wast.js:
+        * wasm/spec-tests/linking.wast.js:
+        * wasm/spec-tests/loop.wast.js:
+        * wasm/spec-tests/memory.wast.js:
+        * wasm/spec-tests/memory_redundancy.wast.js:
+        * wasm/spec-tests/memory_trap.wast.js:
+        * wasm/spec-tests/names.wast.js:
+        * wasm/spec-tests/nop.wast.js:
+        * wasm/spec-tests/resizing.wast.js:
+        * wasm/spec-tests/return.wast.js:
+        * wasm/spec-tests/select.wast.js:
+        * wasm/spec-tests/set_local.wast.js:
+        * wasm/spec-tests/skip-stack-guard-page.wast.js:
+        * wasm/spec-tests/stack.wast.js:
+        * wasm/spec-tests/start.wast.js:
+        * wasm/spec-tests/store_retval.wast.js:
+        * wasm/spec-tests/switch.wast.js:
+        * wasm/spec-tests/tee_local.wast.js:
+        * wasm/spec-tests/traps.wast.js:
+        * wasm/spec-tests/typecheck.wast.js:
+        * wasm/spec-tests/unreachable.wast.js:
+        * wasm/spec-tests/unwind.wast.js:
+        * wasm/wasm.json:
+
+2017-02-22  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        JSModuleNamespace object should have IC
+        https://bugs.webkit.org/show_bug.cgi?id=160590
+
+        Reviewed by Saam Barati.
+
+        * modules/module-assert-access-binding.js: Added.
+        * modules/module-assert-access-namespace.js: Added.
+        * modules/namespace-empty.js: Added.
+        (from.string_appeared_here.access):
+        (i.shouldThrow):
+        * stress/module-namespace-access-change.js: Added.
+        (shouldBe):
+        (access):
+        (import.string_appeared_here.then):
+        * stress/module-namespace-access-non-constant.js: Added.
+        (shouldBe):
+        (import.string_appeared_here.then):
+        * stress/module-namespace-access-poly.js: Added.
+        (shouldBe):
+        (access):
+        (import.string_appeared_here.then):
+        * stress/module-namespace-access-transitive-exports.js: Added.
+        (shouldBe):
+        (import.string_appeared_here.then):
+        * stress/module-namespace-access.js: Added.
+        (shouldBe):
+        (import.string_appeared_here.then):
+        * stress/resources/module-namespace-access-transitive-exports-2.js: Added.
+        (export.cocoa):
+        (export.change):
+        * stress/resources/module-namespace-access-transitive-exports.js: Added.
+        * stress/resources/module-namespace-access.js: Added.
+        (export.cocoa):
+        (export.change):
+
+2017-02-20  Filip Pizlo  <fpizlo@apple.com>
+
+        The collector thread should only start when the mutator doesn't have heap access
+        https://bugs.webkit.org/show_bug.cgi?id=167737
+
+        Reviewed by Keith Miller.
+        
+        Add versions of splay that flash heap access, to simulate what might happen if a third-party app
+        was running concurrent GC. In this case, we might actually start the collector thread.
+
+        * stress/splay-flash-access-1ms.js: Added.
+        (performance.now):
+        (this.Setup.setup.setup):
+        (this.TearDown.tearDown.tearDown):
+        (Benchmark):
+        (BenchmarkResult):
+        (BenchmarkResult.prototype.valueOf):
+        (BenchmarkSuite):
+        (alert):
+        (Math.random):
+        (BenchmarkSuite.ResetRNG):
+        (RunStep):
+        (BenchmarkSuite.RunSuites):
+        (BenchmarkSuite.CountBenchmarks):
+        (BenchmarkSuite.GeometricMean):
+        (BenchmarkSuite.GeometricMeanTime):
+        (BenchmarkSuite.AverageAbovePercentile):
+        (BenchmarkSuite.GeometricMeanLatency):
+        (BenchmarkSuite.FormatScore):
+        (BenchmarkSuite.prototype.NotifyStep):
+        (BenchmarkSuite.prototype.NotifyResult):
+        (BenchmarkSuite.prototype.NotifyError):
+        (BenchmarkSuite.prototype.RunSingleBenchmark):
+        (RunNextSetup):
+        (RunNextBenchmark):
+        (RunNextTearDown):
+        (BenchmarkSuite.prototype.RunStep):
+        (GeneratePayloadTree):
+        (GenerateKey):
+        (SplayUpdateStats):
+        (InsertNewNode):
+        (SplaySetup):
+        (SplayTearDown):
+        (SplayRun):
+        (SplayTree):
+        (SplayTree.prototype.isEmpty):
+        (SplayTree.prototype.insert):
+        (SplayTree.prototype.remove):
+        (SplayTree.prototype.find):
+        (SplayTree.prototype.findMax):
+        (SplayTree.prototype.findGreatestLessThan):
+        (SplayTree.prototype.exportKeys):
+        (SplayTree.prototype.splay_):
+        (SplayTree.Node):
+        (SplayTree.Node.prototype.traverse_):
+        (jscSetUp):
+        (jscTearDown):
+        (jscRun):
+        (averageAbovePercentile):
+        (printPercentile):
+        * stress/splay-flash-access.js: Added.
+        (performance.now):
+        (this.Setup.setup.setup):
+        (this.TearDown.tearDown.tearDown):
+        (Benchmark):
+        (BenchmarkResult):
+        (BenchmarkResult.prototype.valueOf):
+        (BenchmarkSuite):
+        (alert):
+        (Math.random):
+        (BenchmarkSuite.ResetRNG):
+        (RunStep):
+        (BenchmarkSuite.RunSuites):
+        (BenchmarkSuite.CountBenchmarks):
+        (BenchmarkSuite.GeometricMean):
+        (BenchmarkSuite.GeometricMeanTime):
+        (BenchmarkSuite.AverageAbovePercentile):
+        (BenchmarkSuite.GeometricMeanLatency):
+        (BenchmarkSuite.FormatScore):
+        (BenchmarkSuite.prototype.NotifyStep):
+        (BenchmarkSuite.prototype.NotifyResult):
+        (BenchmarkSuite.prototype.NotifyError):
+        (BenchmarkSuite.prototype.RunSingleBenchmark):
+        (RunNextSetup):
+        (RunNextBenchmark):
+        (RunNextTearDown):
+        (BenchmarkSuite.prototype.RunStep):
+        (GeneratePayloadTree):
+        (GenerateKey):
+        (SplayUpdateStats):
+        (InsertNewNode):
+        (SplaySetup):
+        (SplayTearDown):
+        (SplayRun):
+        (SplayTree):
+        (SplayTree.prototype.isEmpty):
+        (SplayTree.prototype.insert):
+        (SplayTree.prototype.remove):
+        (SplayTree.prototype.find):
+        (SplayTree.prototype.findMax):
+        (SplayTree.prototype.findGreatestLessThan):
+        (SplayTree.prototype.exportKeys):
+        (SplayTree.prototype.splay_):
+        (SplayTree.Node):
+        (SplayTree.Node.prototype.traverse_):
+        (jscSetUp):
+        (jscTearDown):
+        (jscRun):
+        (averageAbovePercentile):
+        (printPercentile):
+
+2017-02-21  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Unreviewed, rolling out r212712.
+
+        This change broke the CLoop build.
+
+        Reverted changeset:
+
+        "JSModuleNamespace object should have IC"
+        https://bugs.webkit.org/show_bug.cgi?id=160590
+        http://trac.webkit.org/changeset/212712
+
+2017-02-21  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        JSModuleNamespace object should have IC
+        https://bugs.webkit.org/show_bug.cgi?id=160590
+
+        Reviewed by Saam Barati.
+
+        * modules/module-assert-access-binding.js: Added.
+        * modules/module-assert-access-namespace.js: Added.
+        * modules/namespace-empty.js: Added.
+        (from.string_appeared_here.access):
+        (i.shouldThrow):
+        * stress/module-namespace-access-change.js: Added.
+        (shouldBe):
+        (access):
+        (import.string_appeared_here.then):
+        * stress/module-namespace-access-non-constant.js: Added.
+        (shouldBe):
+        (import.string_appeared_here.then):
+        * stress/module-namespace-access-poly.js: Added.
+        (shouldBe):
+        (access):
+        (import.string_appeared_here.then):
+        * stress/module-namespace-access-transitive-exports.js: Added.
+        (shouldBe):
+        (import.string_appeared_here.then):
+        * stress/module-namespace-access.js: Added.
+        (shouldBe):
+        (import.string_appeared_here.then):
+        * stress/resources/module-namespace-access-transitive-exports-2.js: Added.
+        (export.cocoa):
+        (export.change):
+        * stress/resources/module-namespace-access-transitive-exports.js: Added.
+        * stress/resources/module-namespace-access.js: Added.
+        (export.cocoa):
+        (export.change):
+
+2017-02-21  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        ASSERTION FAILED: "!scope.exception()" with Object.isSealed/isFrozen and uninitialized module bindings
+        https://bugs.webkit.org/show_bug.cgi?id=168605
+
+        Reviewed by Saam Barati.
+
+        * modules/module-namespace-is-frozen.js: Added.
+        (from.string_appeared_here.shouldThrow):
+        (export.b):
+        * modules/module-namespace-is-sealed.js: Added.
+        (from.string_appeared_here.shouldThrow):
+        (export.b):
+
+2017-02-19  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r212466.
+        https://bugs.webkit.org/show_bug.cgi?id=168577
+
+        causes crashes on AArch64 on linux, maybe it's causing crashes
+        on iOS too (Requested by pizlo on #webkit).
+
+        Reverted changeset:
+
+        "The collector thread should only start when the mutator
+        doesn't have heap access"
+        https://bugs.webkit.org/show_bug.cgi?id=167737
+        http://trac.webkit.org/changeset/212466
+
+2017-02-10  Filip Pizlo  <fpizlo@apple.com>
+
+        The collector thread should only start when the mutator doesn't have heap access
+        https://bugs.webkit.org/show_bug.cgi?id=167737
+
+        Reviewed by Keith Miller.
+        
+        Add versions of splay that flash heap access, to simulate what might happen if a third-party app
+        was running concurrent GC. In this case, we might actually start the collector thread.
+
+        * stress/splay-flash-access-1ms.js: Added.
+        (performance.now):
+        (this.Setup.setup.setup):
+        (this.TearDown.tearDown.tearDown):
+        (Benchmark):
+        (BenchmarkResult):
+        (BenchmarkResult.prototype.valueOf):
+        (BenchmarkSuite):
+        (alert):
+        (Math.random):
+        (BenchmarkSuite.ResetRNG):
+        (RunStep):
+        (BenchmarkSuite.RunSuites):
+        (BenchmarkSuite.CountBenchmarks):
+        (BenchmarkSuite.GeometricMean):
+        (BenchmarkSuite.GeometricMeanTime):
+        (BenchmarkSuite.AverageAbovePercentile):
+        (BenchmarkSuite.GeometricMeanLatency):
+        (BenchmarkSuite.FormatScore):
+        (BenchmarkSuite.prototype.NotifyStep):
+        (BenchmarkSuite.prototype.NotifyResult):
+        (BenchmarkSuite.prototype.NotifyError):
+        (BenchmarkSuite.prototype.RunSingleBenchmark):
+        (RunNextSetup):
+        (RunNextBenchmark):
+        (RunNextTearDown):
+        (BenchmarkSuite.prototype.RunStep):
+        (GeneratePayloadTree):
+        (GenerateKey):
+        (SplayUpdateStats):
+        (InsertNewNode):
+        (SplaySetup):
+        (SplayTearDown):
+        (SplayRun):
+        (SplayTree):
+        (SplayTree.prototype.isEmpty):
+        (SplayTree.prototype.insert):
+        (SplayTree.prototype.remove):
+        (SplayTree.prototype.find):
+        (SplayTree.prototype.findMax):
+        (SplayTree.prototype.findGreatestLessThan):
+        (SplayTree.prototype.exportKeys):
+        (SplayTree.prototype.splay_):
+        (SplayTree.Node):
+        (SplayTree.Node.prototype.traverse_):
+        (jscSetUp):
+        (jscTearDown):
+        (jscRun):
+        (averageAbovePercentile):
+        (printPercentile):
+        * stress/splay-flash-access.js: Added.
+        (performance.now):
+        (this.Setup.setup.setup):
+        (this.TearDown.tearDown.tearDown):
+        (Benchmark):
+        (BenchmarkResult):
+        (BenchmarkResult.prototype.valueOf):
+        (BenchmarkSuite):
+        (alert):
+        (Math.random):
+        (BenchmarkSuite.ResetRNG):
+        (RunStep):
+        (BenchmarkSuite.RunSuites):
+        (BenchmarkSuite.CountBenchmarks):
+        (BenchmarkSuite.GeometricMean):
+        (BenchmarkSuite.GeometricMeanTime):
+        (BenchmarkSuite.AverageAbovePercentile):
+        (BenchmarkSuite.GeometricMeanLatency):
+        (BenchmarkSuite.FormatScore):
+        (BenchmarkSuite.prototype.NotifyStep):
+        (BenchmarkSuite.prototype.NotifyResult):
+        (BenchmarkSuite.prototype.NotifyError):
+        (BenchmarkSuite.prototype.RunSingleBenchmark):
+        (RunNextSetup):
+        (RunNextBenchmark):
+        (RunNextTearDown):
+        (BenchmarkSuite.prototype.RunStep):
+        (GeneratePayloadTree):
+        (GenerateKey):
+        (SplayUpdateStats):
+        (InsertNewNode):
+        (SplaySetup):
+        (SplayTearDown):
+        (SplayRun):
+        (SplayTree):
+        (SplayTree.prototype.isEmpty):
+        (SplayTree.prototype.insert):
+        (SplayTree.prototype.remove):
+        (SplayTree.prototype.find):
+        (SplayTree.prototype.findMax):
+        (SplayTree.prototype.findGreatestLessThan):
+        (SplayTree.prototype.exportKeys):
+        (SplayTree.prototype.splay_):
+        (SplayTree.Node):
+        (SplayTree.Node.prototype.traverse_):
+        (jscSetUp):
+        (jscTearDown):
+        (jscRun):
+        (averageAbovePercentile):
+        (printPercentile):
+
+2017-02-16  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [JSC] Update module namespace object according to the latest ECMA262
+        https://bugs.webkit.org/show_bug.cgi?id=168280
+
+        Reviewed by Saam Barati.
+
+        * modules/namespace-object-symbol-iterator-name.js:
+        * modules/namespace-object-typed-array-fast-path.js:
+        * modules/namespace.js:
+        (shouldBe.JSON.stringify.Reflect.getOwnPropertyDescriptor):
+        (shouldThrow):
+
+2017-02-11  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [JSC] Implement (Shared)ArrayBuffer.prototype.byteLength
+        https://bugs.webkit.org/show_bug.cgi?id=166476
+
+        Reviewed by Saam Barati.
+
+        * ChakraCore/test/typedarray/arraybufferType.baseline-jsc:
+        * stress/array-buffer-byte-length.js: Added.
+        (shouldBe):
+        (shouldThrow):
+        (Symbol):
+        * stress/reflect-set.js:
+
+2017-02-10  Saam Barati  <sbarati@apple.com>
+
+        Object allocation sinking phase doesn't properly handle control flow when emitting a PutHint of a materialized object into a PromotedHeapLocation of a still sunken object
+        https://bugs.webkit.org/show_bug.cgi?id=168140
+        <rdar://problem/30205880>
+
+        Reviewed by Filip Pizlo.
+
+        * stress/allocation-sinking-puthint-control-flow.js: Added.
+        (e):
+        (bar):
+        (let.y):
+        (else.let.y):
+        (baz):
+        (foo):
+        (catch):
+
+2017-02-09  Mark Lam  <mark.lam@apple.com>
+
+        B3::Procedure::deleteOrphans() should neutralize upsilons with dead phis.
+        https://bugs.webkit.org/show_bug.cgi?id=167437
+        <rdar://problem/30198083>
+
+        Reviewed by Filip Pizlo.
+
+        * stress/b3-delete-orphans-should-neutralize-upsilons-with-dead-phis.js: Added.
+
+2017-02-09  Saam Barati  <sbarati@apple.com>
+
+        Sloppy mode: We don't properly hoist functions names "arguments" when we have a non-simple parameter list
+        https://bugs.webkit.org/show_bug.cgi?id=167319
+        <rdar://problem/30149432>
+
+        Reviewed by Mark Lam.
+
+        * stress/sloppy-mode-hoist-arguments-function-non-simple-parameter-list.js: Added.
+        (assert):
+        (assert.arguments):
+        (assert.b):
+        (x.arguments):
+        (x.b):
+        (x):
+
+2017-02-09  Mark Lam  <mark.lam@apple.com>
+
+        Fix max length check in ArrayPrototype.js' concatSlowPath().
+        https://bugs.webkit.org/show_bug.cgi?id=167270
+        <rdar://problem/30128133>
+
+        Reviewed by Filip Pizlo.
+
+        * stress/array-prototype-concat-of-long-spliced-arrays.js: Added.
+        * stress/array-prototype-concat-of-long-spliced-arrays2.js: Added.
+
+2017-02-09  Keith Miller  <keith_miller@apple.com>
+
+        We should not allow Function.caller to be used on native functions
+        https://bugs.webkit.org/show_bug.cgi?id=165628
+
+        Reviewed by Mark Lam.
+
+        * stress/caller-native-code.js: Added.
+        (f):
+
+2017-02-04  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [JSC] Add operationToInt32SensibleSlow to optimize kraken pbkdf2 and sha256
+        https://bugs.webkit.org/show_bug.cgi?id=167736
+
+        Reviewed by Saam Barati.
+
+        * stress/to-int32-sensible.js: Added.
+        (shouldBe):
+        (toInt32):
+        (test):
+
+2017-02-01  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        Unreviewed, remove loop
+        https://bugs.webkit.org/show_bug.cgi?id=167694
+
+        It causes timeout.
+        Original bug can be tested even without this loop.
+
+        * stress/arity-fixup-should-not-touch-stack-area-below-sp.js:
+
+2017-02-01  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        ArityFixup should adjust SP first
+        https://bugs.webkit.org/show_bug.cgi?id=167239
+
+        Reviewed by Michael Saboff.
+
+        Significantly large arity fixup reliably causes this crash.
+
+        * stress/arity-fixup-should-not-touch-stack-area-below-sp.js: Added.
+
+2017-01-31  Filip Pizlo  <fpizlo@apple.com>
+
+        Move slow-running microbenchmarks out of JSTests/microbenchmarks
+        https://bugs.webkit.org/show_bug.cgi?id=167676
+
+        Reviewed by Saam Barati.
+        
+        The microbenchmarks directory is profitable when it's cheap to run. This change moves very slow
+        tests (>=200ms running time on my machine) and puts them in JSTests/slowMicrobenchmarks instead.
+        That directory is run only through `slow!; defaultQuickRun` and is not run by run-jsc-benchmarks.
+        This is a big progression in test running time. But because it frontloads more slow tests, the
+        tests will seem to run more slowly when you first start the test runner.
+
+        * microbenchmarks/default-derived-constructor.js: Removed.
+        * microbenchmarks/dense-set.js: Removed.
+        * microbenchmarks/ftl-polymorphic-div.js: Removed.
+        * microbenchmarks/ftl-polymorphic-mul.js: Removed.
+        * microbenchmarks/function-bind-inlining.js: Removed.
+        * microbenchmarks/function-bind-no-inlining.js: Removed.
+        * microbenchmarks/large-map-iteration-with-additions.js: Removed.
+        * microbenchmarks/large-map-iteration-with-mutation.js: Removed.
+        * microbenchmarks/map-get-get-cse.js: Removed.
+        * microbenchmarks/misc-bugs-847389-jpeg2000.js: Removed.
+        * microbenchmarks/spread-small-array.js: Removed.
+        * microbenchmarks/v8-raytrace-with-try-catch-high-frequency-throws.js: Removed.
+        * slowMicrobenchmarks: Added.
+        * slowMicrobenchmarks.yaml: Added.
+        * slowMicrobenchmarks/README: Added.
+        * slowMicrobenchmarks/default-derived-constructor.js: Copied from JSTests/microbenchmarks/default-derived-constructor.js.
+        * slowMicrobenchmarks/dense-set.js: Copied from JSTests/microbenchmarks/dense-set.js.
+        * slowMicrobenchmarks/ftl-polymorphic-div.js: Copied from JSTests/microbenchmarks/ftl-polymorphic-div.js.
+        * slowMicrobenchmarks/ftl-polymorphic-mul.js: Copied from JSTests/microbenchmarks/ftl-polymorphic-mul.js.
+        * slowMicrobenchmarks/function-bind-inlining.js: Copied from JSTests/microbenchmarks/function-bind-inlining.js.
+        * slowMicrobenchmarks/function-bind-no-inlining.js: Copied from JSTests/microbenchmarks/function-bind-no-inlining.js.
+        * slowMicrobenchmarks/large-map-iteration-with-additions.js: Copied from JSTests/microbenchmarks/large-map-iteration-with-additions.js.
+        * slowMicrobenchmarks/large-map-iteration-with-mutation.js: Copied from JSTests/microbenchmarks/large-map-iteration-with-mutation.js.
+        * slowMicrobenchmarks/map-get-get-cse.js: Copied from JSTests/microbenchmarks/map-get-get-cse.js.
+        * slowMicrobenchmarks/misc-bugs-847389-jpeg2000.js: Copied from JSTests/microbenchmarks/misc-bugs-847389-jpeg2000.js.
+        * slowMicrobenchmarks/spread-small-array.js: Copied from JSTests/microbenchmarks/spread-small-array.js.
+        * slowMicrobenchmarks/v8-raytrace-with-try-catch-high-frequency-throws.js: Copied from JSTests/microbenchmarks/v8-raytrace-with-try-catch-high-frequency-throws.js.
+
+2017-01-30  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [JSC] Do not reject WebAssembly.compile() with Exception
+        https://bugs.webkit.org/show_bug.cgi?id=167585
+
+        Reviewed by Mark Lam.
+
+        * wasm/js-api/Module-compile.js:
+        (async.testPromiseAPI):
+
+2017-01-27  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        Lift template escape sequence restrictions in tagged templates
+        https://bugs.webkit.org/show_bug.cgi?id=166871
+
+        Reviewed by Saam Barati.
+
+        Update the error messages and add new tests.
+
+        * ChakraCore/test/es6/unicode_6_identifier_Blue524737.baseline-jsc:
+        * stress/lift-template-literal.js: Added.
+        (dump):
+        (testTag.return.tag):
+        (testTag):
+        * stress/template-literal-syntax.js:
+
+2017-01-26  Mark Lam  <mark.lam@apple.com>
+
+        Fix missing exception check in genericTypedArrayViewProtoFuncSet().
+        https://bugs.webkit.org/show_bug.cgi?id=166812
+        <rdar://problem/29916672>
+
+        Reviewed by Saam Barati.
+
+        * stress/regress-166812.js: Added.
+
+2017-01-26  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r211224.
+        https://bugs.webkit.org/show_bug.cgi?id=167479
+
+        "It was a Kraken performance regression" (Requested by
+        saamyjoon on #webkit).
+
+        Reverted changeset:
+
+        "OSR entry: delay outer-loop compilation when at inner-loop"
+        https://bugs.webkit.org/show_bug.cgi?id=167149
+        http://trac.webkit.org/changeset/211224
+
+2017-01-26  JF Bastien  <jfbastien@apple.com>
+
+        OSR entry: delay outer-loop compilation when at inner-loop
+        https://bugs.webkit.org/show_bug.cgi?id=167149
+
+        Reviewed by Filip Pizlo.
+
+        Try to be mean to OSR entry by using nested loops, and having
+        non-int32 types or truly varying types.
+
+        Mandelbrot currently never tiers up to FTL because it exits too
+        many times before this. That shouldn't happen because it's just
+        numbers and int32s. I'll file a bug to fix this.
+
+        * microbenchmarks/mandelbrot.js: Added.
+        (mandelbrot):
+        (printable):
+        * microbenchmarks/nonude.js: Added.
+        (Array.prototype.remove):
+        (const.u):
+        (const.load):
+        (const.scan):
+        (const.main):
+
+2017-01-25  Saam Barati  <sbarati@apple.com>
+
+        WebAssembly JS API: coerce return values from imports
+        https://bugs.webkit.org/show_bug.cgi?id=165480
+        <rdar://problem/29760318>
+
+        Reviewed by Yusuke Suzuki.
+
+        * wasm/function-tests/function-import-return-value.js: Added.
+        (import.Builder.from.string_appeared_here.import.as.assert.from.string_appeared_here.const.tests.x.assert.eq):
+        (import.Builder.from.string_appeared_here.import.as.assert.from.string_appeared_here.const.tests.Math.fround):
+        (import.Builder.from.string_appeared_here.import.as.assert.from.string_appeared_here.let.type.of.Reflect.ownKeys):
+        (test.1):
+        (assert.truthy):
+        (assert.throws):
+
+2017-01-25  Filip Pizlo  <fpizlo@apple.com>
+
+        jsc.cpp should have the $.agent stuff for testing SAB
+        https://bugs.webkit.org/show_bug.cgi?id=167431
+
+        Reviewed by Saam Barati.
+        
+        Add a very basic test of Atomics using $.agent. This is based on
+        LayoutTests/workers/sab/simple.html.
+
+        * stress/lars-sab-workers.js: Added.
+        (startWorker):
+        (resources):
+        (wake):
+        (else):
+
+2017-01-24  Filip Pizlo  <fpizlo@apple.com>
+
+        Atomics.store should return the int-converted value according to toInteger
+        https://bugs.webkit.org/show_bug.cgi?id=167399
+
+        Reviewed by Saam Barati.
+
+        * stress/atomics-add-uint32.js: Added.
+        * stress/atomics-store-return.js: Fix the test to match what the spec wants.
+
+2017-01-24  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [JSC] Optimize Number#toString with Int52
+        https://bugs.webkit.org/show_bug.cgi?id=167303
+
+        Reviewed by Sam Weinig.
+
+        * stress/to-string-with-int52.js: Added.
+        (shouldBe):
+
+2017-01-24  Filip Pizlo  <fpizlo@apple.com>
+
+        Atomics.store should return the int-converted value, not the value that it stored
+        https://bugs.webkit.org/show_bug.cgi?id=167395
+
+        Reviewed by Saam Barati.
+
+        * stress/atomics-store-return.js: Added.
+
+2017-01-24  Filip Pizlo  <fpizlo@apple.com>
+
+        -0 is a valid array index and AtomicsObject should know this
+        https://bugs.webkit.org/show_bug.cgi?id=167386
+
+        Reviewed by Mark Lam.
+
+        * stress/atomics-neg-zero.js: Added.
+
+2017-01-23  Saam Barati  <sbarati@apple.com>
+
+        https://bugs.webkit.org/show_bug.cgi?id=167247
+        JSC: operationSpreadGeneric uses the wrong global object for the builtin function and slow_path_spread consults the wrong global object to prove if the iterator protocol is unobservable
+        <rdar://problem/30121809>
+
+        Reviewed by Filip Pizlo.
+
+        * stress/spread-consults-correct-global-object.js: Added.
+        (assert):
+        (spread):
+        * stress/spread-correct-global-object-on-exception.js: Added.
+        (assert):
+        (spread):
+        (const.objectText.let.o.Symbol.iterator):
+        (catch):
+
+2017-01-21  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        dynamic import is ambiguous with import declaration at module code
+        https://bugs.webkit.org/show_bug.cgi?id=167098
+
+        Reviewed by Darin Adler.
+
+        * modules/import-call.js: Added.
+        (from.string_appeared_here.import.string_appeared_here.then):
+        * modules/import-call/main.js: Added.
+        * stress/import-syntax.js:
+        (async):
+
 2017-01-19  Skachkov Oleksandr  <gskachkov@gmail.com>
 
         "this" missing after await in async arrow function

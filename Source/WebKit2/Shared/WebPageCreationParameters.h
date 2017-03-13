@@ -42,6 +42,7 @@
 #include <WebCore/ScrollTypes.h>
 #include <WebCore/SessionID.h>
 #include <WebCore/UserInterfaceLayoutDirection.h>
+#include <wtf/HashMap.h>
 #include <wtf/text/WTFString.h>
 
 #if PLATFORM(MAC)
@@ -135,11 +136,25 @@ struct WebPageCreationParameters {
     float textAutosizingWidth;
     bool ignoresViewportScaleLimits;
 #endif
+#if PLATFORM(COCOA)
+    bool smartInsertDeleteEnabled;
+#endif
     bool appleMailPaginationQuirkEnabled;
     bool shouldScaleViewToFitDocument;
 
     WebCore::UserInterfaceLayoutDirection userInterfaceLayoutDirection;
     WebCore::LayoutMilestones observedLayoutMilestones;
+
+    String overrideContentSecurityPolicy;
+
+    HashMap<String, uint64_t> urlSchemeHandlers;
+
+#if ENABLE(WEB_RTC)
+    bool iceCandidateFilteringEnabled { true };
+#if USE(LIBWEBRTC)
+    bool enumeratingAllNetworkInterfacesEnabled { false };
+#endif
+#endif
 };
 
 } // namespace WebKit

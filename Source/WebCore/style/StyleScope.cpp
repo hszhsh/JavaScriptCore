@@ -32,6 +32,7 @@
 #include "Element.h"
 #include "ElementChildIterator.h"
 #include "ExtensionStyleSheets.h"
+#include "HTMLHeadElement.h"
 #include "HTMLIFrameElement.h"
 #include "HTMLLinkElement.h"
 #include "HTMLSlotElement.h"
@@ -48,6 +49,7 @@
 #include "UserContentController.h"
 #include "UserContentURLPattern.h"
 #include "UserStyleSheet.h"
+#include <wtf/SetForScope.h>
 
 namespace WebCore {
 
@@ -71,6 +73,7 @@ Scope::Scope(ShadowRoot& shadowRoot)
 
 Scope::~Scope()
 {
+    ASSERT(!hasPendingSheets());
 }
 
 bool Scope::shouldUseSharedUserAgentShadowTreeStyleResolver() const
@@ -91,6 +94,7 @@ StyleResolver& Scope::resolver()
         return m_document.userAgentShadowTreeStyleResolver();
 
     if (!m_resolver) {
+        SetForScope<bool> isUpdatingStyleResolver { m_isUpdatingStyleResolver, true };
         m_resolver = std::make_unique<StyleResolver>(m_document);
         m_resolver->appendAuthorStyleSheets(m_activeStyleSheets);
     }
@@ -117,7 +121,7 @@ void Scope::clearResolver()
 
 Scope& Scope::forNode(Node& node)
 {
-    ASSERT(node.inDocument());
+    ASSERT(node.isConnected());
     auto* shadowRoot = node.containingShadowRoot();
     if (shadowRoot)
         return shadowRoot->styleScope();
@@ -169,20 +173,49 @@ void Scope::setSelectedStylesheetSetName(const String& name)
     didChangeActiveStyleSheetCandidates();
 }
 
-// This method is called whenever a top-level stylesheet has finished loading.
-void Scope::removePendingSheet(RemovePendingSheetNotificationType notification)
+
+void Scope::addPendingSheet(const Element& element)
 {
-    // Make sure we knew this sheet was pending, and that our count isn't out of sync.
-    ASSERT(m_pendingStyleSheetCount > 0);
+    ASSERT(!hasPendingSheet(element));
 
-    m_pendingStyleSheetCount--;
-    if (m_pendingStyleSheetCount)
-        return;
+    bool isInHead = ancestorsOfType<HTMLHeadElement>(element).first();
+    if (isInHead)
+        m_elementsInHeadWithPendingSheets.add(&element);
+    else
+        m_elementsInBodyWithPendingSheets.add(&element);
+}
 
-    if (notification == RemovePendingSheetNotifyLater) {
-        m_document.setNeedsNotifyRemoveAllPendingStylesheet();
+// This method is called whenever a top-level stylesheet has finished loading.
+void Scope::removePendingSheet(const Element& element)
+{
+    ASSERT(hasPendingSheet(element));
+
+    if (!m_elementsInHeadWithPendingSheets.remove(&element))
+        m_elementsInBodyWithPendingSheets.remove(&element);
+
+    didRemovePendingStylesheet();
+}
+
+void Scope::addPendingSheet(const ProcessingInstruction& processingInstruction)
+{
+    ASSERT(!m_processingInstructionsWithPendingSheets.contains(&processingInstruction));
+
+    m_processingInstructionsWithPendingSheets.add(&processingInstruction);
+}
+
+void Scope::removePendingSheet(const ProcessingInstruction& processingInstruction)
+{
+    ASSERT(m_processingInstructionsWithPendingSheets.contains(&processingInstruction));
+
+    m_processingInstructionsWithPendingSheets.remove(&processingInstruction);
+
+    didRemovePendingStylesheet();
+}
+
+void Scope::didRemovePendingStylesheet()
+{
+    if (hasPendingSheets())
         return;
-    }
 
     didChangeActiveStyleSheetCandidates();
 
@@ -190,9 +223,19 @@ void Scope::removePendingSheet(RemovePendingSheetNotificationType notification)
         m_document.didRemoveAllPendingStylesheet();
 }
 
+bool Scope::hasPendingSheet(const Element& element) const
+{
+    return m_elementsInHeadWithPendingSheets.contains(&element) || hasPendingSheetInBody(element);
+}
+
+bool Scope::hasPendingSheetInBody(const Element& element) const
+{
+    return m_elementsInBodyWithPendingSheets.contains(&element);
+}
+
 void Scope::addStyleSheetCandidateNode(Node& node, bool createdByParser)
 {
-    if (!node.inDocument())
+    if (!node.isConnected())
         return;
     
     // Until the <body> exists, we have no choice but to compare document positions,
@@ -231,7 +274,7 @@ void Scope::removeStyleSheetCandidateNode(Node& node)
 
 void Scope::collectActiveStyleSheets(Vector<RefPtr<StyleSheet>>& sheets)
 {
-    if (m_document.settings() && !m_document.settings()->authorAndUserStylesEnabled())
+    if (!m_document.settings().authorAndUserStylesEnabled())
         return;
 
     for (auto& node : m_styleSheetCandidateNodes) {
@@ -346,7 +389,7 @@ Scope::StyleResolverUpdateType Scope::analyzeStyleSheetChange(const Vector<RefPt
     auto styleResolverUpdateType = hasInsertions ? Reset : Additive;
 
     // If we are already parsing the body and so may have significant amount of elements, put some effort into trying to avoid style recalcs.
-    if (!m_document.bodyOrFrameset() || m_document.hasNodesWithPlaceholderStyle())
+    if (!m_document.bodyOrFrameset() || m_document.hasNodesWithNonFinalStyle())
         return styleResolverUpdateType;
 
     StyleInvalidationAnalysis invalidationAnalysis(addedSheets, styleResolver.mediaQueryEvaluator());
@@ -397,7 +440,7 @@ void Scope::updateActiveStyleSheets(UpdateType updateType)
 
     // Don't bother updating, since we haven't loaded all our style info yet
     // and haven't calculated the style resolver for the first time.
-    if (!m_shadowRoot && !m_didUpdateActiveStyleSheets && m_pendingStyleSheetCount) {
+    if (!m_shadowRoot && !m_didUpdateActiveStyleSheets && hasPendingSheetsBeforeBody()) {
         clearResolver();
         return;
     }
@@ -456,6 +499,7 @@ void Scope::updateStyleResolver(Vector<RefPtr<CSSStyleSheet>>& activeStyleSheets
     }
     auto& styleResolver = resolver();
 
+    SetForScope<bool> isUpdatingStyleResolver { m_isUpdatingStyleResolver, true };
     if (updateType == Reset) {
         styleResolver.ruleSets().resetAuthorStyle();
         styleResolver.appendAuthorStyleSheets(activeStyleSheets);
@@ -526,6 +570,10 @@ void Scope::clearPendingUpdate()
 
 void Scope::scheduleUpdate(UpdateType update)
 {
+    // FIXME: The m_isUpdatingStyleResolver test is here because extension stylesheets can get us here from StyleResolver::appendAuthorStyleSheets.
+    if (update == UpdateType::ContentsOrInterpretation && !m_isUpdatingStyleResolver)
+        clearResolver();
+
     if (!m_pendingUpdate || *m_pendingUpdate < update) {
         m_pendingUpdate = update;
         if (m_shadowRoot)

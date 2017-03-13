@@ -102,6 +102,12 @@ public:
     bool acceleratesDrawing() const override;
     void setAcceleratesDrawing(bool) override;
 
+    bool wantsDeepColorBackingStore() const override;
+    void setWantsDeepColorBackingStore(bool) override;
+
+    bool supportsSubpixelAntialiasedText() const override;
+    void setSupportsSubpixelAntialiasedText(bool) override;
+
     CFTypeRef contents() const override;
     void setContents(CFTypeRef) override;
 
@@ -155,7 +161,7 @@ public:
     PlatformCALayer* rootLayer() const override;
     void setNeedsLayout() override;
     void setNeedsCommit() override;
-    void drawTextAtPoint(CGContextRef, CGFloat x, CGFloat y, CGSize scale, CGFloat fontSize, const char* text, size_t length) const override;
+    void drawTextAtPoint(CGContextRef, CGFloat x, CGFloat y, CGSize scale, CGFloat fontSize, const char* text, size_t length, CGFloat strokeWidth, Color strokeColor) const override;
 
     String layerTreeAsString() const override;
 

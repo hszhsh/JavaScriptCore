@@ -31,13 +31,14 @@
 #import <wtf/RetainPtr.h>
 
 #if PLATFORM(IOS)
+#import <WebKit/WKWebViewPrivate.h>
 @interface WKWebView ()
 
 // FIXME: move these to WKWebView_Private.h
 - (void)scrollViewWillBeginZooming:(UIScrollView *)scrollView withView:(UIView *)view;
 - (void)scrollViewDidEndZooming:(UIScrollView *)scrollView withView:(UIView *)view atScale:(CGFloat)scale;
 - (void)_didFinishScrolling;
-- (void)_updateVisibleContentRects;
+- (void)_scheduleVisibleContentRectUpdate;
 
 @end
 #endif
@@ -50,6 +51,7 @@
 
 @property (nonatomic, copy) void (^zoomToScaleCompletionHandler)(void);
 @property (nonatomic, copy) void (^showKeyboardCompletionHandler)(void);
+@property (nonatomic, copy) void (^retrieveSpeakSelectionContentCompletionHandler)(void);
 @property (nonatomic) BOOL isShowingKeyboard;
 
 @end
@@ -91,6 +93,7 @@
 
     self.zoomToScaleCompletionHandler = nil;
     self.showKeyboardCompletionHandler = nil;
+    self.retrieveSpeakSelectionContentCompletionHandler = nil;
 
     [super dealloc];
 }
@@ -184,7 +187,20 @@
 - (void)_setStableStateOverride:(NSNumber *)overrideBoolean
 {
     m_stableStateOverride = overrideBoolean;
-    [self _updateVisibleContentRects];
+    [self _scheduleVisibleContentRectUpdate];
+}
+
+- (void)_accessibilityDidGetSpeakSelectionContent:(NSString *)content
+{
+    self.accessibilitySpeakSelectionContent = content;
+    if (self.retrieveSpeakSelectionContentCompletionHandler)
+        self.retrieveSpeakSelectionContentCompletionHandler();
+}
+
+- (void)accessibilityRetrieveSpeakSelectionContentWithCompletionHandler:(void (^)(void))completionHandler
+{
+    self.retrieveSpeakSelectionContentCompletionHandler = completionHandler;
+    [self _accessibilityRetrieveSpeakSelectionContent];
 }
 
 #endif

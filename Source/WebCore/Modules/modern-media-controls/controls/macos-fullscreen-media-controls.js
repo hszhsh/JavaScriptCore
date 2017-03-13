@@ -23,9 +23,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-const MarginForThreeButtonsOrLess = 24;
-const MarginForFourButtons = 16;
-const MarginForFiveButtons = 12;
+const ButtonMarginForThreeButtonsOrLess = 24;
+const ButtonMarginForFourButtons = 16;
+const ButtonMarginForFiveButtons = 12;
 const FullscreenTimeControlWidth = 457;
 
 class MacOSFullscreenMediaControls extends MacOSMediaControls
@@ -40,56 +40,54 @@ class MacOSFullscreenMediaControls extends MacOSMediaControls
         this.element.classList.add("fullscreen");
 
         // Set up fullscreen-specific buttons.
+        this.volumeDownButton = new VolumeDownButton(this);
+        this.volumeUpButton = new VolumeUpButton(this);
         this.rewindButton = new RewindButton(this);
         this.forwardButton = new ForwardButton(this);
         this.fullscreenButton.isFullscreen = true;
 
         this.volumeSlider.width = 60;
 
+        this._leftContainer = new ButtonsContainer({
+            buttons: [this.volumeDownButton, this.volumeSlider, this.volumeUpButton],
+            cssClassName: "left",
+            leftMargin: 12,
+            rightMargin: 0,
+            buttonMargin: 6
+        });
+
         this._centerContainer = new ButtonsContainer({
             buttons: [this.rewindButton, this.playPauseButton, this.forwardButton],
             cssClassName: "center",
-            padding: 27,
-            margin: 27
+            leftMargin: 27,
+            rightMargin: 27,
+            buttonMargin: 27
         });
 
         this._rightContainer = new ButtonsContainer({
             buttons: [this.airplayButton, this.pipButton, this.tracksButton, this.fullscreenButton],
             cssClassName: "right",
-            padding: 12
+            leftMargin: 12,
+            rightMargin: 12
         });
 
-        this.controlsBar.children = [this.volumeSlider, this._centerContainer, this._rightContainer, this.timeControl];
+        this.controlsBar.children = [new BackgroundTint, this._leftContainer, this._centerContainer, this._rightContainer, this.timeControl];
 
-        this.element.addEventListener("mousedown", this);
-    }
-
-    // Public
-
-    showTracksPanel()
-    {
-        super.showTracksPanel();
-
-        const tracksButtonBounds = this.tracksButton.element.getBoundingClientRect();
-        this.tracksPanel.rightX = window.innerWidth - tracksButtonBounds.right;
-        this.tracksPanel.bottomY = window.innerHeight - tracksButtonBounds.top + 1;
+        this.controlsBar.element.addEventListener("mousedown", this);
     }
 
     // Protected
 
     handleEvent(event)
     {
-        switch (event.type) {
-        case "mousedown":
+        if (event.type === "mousedown" && event.currentTarget === this.controlsBar.element)
             this._handleMousedown(event);
-            break;
-        case "mousemove":
+        else if (event.type === "mousemove" && event.currentTarget === this.element)
             this._handleMousemove(event);
-            break;
-        case "mouseup":
+        else if (event.type === "mouseup" && event.currentTarget === this.element)
             this._handleMouseup(event);
-            break;
-        }
+        else
+            super.handleEvent(event);
     }
 
     layout()
@@ -98,14 +96,15 @@ class MacOSFullscreenMediaControls extends MacOSMediaControls
 
         const numberOfEnabledButtons = this._rightContainer.buttons.filter(button => button.enabled).length;
 
-        let margin = MarginForFiveButtons;
+        let buttonMargin = ButtonMarginForFiveButtons;
         if (numberOfEnabledButtons === 4)
-            margin = MarginForFourButtons;
+            buttonMargin = ButtonMarginForFourButtons;
         else if (numberOfEnabledButtons <= 3)
-            margin = MarginForThreeButtonsOrLess;
+            buttonMargin = ButtonMarginForThreeButtonsOrLess;
 
-        this._rightContainer.margin = margin;
+        this._rightContainer.buttonMargin = buttonMargin;
 
+        this._leftContainer.layout();
         this._centerContainer.layout();
         this._rightContainer.layout();
 
@@ -116,10 +115,12 @@ class MacOSFullscreenMediaControls extends MacOSMediaControls
 
     _handleMousedown(event)
     {
-        if (event.target !== this.controlsBar.element)
+        // We don't allow dragging when the interaction is initiated on an interactive element. 
+        if (event.target.localName === "button" || event.target.localName === "input")
             return;
 
         event.preventDefault();
+        event.stopPropagation();
 
         this._lastDragPoint = this._pointForEvent(event);
 
@@ -137,7 +138,7 @@ class MacOSFullscreenMediaControls extends MacOSMediaControls
             this.controlsBar.translation.x + currentDragPoint.x - this._lastDragPoint.x,
             this.controlsBar.translation.y + currentDragPoint.y - this._lastDragPoint.y
         );
-        
+
         this._lastDragPoint = currentDragPoint;
     }
 

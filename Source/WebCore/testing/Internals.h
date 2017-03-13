@@ -66,11 +66,13 @@ class Page;
 class Range;
 class RenderedDocumentMarker;
 class RTCPeerConnection;
+class SVGSVGElement;
 class SerializedScriptValue;
 class SourceBuffer;
 class StyleSheet;
 class TimeRanges;
 class TypeConversions;
+class WebGLRenderingContextBase;
 class XMLHttpRequest;
 
 class Internals final : public RefCounted<Internals>, private ContextDestructionObserver {
@@ -111,6 +113,8 @@ public:
     void clearPageCache();
     unsigned pageCacheSize() const;
 
+    void disableTileSizeUpdateDelay();
+
     Ref<CSSComputedStyleDeclaration> computedStyleIncludingVisitedInfo(Element&) const;
 
     Node* ensureUserAgentShadowRoot(Element& host);
@@ -127,6 +131,7 @@ public:
     // DOMTimers throttling testing.
     ExceptionOr<bool> isTimerThrottled(int timeoutId);
     bool isRequestAnimationFrameThrottled() const;
+    double requestAnimationFrameInterval() const;
     bool areTimersThrottled() const;
 
     enum EventThrottlingBehavior { Responsive, Unresponsive };
@@ -143,6 +148,7 @@ public:
     ExceptionOr<void> resumeAnimations() const;
     ExceptionOr<bool> pauseAnimationAtTimeOnElement(const String& animationName, double pauseTime, Element&);
     ExceptionOr<bool> pauseAnimationAtTimeOnPseudoElement(const String& animationName, double pauseTime, Element&, const String& pseudoId);
+    double animationsInterval() const;
 
     // CSS Transition testing.
     ExceptionOr<bool> pauseTransitionAtTimeOnElement(const String& propertyName, double pauseTime, Element&);
@@ -171,6 +177,9 @@ public:
     ExceptionOr<void> setMarkedTextMatchesAreHighlighted(bool);
 
     void invalidateFontCache();
+    void setFontSmoothingEnabled(bool);
+    
+    ExceptionOr<void> setLowPowerModeEnabled(bool);
 
     ExceptionOr<void> setScrollViewPosition(int x, int y);
     
@@ -201,6 +210,7 @@ public:
     String rangeAsText(const Range&);
     Ref<Range> subrange(Range&, int rangeLocation, int rangeLength);
     ExceptionOr<RefPtr<Range>> rangeForDictionaryLookupAtLocation(int x, int y);
+    RefPtr<Range> rangeOfStringNearLocation(const Range&, const String&, unsigned);
 
     ExceptionOr<void> setDelegatesScrolling(bool enabled);
 
@@ -249,6 +259,8 @@ public:
 
     InternalSettings* settings() const;
     unsigned workerThreadCount() const;
+    bool areSVGAnimationsPaused() const;
+    ExceptionOr<double> svgAnimationsInterval(SVGSVGElement&) const;
 
     ExceptionOr<void> setDeviceProximity(const String& eventType, double value, double min, double max);
 
@@ -258,9 +270,11 @@ public:
         LAYER_TREE_INCLUDES_TILE_CACHES = 2,
         LAYER_TREE_INCLUDES_REPAINT_RECTS = 4,
         LAYER_TREE_INCLUDES_PAINTING_PHASES = 8,
-        LAYER_TREE_INCLUDES_CONTENT_LAYERS = 16
+        LAYER_TREE_INCLUDES_CONTENT_LAYERS = 16,
+        LAYER_TREE_INCLUDES_ACCELERATES_DRAWING = 32,
     };
     ExceptionOr<String> layerTreeAsText(Document&, unsigned short flags) const;
+    ExceptionOr<uint64_t> layerIDForElement(Element&);
     ExceptionOr<String> repaintRectsAsText() const;
     ExceptionOr<String> scrollingStateTreeAsText() const;
     ExceptionOr<String> mainThreadScrollingReasons() const;
@@ -388,8 +402,9 @@ public:
 
 #if ENABLE(WEB_RTC)
     void enableMockMediaEndpoint();
-    void enableMockRTCPeerConnectionHandler();
     void emulateRTCPeerConnectionPlatformEvent(RTCPeerConnection&, const String& action);
+    void useMockRTCPeerConnectionFactory(const String&);
+    void setICECandidateFiltering(bool);
 #endif
 
     String getImageSourceURL(Element&);
@@ -462,7 +477,7 @@ public:
 
     enum class PageOverlayType { View, Document };
     ExceptionOr<Ref<MockPageOverlay>> installMockPageOverlay(PageOverlayType);
-    ExceptionOr<String> pageOverlayLayerTreeAsText() const;
+    ExceptionOr<String> pageOverlayLayerTreeAsText(unsigned short flags) const;
 
     void setPageMuted(const String&);
     String pageMediaState();
@@ -498,18 +513,6 @@ public:
 
     String composedTreeAsText(Node&);
     
-    void setLinkPreloadSupport(bool);
-    void setResourceTimingSupport(bool);
-
-#if ENABLE(CSS_GRID_LAYOUT)
-    void setCSSGridLayoutEnabled(bool);
-#endif
-
-#if ENABLE(WEBGL2)
-    bool webGL2Enabled() const;
-    void setWebGL2Enabled(bool);
-#endif
-
     bool isProcessingUserGesture();
 
     RefPtr<GCObservation> observeGC(JSC::JSValue);
@@ -531,8 +534,14 @@ public:
 
     Vector<String> accessKeyModifiers() const;
 
-#if USE(QUICK_LOOK)
+#if PLATFORM(IOS)
     void setQuickLookPassword(const String&);
+#endif
+
+    void setAsRunningUserScripts(Document&);
+
+#if ENABLE(WEBGL)
+    void simulateWebGLContextChanged(WebGLRenderingContextBase&);
 #endif
 
 private:

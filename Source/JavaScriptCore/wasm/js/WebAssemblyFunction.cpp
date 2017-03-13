@@ -50,12 +50,14 @@ static EncodedJSValue JSC_HOST_CALL callWebAssemblyFunction(ExecState* exec)
 {
     VM& vm = exec->vm();
     auto scope = DECLARE_THROW_SCOPE(vm);
-    WebAssemblyFunction* wasmFunction = jsDynamicCast<WebAssemblyFunction*>(exec->jsCallee());
+    WebAssemblyFunction* wasmFunction = jsDynamicCast<WebAssemblyFunction*>(vm, exec->jsCallee());
     if (!wasmFunction)
         return JSValue::encode(throwException(exec, scope, createTypeError(exec, "expected a WebAssembly function", defaultSourceAppender, runtimeTypeForValue(exec->jsCallee()))));
     Wasm::SignatureIndex signatureIndex = wasmFunction->signatureIndex();
     const Wasm::Signature* signature = Wasm::SignatureInformation::get(&vm, signatureIndex);
 
+    // Make sure that the memory we think we are going to run with matches the one we expect.
+    ASSERT(wasmFunction->instance()->codeBlock()->isSafeToRun(wasmFunction->instance()->memory()));
     {
         // Check if we have a disallowed I64 use.
 
@@ -174,7 +176,7 @@ void WebAssemblyFunction::visitChildren(JSCell* cell, SlotVisitor& visitor)
 void WebAssemblyFunction::finishCreation(VM& vm, NativeExecutable* executable, unsigned length, const String& name, JSWebAssemblyInstance* instance, JSWebAssemblyCallee* jsEntrypoint, JSWebAssemblyCallee* wasmEntrypoint)
 {
     Base::finishCreation(vm, executable, length, name);
-    ASSERT(inherits(info()));
+    ASSERT(inherits(vm, info()));
     m_instance.set(vm, this, instance);
     ASSERT(jsEntrypoint != wasmEntrypoint);
     m_jsEntrypoint.set(vm, this, jsEntrypoint);

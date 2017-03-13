@@ -197,6 +197,11 @@ public:
         m_getByIds.append(InlineCacheWrapper<JITGetByIdGenerator>(gen, slowPath));
     }
     
+    void addGetByIdWithThis(const JITGetByIdWithThisGenerator& gen, SlowPathGenerator* slowPath)
+    {
+        m_getByIdsWithThis.append(InlineCacheWrapper<JITGetByIdWithThisGenerator>(gen, slowPath));
+    }
+    
     void addPutById(const JITPutByIdGenerator& gen, SlowPathGenerator* slowPath)
     {
         m_putByIds.append(InlineCacheWrapper<JITPutByIdGenerator>(gen, slowPath));
@@ -242,14 +247,14 @@ public:
     }
 
     template<typename T>
-    Jump branchWeakStructure(RelationalCondition cond, T left, Structure* weakStructure)
+    Jump branchWeakStructure(RelationalCondition cond, T left, RegisteredStructure weakStructure)
     {
+        Structure* structure = weakStructure.get();
 #if USE(JSVALUE64)
-        Jump result = branch32(cond, left, TrustedImm32(weakStructure->id()));
-        addWeakReference(weakStructure);
+        Jump result = branch32(cond, left, TrustedImm32(structure->id()));
         return result;
 #else
-        return branchWeakPtr(cond, left, weakStructure);
+        return branchPtr(cond, left, TrustedImmPtr(structure));
 #endif
     }
 
@@ -339,6 +344,7 @@ private:
     };
     
     Vector<InlineCacheWrapper<JITGetByIdGenerator>, 4> m_getByIds;
+    Vector<InlineCacheWrapper<JITGetByIdWithThisGenerator>, 4> m_getByIdsWithThis;
     Vector<InlineCacheWrapper<JITPutByIdGenerator>, 4> m_putByIds;
     Vector<InRecord, 4> m_ins;
     Vector<JSCallRecord, 4> m_jsCalls;

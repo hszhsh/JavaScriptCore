@@ -124,10 +124,8 @@ public:
     DataRef<StyleFilterData> backdropFilter; // Filter operations (url, sepia, blur, etc.)
 #endif
 
-#if ENABLE(CSS_GRID_LAYOUT)
     DataRef<StyleGridData> grid;
     DataRef<StyleGridItemData> gridItem;
-#endif
 
 #if ENABLE(CSS_SCROLL_SNAP)
     DataRef<StyleScrollSnapPort> scrollSnapPort;
@@ -222,7 +220,7 @@ public:
 
     unsigned hasAttrContent : 1;
 
-    unsigned isPlaceholderStyle : 1;
+    unsigned isNotFinal : 1;
 
 private:
     StyleRareNonInheritedData();

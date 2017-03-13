@@ -37,12 +37,14 @@
 #include "GraphicsContext.h"
 #include "InspectorClient.h"
 #include "InspectorOverlayPage.h"
+#include "LibWebRTCProvider.h"
 #include "MainFrame.h"
 #include "Node.h"
 #include "Page.h"
 #include "PageConfiguration.h"
 #include "PolygonShape.h"
 #include "PseudoElement.h"
+#include "RTCController.h"
 #include "RectangleShape.h"
 #include "RenderBoxModelObject.h"
 #include "RenderElement.h"
@@ -340,7 +342,7 @@ void InspectorOverlay::update()
     drawPaintRects();
 
     // Position DOM elements.
-    overlayPage()->mainFrame().document()->recalcStyle(Style::Force);
+    overlayPage()->mainFrame().document()->resolveStyle(Document::ResolveStyleType::Rebuild);
     if (overlayView->needsLayout())
         overlayView->layout();
 
@@ -859,7 +861,11 @@ Page* InspectorOverlay::overlayPage()
     if (m_overlayPage)
         return m_overlayPage.get();
 
-    PageConfiguration pageConfiguration(createEmptyEditorClient(), SocketProvider::create());
+    PageConfiguration pageConfiguration(
+        createEmptyEditorClient(),
+        SocketProvider::create(),
+        makeUniqueRef<LibWebRTCProvider>()
+    );
     fillWithEmptyClients(pageConfiguration);
     m_overlayPage = std::make_unique<Page>(WTFMove(pageConfiguration));
     m_overlayPage->setDeviceScaleFactor(m_page.deviceScaleFactor());

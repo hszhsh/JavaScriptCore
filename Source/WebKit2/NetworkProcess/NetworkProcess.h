@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2012-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,11 +30,11 @@
 #include "DownloadManager.h"
 #include "MessageReceiverMap.h"
 #include <WebCore/DiagnosticLoggingClient.h>
-#include <WebCore/MemoryPressureHandler.h>
 #include <WebCore/SessionID.h>
 #include <memory>
 #include <wtf/Forward.h>
 #include <wtf/Function.h>
+#include <wtf/MemoryPressureHandler.h>
 #include <wtf/NeverDestroyed.h>
 #include <wtf/RetainPtr.h>
 
@@ -95,7 +95,7 @@ public:
     // Diagnostic messages logging.
     void logDiagnosticMessage(uint64_t webPageID, const String& message, const String& description, WebCore::ShouldSample);
     void logDiagnosticMessageWithResult(uint64_t webPageID, const String& message, const String& description, WebCore::DiagnosticLoggingResultType, WebCore::ShouldSample);
-    void logDiagnosticMessageWithValue(uint64_t webPageID, const String& message, const String& description, const String& value, WebCore::ShouldSample);
+    void logDiagnosticMessageWithValue(uint64_t webPageID, const String& message, const String& description, double value, unsigned significantFigures, WebCore::ShouldSample);
 
 #if PLATFORM(COCOA)
     RetainPtr<CFDataRef> sourceApplicationAuditData() const;
@@ -116,6 +116,10 @@ public:
 
     void grantSandboxExtensionsToDatabaseProcessForBlobs(const Vector<String>& filenames, Function<void ()>&& completionHandler);
 
+#if HAVE(CFNETWORK_STORAGE_PARTITIONING)
+    void shouldPartitionCookiesForTopPrivatelyOwnedDomains(const Vector<String>&, bool value);
+#endif
+
     std::chrono::milliseconds loadThrottleLatency() const { return m_loadThrottleLatency; }
 
 private:
@@ -127,8 +131,7 @@ private:
     void terminate() override;
     void platformTerminate();
 
-    void lowMemoryHandler(WebCore::Critical);
-    void platformLowMemoryHandler(WebCore::Critical);
+    void lowMemoryHandler(Critical);
 
     // ChildProcess
     void initializeProcess(const ChildProcessInitializationParameters&) override;
@@ -141,7 +144,6 @@ private:
     void didReceiveMessage(IPC::Connection&, IPC::Decoder&) override;
     void didReceiveSyncMessage(IPC::Connection&, IPC::Decoder&, std::unique_ptr<IPC::Encoder>&) override;
     void didClose(IPC::Connection&) override;
-    void didReceiveInvalidMessage(IPC::Connection&, IPC::StringReference messageReceiverName, IPC::StringReference messageName) override;
 
     // DownloadManager::Client
     void didCreateDownload() override;

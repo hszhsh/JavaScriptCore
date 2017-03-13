@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2010-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,6 +26,7 @@
 #import "config.h"
 #import "WebProcessPool.h"
 
+#import "LegacyCustomProtocolManagerClient.h"
 #import "NetworkProcessCreationParameters.h"
 #import "NetworkProcessMessages.h"
 #import "NetworkProcessProxy.h"
@@ -145,6 +146,11 @@ void WebProcessPool::platformInitialize()
     IPC::setAllowsDecodingSecKeyRef(true);
     WebKit::WebMemoryPressureHandler::singleton();
 #endif
+
+    setLegacyCustomProtocolManagerClient(std::make_unique<LegacyCustomProtocolManagerClient>());
+
+    if (m_websiteDataStore)
+        m_websiteDataStore->registerSharedResourceLoadObserver();
 }
 
 #if PLATFORM(IOS)
@@ -242,6 +248,17 @@ void WebProcessPool::platformInitializeWebProcess(WebProcessCreationParameters& 
     ASSERT(parameters.uiProcessCookieStorageIdentifier.isEmpty());
     parameters.uiProcessCookieStorageIdentifier.append(CFDataGetBytePtr(cookieStorageData.get()), CFDataGetLength(cookieStorageData.get()));
 #endif
+#if ENABLE(MEDIA_STREAM)
+    // Allow microphone access if either preference is set because WebRTC requires microphone access.
+    bool mediaStreamEnabled = m_defaultPageGroup->preferences().mediaStreamEnabled();
+    bool webRTCEnabled = m_defaultPageGroup->preferences().peerConnectionEnabled();
+    if ([defaults objectForKey:@"ExperimentalPeerConnectionEnabled"])
+        webRTCEnabled = [defaults boolForKey:@"ExperimentalPeerConnectionEnabled"];
+    
+    // FIXME: Remove this and related parameter when <rdar://problem/29448368> is fixed.
+    if (mediaStreamEnabled || webRTCEnabled)
+        SandboxExtension::createHandleForGenericExtension("com.apple.webkit.microphone", parameters.audioCaptureExtensionHandle);
+#endif
 }
 
 void WebProcessPool::platformInitializeNetworkProcess(NetworkProcessCreationParameters& parameters)
@@ -252,9 +269,6 @@ void WebProcessPool::platformInitializeNetworkProcess(NetworkProcessCreationPara
 
     parameters.parentProcessName = [[NSProcessInfo processInfo] processName];
     parameters.uiProcessBundleIdentifier = [[NSBundle mainBundle] bundleIdentifier];
-
-    for (const auto& scheme : globalURLSchemesWithCustomProtocolHandlers())
-        parameters.urlSchemesRegisteredForCustomProtocols.append(scheme);
 
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
 
@@ -291,6 +305,14 @@ void WebProcessPool::platformInitializeNetworkProcess(NetworkProcessCreationPara
     parameters.recordReplayCacheLocation = [defaults stringForKey:WebKitRecordReplayCacheLocationDefaultsKey];
     if (parameters.recordReplayCacheLocation.isEmpty())
         parameters.recordReplayCacheLocation = parameters.diskCacheDirectory;
+#endif
+#if ENABLE(WEB_RTC)
+    bool webRTCEnabled = m_defaultPageGroup->preferences().peerConnectionEnabled();
+    if ([defaults objectForKey:@"ExperimentalPeerConnectionEnabled"])
+        webRTCEnabled = [defaults boolForKey:@"ExperimentalPeerConnectionEnabled"];
+
+    if (webRTCEnabled)
+        SandboxExtension::createHandleForGenericExtension("com.apple.webkit.webrtc", parameters.webRTCNetworkingHandle);
 #endif
 }
 
@@ -450,6 +472,24 @@ String WebProcessPool::legacyPlatformDefaultNetworkCacheDirectory()
     return stringByResolvingSymlinksInPath([cachePath stringByStandardizingPath]);
 }
 
+String WebProcessPool::legacyPlatformDefaultJavaScriptConfigurationDirectory()
+{
+#if PLATFORM(IOS)
+    String path = pathForProcessContainer();
+    if (path.isEmpty())
+        path = NSHomeDirectory();
+    
+    path = path + "/Library/WebKit/JavaScriptCoreDebug";
+    path = stringByResolvingSymlinksInPath(path);
+
+    return path;
+#else
+    RetainPtr<NSString> javaScriptConfigPath = @"~/Library/WebKit/JavaScriptCoreDebug";
+    
+    return stringByResolvingSymlinksInPath([javaScriptConfigPath stringByStandardizingPath]);
+#endif
+}
+
 bool WebProcessPool::isNetworkCacheEnabled()
 {
 #if ENABLE(NETWORK_CACHE)
@@ -459,7 +499,7 @@ bool WebProcessPool::isNetworkCacheEnabled()
 
     bool networkCacheEnabledByDefaults = [defaults boolForKey:WebKitNetworkCacheEnabledDefaultsKey];
 
-    return networkCacheEnabledByDefaults && linkedOnOrAfter(LibraryVersion::FirstWithNetworkCache);
+    return networkCacheEnabledByDefaults && linkedOnOrAfter(SDKVersion::FirstWithNetworkCache);
 #else
     return false;
 #endif

@@ -18,6 +18,7 @@ set(JavaScriptCore_INCLUDE_DIRECTORIES
     "${JAVASCRIPTCORE_DIR}/dfg"
     "${JAVASCRIPTCORE_DIR}/disassembler"
     "${JAVASCRIPTCORE_DIR}/disassembler/udis86"
+    "${JAVASCRIPTCORE_DIR}/disassembler/ARM64"
     "${JAVASCRIPTCORE_DIR}/domjit"
     "${JAVASCRIPTCORE_DIR}/ftl"
     "${JAVASCRIPTCORE_DIR}/heap"
@@ -63,6 +64,7 @@ set(JavaScriptCore_SOURCES
     API/OpaqueJSString.cpp
 
     assembler/ARMAssembler.cpp
+    assembler/AbstractMacroAssembler.cpp
     assembler/LinkBuffer.cpp
     assembler/MacroAssembler.cpp
     assembler/MacroAssemblerARM.cpp
@@ -71,14 +73,16 @@ set(JavaScriptCore_SOURCES
     assembler/MacroAssemblerPrinter.cpp
     assembler/MacroAssemblerX86Common.cpp
 
+    b3/air/AirAllocateRegistersByGraphColoring.cpp
     b3/air/AirAllocateStack.cpp
     b3/air/AirArg.cpp
     b3/air/AirBasicBlock.cpp
+    b3/air/AirBlockInsertionSet.cpp
     b3/air/AirCCallSpecial.cpp
     b3/air/AirCCallingConvention.cpp
     b3/air/AirCode.cpp
     b3/air/AirCustom.cpp
-    b3/air/AirDumpAsJS.cpp
+    b3/air/AirDisassembler.cpp
     b3/air/AirEliminateDeadCode.cpp
     b3/air/AirEmitShuffle.cpp
     b3/air/AirFixObviousSpills.cpp
@@ -88,7 +92,6 @@ set(JavaScriptCore_SOURCES
     b3/air/AirHandleCalleeSaves.cpp
     b3/air/AirInsertionSet.cpp
     b3/air/AirInst.cpp
-    b3/air/AirIteratedRegisterCoalescing.cpp
     b3/air/AirKind.cpp
     b3/air/AirLogRegisterPressure.cpp
     b3/air/AirLowerAfterRegAlloc.cpp
@@ -108,6 +111,8 @@ set(JavaScriptCore_SOURCES
     b3/air/AirValidate.cpp
 
     b3/B3ArgumentRegValue.cpp
+    b3/B3AtomicValue.cpp
+    b3/B3Bank.cpp
     b3/B3BasicBlock.cpp
     b3/B3BlockInsertionSet.cpp
     b3/B3BreakCriticalEdges.cpp
@@ -176,6 +181,7 @@ set(JavaScriptCore_SOURCES
     b3/B3VariableValue.cpp
     b3/B3WasmAddressValue.cpp
     b3/B3WasmBoundsCheckValue.cpp
+    b3/B3Width.cpp
 
     bindings/ScriptFunctionCall.cpp
     bindings/ScriptObject.cpp
@@ -184,11 +190,13 @@ set(JavaScriptCore_SOURCES
     builtins/BuiltinExecutables.cpp
     builtins/BuiltinExecutableCreator.cpp
 
+    bytecode/AccessCase.cpp
     bytecode/AdaptiveInferredPropertyValueWatchpointBase.cpp
     bytecode/ArithProfile.cpp
     bytecode/ArrayAllocationProfile.cpp
     bytecode/ArrayProfile.cpp
     bytecode/BytecodeBasicBlock.cpp
+    bytecode/BytecodeDumper.cpp
     bytecode/BytecodeGeneratorification.cpp
     bytecode/BytecodeIntrinsicRegistry.cpp
     bytecode/BytecodeLivenessAnalysis.cpp
@@ -214,16 +222,20 @@ set(JavaScriptCore_SOURCES
     bytecode/ExecutionCounter.cpp
     bytecode/ExitKind.cpp
     bytecode/ExitingJITType.cpp
+    bytecode/FullCodeOrigin.cpp
     bytecode/FunctionCodeBlock.cpp
     bytecode/GetByIdStatus.cpp
     bytecode/GetByIdVariant.cpp
+    bytecode/GetterSetterAccessCase.cpp
     bytecode/InlineAccess.cpp
     bytecode/InlineCallFrame.cpp
     bytecode/InlineCallFrameSet.cpp
+    bytecode/IntrinsicGetterAccessCase.cpp
     bytecode/JumpTable.cpp
     bytecode/LLIntPrototypeLoadAdaptiveStructureWatchpoint.cpp
     bytecode/LazyOperandValueProfile.cpp
     bytecode/MethodOfGettingAValueProfile.cpp
+    bytecode/ModuleNamespaceAccessCase.cpp
     bytecode/ModuleProgramCodeBlock.cpp
     bytecode/ObjectPropertyCondition.cpp
     bytecode/ObjectPropertyConditionSet.cpp
@@ -232,6 +244,7 @@ set(JavaScriptCore_SOURCES
     bytecode/PreciseJumpTargets.cpp
     bytecode/ProgramCodeBlock.cpp
     bytecode/PropertyCondition.cpp
+    bytecode/ProxyableAccessCase.cpp
     bytecode/PutByIdFlags.cpp
     bytecode/PutByIdStatus.cpp
     bytecode/PutByIdVariant.cpp
@@ -373,6 +386,7 @@ set(JavaScriptCore_SOURCES
     dfg/DFGPromotedHeapLocation.cpp
     dfg/DFGPureValue.cpp
     dfg/DFGPutStackSinkingPhase.cpp
+    dfg/DFGRegisteredStructureSet.cpp
     dfg/DFGSSACalculator.cpp
     dfg/DFGSSAConversionPhase.cpp
     dfg/DFGSSALoweringPhase.cpp
@@ -386,7 +400,6 @@ set(JavaScriptCore_SOURCES
     dfg/DFGStoreBarrierInsertionPhase.cpp
     dfg/DFGStrengthReductionPhase.cpp
     dfg/DFGStructureAbstractValue.cpp
-    dfg/DFGStructureRegistrationPhase.cpp
     dfg/DFGThreadData.cpp
     dfg/DFGThunks.cpp
     dfg/DFGTierUpCheckInjectionPhase.cpp
@@ -469,6 +482,7 @@ set(JavaScriptCore_SOURCES
     heap/CellContainer.cpp
     heap/CodeBlockSet.cpp
     heap/CollectionScope.cpp
+    heap/CollectorPhase.cpp
     heap/ConservativeRoots.cpp
     heap/DeferGC.cpp
     heap/DestructionMode.cpp
@@ -476,6 +490,7 @@ set(JavaScriptCore_SOURCES
     heap/FullGCActivityCallback.cpp
     heap/FreeList.cpp
     heap/GCActivityCallback.cpp
+    heap/GCConductor.cpp
     heap/GCLogging.cpp
     heap/HandleSet.cpp
     heap/HandleStack.cpp
@@ -485,13 +500,10 @@ set(JavaScriptCore_SOURCES
     heap/HeapProfiler.cpp
     heap/HeapSnapshot.cpp
     heap/HeapSnapshotBuilder.cpp
-    heap/HeapStatistics.cpp
     heap/HeapTimer.cpp
-    heap/HeapVerifier.cpp
     heap/IncrementalSweeper.cpp
     heap/JITStubRoutineSet.cpp
     heap/LargeAllocation.cpp
-    heap/LiveObjectList.cpp
     heap/MachineStackMarker.cpp
     heap/MarkStack.cpp
     heap/MarkedAllocator.cpp
@@ -503,6 +515,7 @@ set(JavaScriptCore_SOURCES
     heap/MutatorState.cpp
     heap/SlotVisitor.cpp
     heap/SpaceTimeMutatorScheduler.cpp
+    heap/StochasticSpaceTimeMutatorScheduler.cpp
     heap/StopIfNecessaryTimer.cpp
     heap/Subspace.cpp
     heap/SynchronousStopTheWorldMutatorScheduler.cpp
@@ -513,6 +526,7 @@ set(JavaScriptCore_SOURCES
     heap/WeakSet.cpp
     heap/WriteBarrierSupport.cpp
 
+    inspector/AsyncStackTrace.cpp
     inspector/ConsoleMessage.cpp
     inspector/ContentSearchUtilities.cpp
     inspector/EventLoop.cpp
@@ -569,7 +583,6 @@ set(JavaScriptCore_SOURCES
     jit/CallFrameShuffler64.cpp
     jit/ExecutableAllocationFuzz.cpp
     jit/ExecutableAllocator.cpp
-    jit/ExecutableAllocatorFixedVMPool.cpp
     jit/GCAwareJITStubRoutine.cpp
     jit/GPRInfo.cpp
     jit/HostCallReturnValue.cpp
@@ -678,6 +691,7 @@ set(JavaScriptCore_SOURCES
     runtime/CommonSlowPathsExceptions.cpp
     runtime/CompilationResult.cpp
     runtime/Completion.cpp
+    runtime/ConfigFile.cpp
     runtime/ConsoleClient.cpp
     runtime/ConsoleObject.cpp
     runtime/ConstantMode.cpp
@@ -892,6 +906,7 @@ set(JavaScriptCore_SOURCES
     runtime/TypeofType.cpp
     runtime/VM.cpp
     runtime/VMEntryScope.cpp
+    runtime/VMTraps.cpp
     runtime/VarOffset.cpp
     runtime/Watchdog.cpp
     runtime/WeakMapConstructor.cpp
@@ -900,17 +915,23 @@ set(JavaScriptCore_SOURCES
     runtime/WeakSetConstructor.cpp
     runtime/WeakSetPrototype.cpp
 
+    tools/CellList.cpp
     tools/CodeProfile.cpp
     tools/CodeProfiling.cpp
     tools/FunctionOverrides.cpp
     tools/FunctionWhitelist.cpp
+    tools/HeapVerifier.cpp
     tools/JSDollarVM.cpp
     tools/JSDollarVMPrototype.cpp
+    tools/SigillCrashAnalyzer.cpp
+    tools/StackTrace.cpp
+    tools/VMInspector.cpp
 
     wasm/JSWebAssembly.cpp
     wasm/WasmB3IRGenerator.cpp
     wasm/WasmBinding.cpp
     wasm/WasmCallingConvention.cpp
+    wasm/WasmFaultSignalHandler.cpp
     wasm/WasmFormat.cpp
     wasm/WasmMemory.cpp
     wasm/WasmMemoryInformation.cpp
@@ -921,6 +942,7 @@ set(JavaScriptCore_SOURCES
     wasm/WasmValidate.cpp
 
     wasm/js/JSWebAssemblyCallee.cpp
+    wasm/js/JSWebAssemblyCodeBlock.cpp
     wasm/js/JSWebAssemblyCompileError.cpp
     wasm/js/JSWebAssemblyInstance.cpp
     wasm/js/JSWebAssemblyLinkError.cpp
@@ -946,6 +968,7 @@ set(JavaScriptCore_SOURCES
     wasm/js/WebAssemblyTableConstructor.cpp
     wasm/js/WebAssemblyTablePrototype.cpp
     wasm/js/WebAssemblyToJSCallee.cpp
+    wasm/js/WebAssemblyWrapperFunction.cpp
 
     yarr/RegularExpression.cpp
     yarr/YarrCanonicalizeUCS2.cpp
@@ -1225,6 +1248,7 @@ set(JavaScriptCore_FORWARDING_HEADERS_DIRECTORIES
     profiler
     replay
     runtime
+    wasm
     yarr
 
     collector/handles

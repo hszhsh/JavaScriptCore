@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2003-2009, 2015-2016 Apple Inc. All rights reserved.
+ *  Copyright (C) 2003-2017 Apple Inc. All rights reserved.
  *  Copyright (C) 2007 Eric Seidel <eric@webkit.org>
  *  Copyright (C) 2009 Acision BV. All rights reserved.
  *
@@ -149,7 +149,7 @@ public:
     {
         LockHolder managerLock(m_lock);
         auto recordedMachineThreads = m_set.take(machineThreads);
-        RELEASE_ASSERT(recordedMachineThreads = machineThreads);
+        RELEASE_ASSERT(recordedMachineThreads == machineThreads);
     }
 
     bool contains(MachineThreads* machineThreads)
@@ -179,25 +179,10 @@ static ActiveMachineThreadsManager& activeMachineThreadsManager()
     return *manager;
 }
     
-static inline PlatformThread getCurrentPlatformThread()
-{
-#if OS(DARWIN)
-    return pthread_mach_thread_np(pthread_self());
-#elif OS(WINDOWS)
-    return GetCurrentThreadId();
-#elif USE(PTHREADS)
-    return pthread_self();
-#endif
-}
-
-MachineThreads::MachineThreads(Heap* heap)
+MachineThreads::MachineThreads()
     : m_registeredThreads(0)
     , m_threadSpecificForMachineThreads(0)
-#if !ASSERT_DISABLED
-    , m_heap(heap)
-#endif
 {
-    UNUSED_PARAM(heap);
     threadSpecificKeyCreate(&m_threadSpecificForMachineThreads, removeThread);
     activeMachineThreadsManager().add(this);
 }
@@ -218,7 +203,7 @@ MachineThreads::~MachineThreads()
 Thread* MachineThreads::Thread::createForCurrentThread()
 {
     auto stackBounds = wtfThreadData().stack();
-    return new Thread(getCurrentPlatformThread(), stackBounds.origin(), stackBounds.end());
+    return new Thread(currentPlatformThread(), stackBounds.origin(), stackBounds.end());
 }
 
 bool MachineThreads::Thread::operator==(const PlatformThread& other) const
@@ -234,8 +219,6 @@ bool MachineThreads::Thread::operator==(const PlatformThread& other) const
 
 void MachineThreads::addCurrentThread()
 {
-    ASSERT(!m_heap->vm()->hasExclusiveThread() || m_heap->vm()->exclusiveThread() == std::this_thread::get_id());
-
     if (threadSpecificGet(m_threadSpecificForMachineThreads)) {
 #ifndef NDEBUG
         LockHolder lock(m_registeredThreadsMutex);
@@ -256,7 +239,7 @@ void MachineThreads::addCurrentThread()
 Thread* MachineThreads::machineThreadForCurrentThread()
 {
     LockHolder lock(m_registeredThreadsMutex);
-    PlatformThread platformThread = getCurrentPlatformThread();
+    PlatformThread platformThread = currentPlatformThread();
     for (Thread* thread = m_registeredThreads; thread; thread = thread->next) {
         if (*thread == platformThread)
             return thread;
@@ -288,7 +271,7 @@ void THREAD_SPECIFIC_CALL MachineThreads::removeThread(void* p)
             return;
 #endif
 
-        machineThreads->removeThreadIfFound(getCurrentPlatformThread());
+        machineThreads->removeThreadIfFound(currentPlatformThread());
     }
 }
 
@@ -311,6 +294,18 @@ void MachineThreads::removeThreadIfFound(PlatformThread platformThread)
         }
         delete t;
     }
+}
+
+SUPPRESS_ASAN
+void MachineThreads::gatherFromCurrentThread(ConservativeRoots& conservativeRoots, JITStubRoutineSet& jitStubRoutines, CodeBlockSet& codeBlocks, CurrentThreadState& currentThreadState)
+{
+    if (currentThreadState.registerState) {
+        void* registersBegin = currentThreadState.registerState;
+        void* registersEnd = reinterpret_cast<void*>(roundUpToMultipleOf<sizeof(void*)>(reinterpret_cast<uintptr_t>(currentThreadState.registerState + 1)));
+        conservativeRoots.add(registersBegin, registersEnd, jitStubRoutines, codeBlocks);
+    }
+
+    conservativeRoots.add(currentThreadState.stackTop, currentThreadState.stackOrigin, jitStubRoutines, codeBlocks);
 }
 
 MachineThreads::Thread::Thread(const PlatformThread& platThread, void* base, void* end)
@@ -369,7 +364,7 @@ bool MachineThreads::Thread::suspend()
     ASSERT(threadIsSuspended);
     return threadIsSuspended;
 #elif USE(PTHREADS)
-    ASSERT_WITH_MESSAGE(getCurrentPlatformThread() != platformThread, "Currently we don't support suspend the current thread itself.");
+    ASSERT_WITH_MESSAGE(currentPlatformThread() != platformThread, "Currently we don't support suspend the current thread itself.");
     {
         // During suspend, suspend or resume should not be executed from the other threads.
         // We use global lock instead of per thread lock.
@@ -946,7 +941,7 @@ void MachineThreads::tryCopyOtherThreadStack(Thread* thread, void* buffer, size_
     thread->freeRegisters(registers);
 }
 
-bool MachineThreads::tryCopyOtherThreadStacks(LockHolder&, void* buffer, size_t capacity, size_t* size)
+bool MachineThreads::tryCopyOtherThreadStacks(const AbstractLocker&, void* buffer, size_t capacity, size_t* size)
 {
     // Prevent two VMs from suspending each other's threads at the same time,
     // which can cause deadlock: <rdar://problem/20300842>.
@@ -955,14 +950,14 @@ bool MachineThreads::tryCopyOtherThreadStacks(LockHolder&, void* buffer, size_t 
 
     *size = 0;
 
-    PlatformThread currentPlatformThread = getCurrentPlatformThread();
+    PlatformThread platformThread = currentPlatformThread();
     int numberOfThreads = 0; // Using 0 to denote that we haven't counted the number of threads yet.
     int index = 1;
     Thread* threadsToBeDeleted = nullptr;
 
     Thread* previousThread = nullptr;
     for (Thread* thread = m_registeredThreads; thread; index++) {
-        if (*thread != currentPlatformThread) {
+        if (*thread != platformThread) {
             bool success = thread->suspend();
 #if OS(DARWIN)
             if (!success) {
@@ -1006,12 +1001,12 @@ bool MachineThreads::tryCopyOtherThreadStacks(LockHolder&, void* buffer, size_t 
     }
 
     for (Thread* thread = m_registeredThreads; thread; thread = thread->next) {
-        if (*thread != currentPlatformThread)
+        if (*thread != platformThread)
             tryCopyOtherThreadStack(thread, buffer, capacity, size);
     }
 
     for (Thread* thread = m_registeredThreads; thread; thread = thread->next) {
-        if (*thread != currentPlatformThread)
+        if (*thread != platformThread)
             thread->resume();
     }
 
@@ -1033,8 +1028,11 @@ static void growBuffer(size_t size, void** buffer, size_t* capacity)
     *buffer = fastMalloc(*capacity);
 }
 
-void MachineThreads::gatherConservativeRoots(ConservativeRoots& conservativeRoots, JITStubRoutineSet& jitStubRoutines, CodeBlockSet& codeBlocks)
+void MachineThreads::gatherConservativeRoots(ConservativeRoots& conservativeRoots, JITStubRoutineSet& jitStubRoutines, CodeBlockSet& codeBlocks, CurrentThreadState* currentThreadState)
 {
+    if (currentThreadState)
+        gatherFromCurrentThread(conservativeRoots, jitStubRoutines, codeBlocks, *currentThreadState);
+
     size_t size;
     size_t capacity = 0;
     void* buffer = nullptr;
@@ -1047,6 +1045,13 @@ void MachineThreads::gatherConservativeRoots(ConservativeRoots& conservativeRoot
 
     conservativeRoots.add(buffer, static_cast<char*>(buffer) + size, jitStubRoutines, codeBlocks);
     fastFree(buffer);
+}
+
+NEVER_INLINE int callWithCurrentThreadState(const ScopedLambda<void(CurrentThreadState&)>& lambda)
+{
+    DECLARE_AND_COMPUTE_CURRENT_THREAD_STATE(state);
+    lambda(state);
+    return 42; // Suppress tail call optimization.
 }
 
 } // namespace JSC

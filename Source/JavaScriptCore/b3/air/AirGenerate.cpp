@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,15 +28,14 @@
 
 #if ENABLE(B3_JIT)
 
+#include "AirAllocateRegistersByGraphColoring.h"
 #include "AirAllocateStack.h"
 #include "AirCode.h"
-#include "AirDumpAsJS.h"
 #include "AirEliminateDeadCode.h"
 #include "AirFixObviousSpills.h"
 #include "AirFixPartialRegisterStalls.h"
 #include "AirGenerationContext.h"
 #include "AirHandleCalleeSaves.h"
-#include "AirIteratedRegisterCoalescing.h"
 #include "AirLogRegisterPressure.h"
 #include "AirLowerAfterRegAlloc.h"
 #include "AirLowerEntrySwitch.h"
@@ -62,17 +61,19 @@ void prepareForGeneration(Code& code)
 {
     TimingScope timingScope("Air::prepareForGeneration");
     
+    // If we're doing super verbose dumping, the phase scope of any phase will already do a dump.
+    if (shouldDumpIR(AirMode) && !shouldDumpIRAtEachPhase(AirMode)) {
+        dataLog("Initial air:\n");
+        dataLog(code);
+    }
+    
     // We don't expect the incoming code to have predecessors computed.
     code.resetReachability();
     
     if (shouldValidateIR())
         validate(code);
 
-    // If we're doing super verbose dumping, the phase scope of any phase will already do a dump.
-    if (shouldDumpIR(AirMode) && !shouldDumpIRAtEachPhase(AirMode)) {
-        dataLog("Initial air:\n");
-        dataLog(code);
-    }
+    simplifyCFG(code);
 
     lowerMacros(code);
 
@@ -89,7 +90,7 @@ void prepareForGeneration(Code& code)
     if (Options::airSpillsEverything())
         spillEverything(code);
     else
-        iteratedRegisterCoalescing(code);
+        allocateRegistersByGraphColoring(code);
 
     if (Options::logAirRegisterPressure()) {
         dataLog("Register pressure after register allocation:\n");
@@ -107,23 +108,11 @@ void prepareForGeneration(Code& code)
     // does things like identify which callee-saves we're using and saves them.
     handleCalleeSaves(code);
     
-    if (Options::dumpAirAsJSBeforeAllocateStack()) {
-        dataLog("Dumping Air as JS before allocateStack:\n");
-        dumpAsJS(code, WTF::dataFile());
-        dataLog("Air hash: ", code.jsHash(), "\n");
-    }
-
     // This turns all Stack and CallArg Args into Addr args that use the frame pointer. It does
     // this by first-fit allocating stack slots. It should be pretty darn close to optimal, so we
     // shouldn't have to worry about this very much.
     allocateStack(code);
     
-    if (Options::dumpAirAfterAllocateStack()) {
-        dataLog("Dumping Air after allocateStack:\n");
-        dataLog(code);
-        dataLog("Air hash: ", code.jsHash(), "\n");
-    }
-
     // If we coalesced moves then we can unbreak critical edges. This is the main reason for this
     // phase.
     simplifyCFG(code);
@@ -196,6 +185,8 @@ void generate(Code& code, CCallHelpers& jit)
         pcToOriginMap.appendItem(jit.labelIgnoringWatchpoints(), inst.origin->origin());
     };
 
+    Disassembler* disassembler = code.disassembler();
+
     for (BasicBlock* block : code) {
         context.currentBlock = block;
         context.indexInBlock = UINT_MAX;
@@ -203,7 +194,13 @@ void generate(Code& code, CCallHelpers& jit)
         CCallHelpers::Label label = jit.label();
         *context.blockLabels[block] = label;
 
+        if (disassembler)
+            disassembler->startBlock(block, jit); 
+
         if (code.isEntrypoint(block)) {
+            if (disassembler)
+                disassembler->startEntrypoint(jit); 
+
             jit.emitFunctionPrologue();
             if (code.frameSize())
                 jit.addPtr(CCallHelpers::TrustedImm32(-code.frameSize()), MacroAssembler::stackPointerRegister);
@@ -214,6 +211,9 @@ void generate(Code& code, CCallHelpers& jit)
                 else
                     jit.storeDouble(entry.reg().fpr(), argFor(entry));
             }
+
+            if (disassembler)
+                disassembler->endEntrypoint(jit); 
         }
         
         ASSERT(block->size() >= 1);
@@ -221,8 +221,12 @@ void generate(Code& code, CCallHelpers& jit)
             context.indexInBlock = i;
             Inst& inst = block->at(i);
             addItem(inst);
+            auto start = jit.labelIgnoringWatchpoints();
             CCallHelpers::Jump jump = inst.generate(jit, context);
             ASSERT_UNUSED(jump, !jump.isSet());
+            auto end = jit.labelIgnoringWatchpoints();
+            if (disassembler)
+                disassembler->addInst(&inst, start, end);
         }
 
         context.indexInBlock = block->size() - 1;
@@ -236,6 +240,7 @@ void generate(Code& code, CCallHelpers& jit)
         if (isReturn(block->last().kind.opcode)) {
             // We currently don't represent the full prologue/epilogue in Air, so we need to
             // have this override.
+            auto start = jit.labelIgnoringWatchpoints();
             if (code.frameSize()) {
                 for (const RegisterAtOffset& entry : code.calleeSaveRegisters()) {
                     if (entry.reg().isGPR())
@@ -248,10 +253,18 @@ void generate(Code& code, CCallHelpers& jit)
                 jit.emitFunctionEpilogueWithEmptyFrame();
             jit.ret();
             addItem(block->last());
+            auto end = jit.labelIgnoringWatchpoints();
+            if (disassembler)
+                disassembler->addInst(&block->last(), start, end);
             continue;
         }
 
+        auto start = jit.labelIgnoringWatchpoints();
         CCallHelpers::Jump jump = block->last().generate(jit, context);
+        auto end = jit.labelIgnoringWatchpoints();
+        if (disassembler)
+            disassembler->addInst(&block->last(), start, end);
+
         // The jump won't be set for patchpoints. It won't be set for Oops because then it won't have
         // any successors.
         if (jump.isSet()) {
@@ -282,9 +295,15 @@ void generate(Code& code, CCallHelpers& jit)
 
     pcToOriginMap.appendItem(jit.label(), Origin());
     // FIXME: Make late paths have Origins: https://bugs.webkit.org/show_bug.cgi?id=153689
+    if (disassembler)
+        disassembler->startLatePath(jit);
+
     for (auto& latePath : context.latePaths)
         latePath->run(jit, context);
-    pcToOriginMap.appendItem(jit.label(), Origin());
+
+    if (disassembler)
+        disassembler->endLatePath(jit);
+    pcToOriginMap.appendItem(jit.labelIgnoringWatchpoints(), Origin());
 }
 
 } } } // namespace JSC::B3::Air

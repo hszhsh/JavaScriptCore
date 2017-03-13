@@ -188,7 +188,6 @@ grid-row-start: auto
 -webkit-hyphens: manual
 -webkit-line-align: none
 -webkit-line-box-contain: block inline replaced
--webkit-line-break: auto
 -webkit-line-clamp: none
 -webkit-line-grid: none
 -webkit-line-snap: none
@@ -248,8 +247,8 @@ flood-opacity: 1
 lighting-color: rgb(255, 255, 255)
 stop-color: rgb(0, 0, 0)
 stop-opacity: 1
-color-interpolation: srgb
-color-interpolation-filters: linearrgb
+color-interpolation: sRGB
+color-interpolation-filters: linearRGB
 color-rendering: auto
 fill: rgb(0, 0, 0)
 fill-opacity: 1

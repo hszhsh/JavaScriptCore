@@ -91,16 +91,6 @@ messages -> WebPageProxy {
 #endif // ENABLE(NETSCAPE_PLUGIN_API)
     SetCanShortCircuitHorizontalWheelEvents(bool canShortCircuitHorizontalWheelEvents)
 
-#if PLATFORM(EFL)
-    HandleInputMethodKeydown() -> (bool handled)
-#endif
-
-#if USE(COORDINATED_GRAPHICS_MULTIPROCESS)
-    PageDidRequestScroll(WebCore::IntPoint point)
-    PageTransitionViewportReady()
-    DidFindZoomableArea(WebCore::IntPoint target, WebCore::IntRect area)
-#endif
-
     DidChangeContentSize(WebCore::IntSize newSize)
 
 #if ENABLE(INPUT_TYPE_COLOR)
@@ -190,11 +180,12 @@ messages -> WebPageProxy {
     SaveImageToLibrary(WebKit::SharedMemory::Handle handle, uint64_t size)
     DidUpdateBlockSelectionWithTouch(uint32_t touch, uint32_t flags, float growThreshold, float shrinkThreshold)
     ShowPlaybackTargetPicker(bool hasVideo, WebCore::IntRect elementRect)
-    ZoomToRect(WebCore::FloatRect rect, double minimumScale, double maximumScale)
     CommitPotentialTapFailed()
     DidNotHandleTapAsClick(WebCore::IntPoint point)
+    DidCompleteSyntheticClick()
     DisableDoubleTapGesturesDuringTapIfNecessary(uint64_t requestID)
     DrawToPDFCallback(IPC::DataReference pdfData, uint64_t callbackID)
+    SelectionRectsCallback(Vector<WebCore::SelectionRect> selectionRects, uint64_t callbackID);
 #endif
 #if ENABLE(DATA_DETECTION)
     SetDataDetectionResult(struct WebKit::DataDetectionResult dataDetectionResult)
@@ -234,9 +225,10 @@ messages -> WebPageProxy {
     ExecuteUndoRedo(uint32_t action) -> (bool result)
 
     # Diagnostic messages logging
-    LogSampledDiagnosticMessage(String message, String description)
-    LogSampledDiagnosticMessageWithResult(String message, String description, uint32_t result)
-    LogSampledDiagnosticMessageWithValue(String message, String description, String value)
+    LogDiagnosticMessage(String message, String description, enum WebCore::ShouldSample shouldSample)
+    LogDiagnosticMessageWithResult(String message, String description, uint32_t result, enum WebCore::ShouldSample shouldSample)
+    LogDiagnosticMessageWithValue(String message, String description, double value, unsigned significantFigures, enum WebCore::ShouldSample shouldSample)
+    LogDiagnosticMessageWithEnhancedPrivacy(String message, String description, enum WebCore::ShouldSample shouldSample)
 
     # Editor notifications
     EditorStateChanged(struct WebKit::EditorState editorState)
@@ -306,7 +298,7 @@ messages -> WebPageProxy {
     DidPerformDragControllerAction(uint64_t dragOperation, bool mouseIsOverFileInput, unsigned numberOfItemsToBeAccepted)
 #endif
 #if PLATFORM(COCOA) && ENABLE(DRAG_SUPPORT)
-    SetDragImage(WebCore::IntPoint clientPosition, WebKit::ShareableBitmap::Handle dragImage, bool linkDrag)
+    SetDragImage(WebCore::IntPoint clientPosition, WebKit::ShareableBitmap::Handle dragImage, std::optional<WebCore::TextIndicatorData> textIndicator, WebCore::FloatPoint dragImageAnchor, uint64_t action)
     SetPromisedDataForImage(String pasteboardName, WebKit::SharedMemory::Handle imageHandle, uint64_t imageSize, String filename, String extension, String title, String url, String visibleURL, WebKit::SharedMemory::Handle archiveHandle, uint64_t archiveSize)
 #if ENABLE(ATTACHMENT_ELEMENT)
     SetPromisedDataForAttachment(String pasteboardName, String filename, String extension, String title, String url, String visibleURL)
@@ -314,6 +306,12 @@ messages -> WebPageProxy {
 #endif
 #if PLATFORM(GTK) && ENABLE(DRAG_SUPPORT)
     StartDrag(struct WebKit::WebSelectionData selection, uint64_t dragOperation, WebKit::ShareableBitmap::Handle dragImage)
+#endif
+
+#if ENABLE(DATA_INTERACTION)
+    DidPerformDataInteractionControllerOperation()
+    DidHandleStartDataInteractionRequest(bool started)
+    DidConcludeEditDataInteraction(std::optional<WebCore::TextIndicatorData> textIndicator)
 #endif
 
 #if PLATFORM(COCOA)
@@ -379,8 +377,8 @@ messages -> WebPageProxy {
 #if PLATFORM(IOS)
     DynamicViewportUpdateChangedTarget(double newTargetScale, WebCore::FloatPoint newScrollPosition, uint64_t dynamicViewportSizeUpdateID)
     CouldNotRestorePageState()
-    RestorePageState(WebCore::FloatPoint scrollPosition, WebCore::FloatPoint scrollOrigin, WebCore::FloatSize obscuredInsetOnSave, double scale)
-    RestorePageCenterAndScale(WebCore::FloatPoint unobscuredCenter, double scale)
+    RestorePageState(std::optional<WebCore::FloatPoint> scrollPosition, WebCore::FloatPoint scrollOrigin, WebCore::FloatSize obscuredInsetOnSave, double scale)
+    RestorePageCenterAndScale(std::optional<WebCore::FloatPoint> unobscuredCenter, double scale)
     DidGetTapHighlightGeometries(uint64_t requestID, WebCore::Color color, Vector<WebCore::FloatQuad> geometries, WebCore::IntSize topLeftRadius, WebCore::IntSize topRightRadius, WebCore::IntSize bottomLeftRadius, WebCore::IntSize bottomRightRadius)
 
     StartAssistingNode(struct WebKit::AssistedNodeInformation information, bool userIsInteracting, bool blurPreviousNode, WebKit::UserData userData)
@@ -431,6 +429,7 @@ messages -> WebPageProxy {
 #if USE(QUICK_LOOK)
     DidStartLoadForQuickLookDocumentInMainFrame(String fileName, String uti)
     DidFinishLoadForQuickLookDocumentInMainFrame(WebKit::QuickLookDocumentData data)
+    DidRequestPasswordForQuickLookDocumentInMainFrame(String fileName)
 #endif
 
 #if ENABLE(CONTENT_FILTERING)
@@ -438,6 +437,7 @@ messages -> WebPageProxy {
 #endif
 
     IsPlayingMediaDidChange(unsigned state, uint64_t sourceElementID)
+    HandleAutoplayEvent(uint32_t event)
 
 #if ENABLE(MEDIA_SESSION)
     HasMediaSessionWithActiveMediaElementsDidChange(bool state)
@@ -483,8 +483,14 @@ messages -> WebPageProxy {
 
 #if PLATFORM(MAC)
     DidHandleAcceptedCandidate()
+#endif
+
+#if PLATFORM(COCOA)
     HandleActiveNowPlayingSessionInfoResponse(bool hasActiveSession, String title, double duration, double elapsedTime)
 #endif
 
     SetIsUsingHighPerformanceWebGL(bool isUsingHighPerformanceWebGL)
+
+    StartURLSchemeHandlerTask(uint64_t loaderIdentifier, uint64_t resourceIdentifier, WebCore::ResourceRequest request)
+    StopURLSchemeHandlerTask(uint64_t loaderIdentifier, uint64_t resourceIdentifier)
 }

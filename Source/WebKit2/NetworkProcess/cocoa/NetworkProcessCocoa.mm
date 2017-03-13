@@ -43,11 +43,6 @@
 
 namespace WebKit {
 
-void NetworkProcess::platformLowMemoryHandler(WebCore::Critical)
-{
-    CFURLConnectionInvalidateConnectionCache();
-}
-
 static void initializeNetworkSettings()
 {
     static const unsigned preferredConnectionCount = 6;
@@ -77,6 +72,9 @@ void NetworkProcess::platformInitializeNetworkProcessCocoa(const NetworkProcessC
     SandboxExtension::consumePermanently(parameters.containerCachesDirectoryExtensionHandle);
     SandboxExtension::consumePermanently(parameters.parentBundleDirectoryExtensionHandle);
 #endif
+#if ENABLE(WEB_RTC)
+    SandboxExtension::consumePermanently(parameters.webRTCNetworkingHandle);
+#endif
     m_diskCacheDirectory = parameters.diskCacheDirectory;
 
 #if PLATFORM(IOS) || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100)
@@ -89,6 +87,7 @@ void NetworkProcess::platformInitializeNetworkProcessCocoa(const NetworkProcessC
     NetworkSessionCocoa::setSourceApplicationAuditTokenData(sourceApplicationAuditData());
     NetworkSessionCocoa::setSourceApplicationBundleIdentifier(parameters.sourceApplicationBundleIdentifier);
     NetworkSessionCocoa::setSourceApplicationSecondaryIdentifier(parameters.sourceApplicationSecondaryIdentifier);
+    NetworkSessionCocoa::setAllowsCellularAccess(parameters.allowsCellularAccess);
 #if PLATFORM(IOS)
     NetworkSessionCocoa::setCTDataConnectionServiceType(parameters.ctDataConnectionServiceType);
 #endif

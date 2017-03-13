@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2014-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -38,12 +38,15 @@ public:
     static RefPtr<WebsiteDataStore> defaultDataStore();
     static Ref<WebsiteDataStore> createNonPersistentDataStore();
     static Ref<WebsiteDataStore> create(WebKit::WebsiteDataStore::Configuration);
+
+    explicit WebsiteDataStore(WebKit::WebsiteDataStore::Configuration);
     virtual ~WebsiteDataStore();
 
     bool isPersistent();
 
     bool resourceLoadStatisticsEnabled() const;
     void setResourceLoadStatisticsEnabled(bool);
+    void registerSharedResourceLoadObserver();
 
     WebKit::WebsiteDataStore& websiteDataStore() { return *m_websiteDataStore; }
 
@@ -57,15 +60,14 @@ public:
     static String defaultWebSQLDatabaseDirectory();
     static String defaultResourceLoadStatisticsDirectory();
 
+    static WebKit::WebsiteDataStore::Configuration defaultDataStoreConfiguration();
+
 private:
-    WebsiteDataStore(WebKit::WebsiteDataStore::Configuration);
     WebsiteDataStore();
 
     static String tempDirectoryFileSystemRepresentation(const String& directoryName);
     static String cacheDirectoryFileSystemRepresentation(const String& directoryName);
     static String websiteDataDirectoryFileSystemRepresentation(const String& directoryName);
-
-    static WebKit::WebsiteDataStore::Configuration defaultDataStoreConfiguration();
 
     RefPtr<WebKit::WebsiteDataStore> m_websiteDataStore;
 };

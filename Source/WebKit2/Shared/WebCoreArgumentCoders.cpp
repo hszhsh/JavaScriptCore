@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2011-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,7 +31,6 @@
 #include <WebCore/AuthenticationChallenge.h>
 #include <WebCore/BlobPart.h>
 #include <WebCore/CertificateInfo.h>
-#include <WebCore/Cookie.h>
 #include <WebCore/Credential.h>
 #include <WebCore/Cursor.h>
 #include <WebCore/DatabaseDetails.h>
@@ -47,7 +46,7 @@
 #include <WebCore/GraphicsLayer.h>
 #include <WebCore/IDBGetResult.h>
 #include <WebCore/Image.h>
-#include <WebCore/JSDOMBinding.h>
+#include <WebCore/JSDOMExceptionHandling.h>
 #include <WebCore/Length.h>
 #include <WebCore/Path.h>
 #include <WebCore/PluginData.h>
@@ -979,10 +978,7 @@ bool ArgumentCoder<Cursor>::decode(Decoder& decoder, Cursor& cursor)
 
 void ArgumentCoder<ResourceRequest>::encode(Encoder& encoder, const ResourceRequest& resourceRequest)
 {
-#if ENABLE(CACHE_PARTITIONING)
     encoder << resourceRequest.cachePartition();
-#endif
-
     encoder << resourceRequest.hiddenFromInspector();
 
     if (resourceRequest.encodingRequiresPlatformData()) {
@@ -996,12 +992,10 @@ void ArgumentCoder<ResourceRequest>::encode(Encoder& encoder, const ResourceRequ
 
 bool ArgumentCoder<ResourceRequest>::decode(Decoder& decoder, ResourceRequest& resourceRequest)
 {
-#if ENABLE(CACHE_PARTITIONING)
     String cachePartition;
     if (!decoder.decode(cachePartition))
         return false;
     resourceRequest.setCachePartition(cachePartition);
-#endif
 
     bool isHiddenFromInspector;
     if (!decoder.decode(isHiddenFromInspector))
@@ -1223,8 +1217,10 @@ void ArgumentCoder<DragData>::encode(Encoder& encoder, const DragData& dragData)
     encoder << dragData.globalPosition();
     encoder.encodeEnum(dragData.draggingSourceOperationMask());
     encoder.encodeEnum(dragData.flags());
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     encoder << dragData.pasteboardName();
+#endif
+#if PLATFORM(MAC)
     encoder << dragData.fileNames();
 #endif
 }
@@ -1248,13 +1244,15 @@ bool ArgumentCoder<DragData>::decode(Decoder& decoder, DragData& dragData)
         return false;
 
     String pasteboardName;
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     if (!decoder.decode(pasteboardName))
         return false;
 #endif
     Vector<String> fileNames;
+#if PLATFORM(MAC)
     if (!decoder.decode(fileNames))
         return false;
+#endif
 
     dragData = DragData(pasteboardName, clientPosition, globalPosition, draggingSourceOperationMask, applicationFlags);
     dragData.setFileNames(fileNames);
@@ -1280,41 +1278,6 @@ bool ArgumentCoder<CompositionUnderline>::decode(Decoder& decoder, CompositionUn
     if (!decoder.decode(underline.thick))
         return false;
     if (!decoder.decode(underline.color))
-        return false;
-
-    return true;
-}
-
-
-void ArgumentCoder<Cookie>::encode(Encoder& encoder, const Cookie& cookie)
-{
-    encoder << cookie.name;
-    encoder << cookie.value;
-    encoder << cookie.domain;
-    encoder << cookie.path;
-    encoder << cookie.expires;
-    encoder << cookie.httpOnly;
-    encoder << cookie.secure;
-    encoder << cookie.session;
-}
-
-bool ArgumentCoder<Cookie>::decode(Decoder& decoder, Cookie& cookie)
-{
-    if (!decoder.decode(cookie.name))
-        return false;
-    if (!decoder.decode(cookie.value))
-        return false;
-    if (!decoder.decode(cookie.domain))
-        return false;
-    if (!decoder.decode(cookie.path))
-        return false;
-    if (!decoder.decode(cookie.expires))
-        return false;
-    if (!decoder.decode(cookie.httpOnly))
-        return false;
-    if (!decoder.decode(cookie.secure))
-        return false;
-    if (!decoder.decode(cookie.session))
         return false;
 
     return true;
@@ -2083,12 +2046,14 @@ void ArgumentCoder<TextIndicatorData>::encode(Encoder& encoder, const TextIndica
     encoder << textIndicatorData.selectionRectInRootViewCoordinates;
     encoder << textIndicatorData.textBoundingRectInRootViewCoordinates;
     encoder << textIndicatorData.textRectsInBoundingRectCoordinates;
+    encoder << textIndicatorData.contentImageWithoutSelectionRectInRootViewCoordinates;
     encoder << textIndicatorData.contentImageScaleFactor;
     encoder.encodeEnum(textIndicatorData.presentationTransition);
     encoder << static_cast<uint64_t>(textIndicatorData.options);
 
     encodeOptionalImage(encoder, textIndicatorData.contentImage.get());
     encodeOptionalImage(encoder, textIndicatorData.contentImageWithHighlight.get());
+    encodeOptionalImage(encoder, textIndicatorData.contentImageWithoutSelection.get());
 }
 
 bool ArgumentCoder<TextIndicatorData>::decode(Decoder& decoder, TextIndicatorData& textIndicatorData)
@@ -2100,6 +2065,9 @@ bool ArgumentCoder<TextIndicatorData>::decode(Decoder& decoder, TextIndicatorDat
         return false;
 
     if (!decoder.decode(textIndicatorData.textRectsInBoundingRectCoordinates))
+        return false;
+
+    if (!decoder.decode(textIndicatorData.contentImageWithoutSelectionRectInRootViewCoordinates))
         return false;
 
     if (!decoder.decode(textIndicatorData.contentImageScaleFactor))
@@ -2117,6 +2085,9 @@ bool ArgumentCoder<TextIndicatorData>::decode(Decoder& decoder, TextIndicatorDat
         return false;
 
     if (!decodeOptionalImage(decoder, textIndicatorData.contentImageWithHighlight))
+        return false;
+
+    if (!decodeOptionalImage(decoder, textIndicatorData.contentImageWithoutSelection))
         return false;
 
     return true;
@@ -2248,6 +2219,8 @@ void ArgumentCoder<ResourceLoadStatistics>::encode(Encoder& encoder, const WebCo
     
     // User interaction
     encoder << statistics.hadUserInteraction;
+    encoder << statistics.mostRecentUserInteraction;
+    encoder << statistics.grandfathered;
     
     // Top frame stats
     encoder << statistics.topFrameHasBeenNavigatedToBefore;
@@ -2278,6 +2251,7 @@ void ArgumentCoder<ResourceLoadStatistics>::encode(Encoder& encoder, const WebCo
     // Prevalent Resource
     encoder << statistics.redirectedToOtherPrevalentResourceOrigins;
     encoder << statistics.isPrevalentResource;
+    encoder << statistics.dataRecordsRemoved;
 }
 
 bool ArgumentCoder<ResourceLoadStatistics>::decode(Decoder& decoder, WebCore::ResourceLoadStatistics& statistics)
@@ -2287,6 +2261,12 @@ bool ArgumentCoder<ResourceLoadStatistics>::decode(Decoder& decoder, WebCore::Re
     
     // User interaction
     if (!decoder.decode(statistics.hadUserInteraction))
+        return false;
+
+    if (!decoder.decode(statistics.mostRecentUserInteraction))
+        return false;
+
+    if (!decoder.decode(statistics.grandfathered))
         return false;
     
     // Top frame stats
@@ -2358,7 +2338,10 @@ bool ArgumentCoder<ResourceLoadStatistics>::decode(Decoder& decoder, WebCore::Re
     
     if (!decoder.decode(statistics.isPrevalentResource))
         return false;
-    
+
+    if (!decoder.decode(statistics.dataRecordsRemoved))
+        return false;
+
     return true;
 }
 
@@ -2411,7 +2394,8 @@ void ArgumentCoder<CaptureDevice>::encode(Encoder& encoder, const WebCore::Captu
     encoder << device.persistentId();
     encoder << device.label();
     encoder << device.groupId();
-    encoder.encodeEnum(device.kind());
+    encoder << device.enabled();
+    encoder.encodeEnum(device.type());
 }
 
 bool ArgumentCoder<CaptureDevice>::decode(Decoder& decoder, WebCore::CaptureDevice& device)
@@ -2428,14 +2412,19 @@ bool ArgumentCoder<CaptureDevice>::decode(Decoder& decoder, WebCore::CaptureDevi
     if (!decoder.decode(groupId))
         return false;
 
-    CaptureDevice::SourceKind kind;
-    if (!decoder.decodeEnum(kind))
+    bool enabled;
+    if (!decoder.decode(enabled))
+        return false;
+
+    CaptureDevice::DeviceType type;
+    if (!decoder.decodeEnum(type))
         return false;
 
     device.setPersistentId(persistentId);
     device.setLabel(label);
     device.setGroupId(groupId);
-    device.setKind(kind);
+    device.setType(type);
+    device.setEnabled(enabled);
 
     return true;
 }

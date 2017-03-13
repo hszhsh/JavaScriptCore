@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- webkit-test-runner [ enableModernMediaControls=true ] -->
+<!DOCTYPE html>
 <script src="../../../resources/js-test-pre.js"></script>
 <body>
 <video src="../../content/test.mp4" style="width: 320px; height: 240px;" controls></video>
@@ -16,24 +16,17 @@ debug("Checking initial size");
 shouldBeEqualToString("mediaControls.style.width", "320px");
 shouldBeEqualToString("mediaControls.style.height", "240px");
 
-window.requestAnimationFrame(() => {
-    shadowRoot.addEventListener("resize", () => {
-        window.requestAnimationFrame(() => {
-            debug("");
-            debug("Shadow root received a resize event");
-            shouldBeEqualToString("mediaControls.style.width", "400px");
-            shouldBeEqualToString("mediaControls.style.height", "300px");
+debug("");
+debug("Resizing to 400x300");
+media.style.width = "400px";
+media.style.height = "300px";
 
-            debug("");
-            media.remove();
-            finishJSTest();
-        });
+shouldBecomeEqualToString("mediaControls.style.width", "400px", () => {
+    shouldBecomeEqualToString("mediaControls.style.height", "300px", () => {
+        debug("");
+        media.remove();
+        finishJSTest();
     });
-
-    debug("");
-    debug("Resizing to 400x300");
-    media.style.width = "400px";
-    media.style.height = "300px";
 });
 
 </script>

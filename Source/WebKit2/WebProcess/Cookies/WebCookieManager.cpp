@@ -30,6 +30,7 @@
 #include "WebCookieManagerMessages.h"
 #include "WebCookieManagerProxyMessages.h"
 #include "WebCoreArgumentCoders.h"
+#include <WebCore/Cookie.h>
 #include <WebCore/CookieStorage.h>
 #include <WebCore/NetworkStorageSession.h>
 #include <WebCore/PlatformCookieJar.h>
@@ -42,8 +43,6 @@ using namespace WebCore;
 
 namespace WebKit {
 
-static WebCookieManager* sharedCookieManager;
-
 const char* WebCookieManager::supplementName()
 {
     return "WebCookieManager";
@@ -53,15 +52,13 @@ WebCookieManager::WebCookieManager(ChildProcess* process)
     : m_process(process)
 {
     m_process->addMessageReceiver(Messages::WebCookieManager::messageReceiverName(), *this);
-
-    ASSERT(!sharedCookieManager);
-    sharedCookieManager = this;
 }
 
-void WebCookieManager::getHostnamesWithCookies(uint64_t callbackID)
+void WebCookieManager::getHostnamesWithCookies(SessionID sessionID, uint64_t callbackID)
 {
     HashSet<String> hostnames;
-    WebCore::getHostnamesWithCookies(NetworkStorageSession::defaultStorageSession(), hostnames);
+    if (auto* storageSession = NetworkStorageSession::storageSession(sessionID))
+        WebCore::getHostnamesWithCookies(*storageSession, hostnames);
 
     Vector<String> hostnameList;
     copyToVector(hostnames, hostnameList);
@@ -69,45 +66,49 @@ void WebCookieManager::getHostnamesWithCookies(uint64_t callbackID)
     m_process->send(Messages::WebCookieManagerProxy::DidGetHostnamesWithCookies(hostnameList, callbackID), 0);
 }
 
-void WebCookieManager::deleteCookiesForHostname(const String& hostname)
+void WebCookieManager::deleteCookiesForHostname(SessionID sessionID, const String& hostname)
 {
-    WebCore::deleteCookiesForHostnames(NetworkStorageSession::defaultStorageSession(), { hostname });
+    if (auto* storageSession = NetworkStorageSession::storageSession(sessionID))
+        WebCore::deleteCookiesForHostnames(*storageSession, { hostname });
 }
 
-void WebCookieManager::deleteAllCookies()
+void WebCookieManager::deleteAllCookies(SessionID sessionID)
 {
-    WebCore::deleteAllCookies(NetworkStorageSession::defaultStorageSession());
+    if (auto* storageSession = NetworkStorageSession::storageSession(sessionID))
+        WebCore::deleteAllCookies(*storageSession);
 }
 
-void WebCookieManager::deleteAllCookiesModifiedSince(std::chrono::system_clock::time_point time)
+void WebCookieManager::deleteAllCookiesModifiedSince(SessionID sessionID, std::chrono::system_clock::time_point time)
 {
-    WebCore::deleteAllCookiesModifiedSince(NetworkStorageSession::defaultStorageSession(), time);
+    if (auto* storageSession = NetworkStorageSession::storageSession(sessionID))
+        WebCore::deleteAllCookiesModifiedSince(*storageSession, time);
 }
 
-void WebCookieManager::addCookie(const Cookie& cookie, const String& hostname)
+void WebCookieManager::setCookies(WebCore::SessionID sessionID, const Vector<Cookie>& cookies, const URL& url, const URL& mainDocumentURL)
 {
-    WebCore::addCookie(NetworkStorageSession::defaultStorageSession(), URL(URL(), hostname), cookie);
+    if (auto* storageSession = NetworkStorageSession::storageSession(sessionID))
+        storageSession->setCookies(cookies, url, mainDocumentURL);
 }
 
-void WebCookieManager::startObservingCookieChanges()
-{
-    WebCore::startObservingCookieChanges(cookiesDidChange);
-}
-
-void WebCookieManager::stopObservingCookieChanges()
-{
-    WebCore::stopObservingCookieChanges();
-}
-
-void WebCookieManager::cookiesDidChange()
-{
-    sharedCookieManager->dispatchCookiesDidChange();
-}
-
-void WebCookieManager::dispatchCookiesDidChange()
+void WebCookieManager::notifyCookiesDidChange(SessionID sessionID)
 {
     ASSERT(RunLoop::isMain());
-    m_process->send(Messages::WebCookieManagerProxy::CookiesDidChange(), 0);
+    m_process->send(Messages::WebCookieManagerProxy::CookiesDidChange(sessionID), 0);
+}
+
+void WebCookieManager::startObservingCookieChanges(SessionID sessionID)
+{
+    if (auto* storageSession = NetworkStorageSession::storageSession(sessionID)) {
+        WebCore::startObservingCookieChanges(*storageSession, [this, sessionID] {
+            notifyCookiesDidChange(sessionID);
+        });
+    }
+}
+
+void WebCookieManager::stopObservingCookieChanges(SessionID sessionID)
+{
+    if (auto* storageSession = NetworkStorageSession::storageSession(sessionID))
+        WebCore::stopObservingCookieChanges(*storageSession);
 }
 
 void WebCookieManager::setHTTPCookieAcceptPolicy(HTTPCookieAcceptPolicy policy)

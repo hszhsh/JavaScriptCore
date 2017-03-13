@@ -41,7 +41,7 @@
 namespace WebCore {
 
 class AffineTransform;
-class AnimationController;
+class CSSAnimationController;
 class Color;
 class Cursor;
 class Document;
@@ -226,7 +226,7 @@ public:
 
     virtual bool isDetailsMarker() const { return false; }
     virtual bool isEmbeddedObject() const { return false; }
-    virtual bool isFieldset() const { return false; }
+    bool isFieldset() const;
     virtual bool isFileUploadControl() const { return false; }
     virtual bool isFrame() const { return false; }
     virtual bool isFrameSet() const { return false; }
@@ -277,9 +277,7 @@ public:
     virtual bool isRenderFullScreen() const { return false; }
     virtual bool isRenderFullScreenPlaceholder() const { return false; }
 #endif
-#if ENABLE(CSS_GRID_LAYOUT)
     virtual bool isRenderGrid() const { return false; }
-#endif
     virtual bool isRenderNamedFlowThread() const { return false; }
     bool isInFlowRenderFlowThread() const { return isRenderFlowThread() && !isOutOfFlowPositioned(); }
     bool isOutOfFlowRenderFlowThread() const { return isRenderFlowThread() && isOutOfFlowPositioned(); }
@@ -450,6 +448,10 @@ public:
     bool hasOutlineAutoAncestor() const { return m_bitfields.hasRareData() && rareData().hasOutlineAutoAncestor(); }
     bool isRegisteredForVisibleInViewportCallback() { return m_bitfields.hasRareData() && rareData().isRegisteredForVisibleInViewportCallback(); }
 
+    bool isExcludedFromNormalLayout() const { return m_bitfields.isExcludedFromNormalLayout(); }
+    void setIsExcludedFromNormalLayout(bool excluded) { m_bitfields.setIsExcludedFromNormalLayout(excluded); }
+    bool isExcludedAndPlacedInBorder() const { return isExcludedFromNormalLayout() && isLegend(); }
+
     enum VisibleInViewportState {
         VisibilityUnknown,
         VisibleInViewport,
@@ -587,6 +589,7 @@ public:
     virtual void updateHitTestResult(HitTestResult&, const LayoutPoint&);
     virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction);
 
+    virtual Position positionForPoint(const LayoutPoint&);
     virtual VisiblePosition positionForPoint(const LayoutPoint&, const RenderRegion*);
     VisiblePosition createVisiblePosition(int offset, EAffinity) const;
     VisiblePosition createVisiblePosition(const Position&) const;
@@ -771,7 +774,7 @@ public:
     
     void removeFromParent();
 
-    AnimationController& animation() const;
+    CSSAnimationController& animation() const;
 
     // Map points and quads through elements, potentially via 3d transforms. You should never need to call these directly; use
     // localToAbsolute/absoluteToLocal methods instead.
@@ -902,6 +905,7 @@ private:
             , m_hasTransformRelatedProperty(false)
             , m_everHadLayout(false)
             , m_childrenInline(false)
+            , m_isExcludedFromNormalLayout(false)
             , m_positionedState(IsStaticallyPositioned)
             , m_selectionState(SelectionNone)
             , m_flowThreadState(NotInsideFlowThread)
@@ -937,6 +941,8 @@ private:
 
         // from RenderBlock
         ADD_BOOLEAN_BITFIELD(childrenInline, ChildrenInline);
+        
+        ADD_BOOLEAN_BITFIELD(isExcludedFromNormalLayout, IsExcludedFromNormalLayout);
 
     private:
         unsigned m_positionedState : 2; // PositionedState
@@ -1016,7 +1022,7 @@ inline Page& RenderObject::page() const
     return *frame().page();
 }
 
-inline AnimationController& RenderObject::animation() const
+inline CSSAnimationController& RenderObject::animation() const
 {
     return frame().animation();
 }

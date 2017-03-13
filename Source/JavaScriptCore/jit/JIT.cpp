@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2009, 2012-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2008-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,6 +29,7 @@
 
 #include "JIT.h"
 
+#include "BytecodeGraph.h"
 #include "CodeBlock.h"
 #include "CodeBlockWithJITType.h"
 #include "DFGCapabilities.h"
@@ -42,11 +43,13 @@
 #include "MaxFrameExtentForSlowPathCall.h"
 #include "PCToCodeOriginMap.h"
 #include "ProfilerDatabase.h"
+#include "ProgramCodeBlock.h"
 #include "ResultType.h"
 #include "SlowPathCall.h"
 #include "StackAlignment.h"
 #include "TypeProfilerLog.h"
 #include <wtf/CryptographicallyRandomNumber.h>
+#include <wtf/GraphNodeWorklist.h>
 #include <wtf/SimpleStats.h>
 
 using namespace std;
@@ -74,12 +77,13 @@ JIT::CodeRef JIT::compileCTINativeCall(VM* vm, NativeFunction func)
     return jit.privateCompileCTINativeCall(vm, func);
 }
 
-JIT::JIT(VM* vm, CodeBlock* codeBlock)
+JIT::JIT(VM* vm, CodeBlock* codeBlock, unsigned loopOSREntryBytecodeOffset)
     : JSInterfaceJIT(vm, codeBlock)
     , m_interpreter(vm->interpreter)
     , m_labels(codeBlock ? codeBlock->numberOfInstructions() : 0)
     , m_bytecodeOffset(std::numeric_limits<unsigned>::max())
     , m_getByIdIndex(UINT_MAX)
+    , m_getByIdWithThisIndex(UINT_MAX)
     , m_putByIdIndex(UINT_MAX)
     , m_byValInstructionIndex(UINT_MAX)
     , m_callLinkInfoIndex(UINT_MAX)
@@ -87,6 +91,7 @@ JIT::JIT(VM* vm, CodeBlock* codeBlock)
     , m_pcToCodeOriginMapBuilder(*vm)
     , m_canBeOptimized(false)
     , m_shouldEmitProfiling(false)
+    , m_loopOSREntryBytecodeOffset(loopOSREntryBytecodeOffset)
 {
 }
 
@@ -147,14 +152,18 @@ void JIT::assertStackPointerOffset()
 
 #define DEFINE_SLOW_OP(name) \
     case op_##name: { \
-        JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_##name); \
-        slowPathCall.call(); \
+        if (m_bytecodeOffset >= startBytecodeOffset) { \
+            JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_##name); \
+            slowPathCall.call(); \
+        } \
         NEXT_OPCODE(op_##name); \
     }
 
 #define DEFINE_OP(name) \
     case name: { \
-        emit_##name(currentInstruction); \
+        if (m_bytecodeOffset >= startBytecodeOffset) { \
+            emit_##name(currentInstruction); \
+        } \
         NEXT_OPCODE(name); \
     }
 
@@ -177,7 +186,42 @@ void JIT::privateCompileMainPass()
 
     m_callLinkInfoIndex = 0;
 
+    unsigned startBytecodeOffset = 0;
+    if (m_loopOSREntryBytecodeOffset && m_codeBlock->inherits(*m_codeBlock->vm(), ProgramCodeBlock::info())) {
+        // We can only do this optimization because we execute ProgramCodeBlock's exactly once.
+        // This optimization would be invalid otherwise. When the LLInt determines it wants to
+        // do OSR entry into the baseline JIT in a loop, it will pass in the bytecode offset it
+        // was executing at when it kicked off our compilation. We only need to compile code for
+        // anything reachable from that bytecode offset.
+
+        // We only bother building the bytecode graph if it could save time and executable
+        // memory. We pick an arbitrary offset where we deem this is profitable.
+        if (m_loopOSREntryBytecodeOffset >= 200) {
+            // As a simplification, we don't find all bytecode ranges that are unreachable.
+            // Instead, we just find the minimum bytecode offset that is reachable, and
+            // compile code from that bytecode offset onwards.
+
+            BytecodeGraph<CodeBlock> graph(m_codeBlock, m_instructions);
+            BytecodeBasicBlock* block = graph.findBasicBlockForBytecodeOffset(m_loopOSREntryBytecodeOffset);
+            RELEASE_ASSERT(block);
+
+            GraphNodeWorklist<BytecodeBasicBlock*> worklist;
+            startBytecodeOffset = UINT_MAX;
+            worklist.push(block);
+            while (BytecodeBasicBlock* block = worklist.pop()) {
+                startBytecodeOffset = std::min(startBytecodeOffset, block->leaderOffset());
+                worklist.pushAll(block->successors());
+            }
+        }
+    }
+
     for (m_bytecodeOffset = 0; m_bytecodeOffset < instructionCount; ) {
+        if (m_bytecodeOffset == startBytecodeOffset && startBytecodeOffset > 0) {
+            // We've proven all bytecode instructions up until here are unreachable.
+            // Let's ensure that by crashing if it's ever hit.
+            breakpoint();
+        }
+
         if (m_disassembler)
             m_disassembler->setForBytecodeMainPath(m_bytecodeOffset, label());
         Instruction* currentInstruction = instructionsBegin + m_bytecodeOffset;
@@ -285,7 +329,7 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_jngreatereq)
         DEFINE_OP(op_jtrue)
         DEFINE_OP(op_loop_hint)
-        DEFINE_OP(op_watchdog)
+        DEFINE_OP(op_check_traps)
         DEFINE_OP(op_lshift)
         DEFINE_OP(op_mod)
         DEFINE_OP(op_mov)
@@ -394,6 +438,7 @@ void JIT::privateCompileSlowCases()
     Instruction* instructionsBegin = m_codeBlock->instructions().begin();
 
     m_getByIdIndex = 0;
+    m_getByIdWithThisIndex = 0;
     m_putByIdIndex = 0;
     m_byValInstructionIndex = 0;
     m_callLinkInfoIndex = 0;
@@ -449,6 +494,7 @@ void JIT::privateCompileSlowCases()
         case op_get_by_id_proto_load:
         case op_get_by_id_unset:
         DEFINE_SLOWCASE_OP(op_get_by_id)
+        DEFINE_SLOWCASE_OP(op_get_by_id_with_this)
         DEFINE_SLOWCASE_OP(op_get_by_val)
         DEFINE_SLOWCASE_OP(op_instanceof)
         DEFINE_SLOWCASE_OP(op_instanceof_custom)
@@ -461,7 +507,7 @@ void JIT::privateCompileSlowCases()
         DEFINE_SLOWCASE_OP(op_jngreater)
         DEFINE_SLOWCASE_OP(op_jngreatereq)
         DEFINE_SLOWCASE_OP(op_loop_hint)
-        DEFINE_SLOWCASE_OP(op_watchdog)
+        DEFINE_SLOWCASE_OP(op_check_traps)
         DEFINE_SLOWCASE_OP(op_lshift)
         DEFINE_SLOWCASE_OP(op_mod)
         DEFINE_SLOWCASE_OP(op_mul)
@@ -508,6 +554,7 @@ void JIT::privateCompileSlowCases()
     }
 
     RELEASE_ASSERT(m_getByIdIndex == m_getByIds.size());
+    RELEASE_ASSERT(m_getByIdWithThisIndex == m_getByIdsWithThis.size());
     RELEASE_ASSERT(m_putByIdIndex == m_putByIds.size());
     RELEASE_ASSERT(m_callLinkInfoIndex == m_callCompilationInfo.size());
     RELEASE_ASSERT(numberOfValueProfiles == m_codeBlock->numberOfValueProfiles());
@@ -730,6 +777,8 @@ CompilationResult JIT::link()
 
     for (unsigned i = m_getByIds.size(); i--;)
         m_getByIds[i].finalize(patchBuffer);
+    for (unsigned i = m_getByIdsWithThis.size(); i--;)
+        m_getByIdsWithThis[i].finalize(patchBuffer);
     for (unsigned i = m_putByIds.size(); i--;)
         m_putByIds[i].finalize(patchBuffer);
 
@@ -786,7 +835,7 @@ CompilationResult JIT::link()
     if (m_compilation) {
         if (Options::disassembleBaselineForProfiler())
             m_disassembler->reportToProfiler(m_compilation.get(), patchBuffer);
-        m_vm->m_perBytecodeProfiler->addCompilation(m_codeBlock, m_compilation);
+        m_vm->m_perBytecodeProfiler->addCompilation(m_codeBlock, *m_compilation);
     }
 
     if (m_pcToCodeOriginMapBuilder.didBuildMapping())
@@ -802,7 +851,7 @@ CompilationResult JIT::link()
 
     m_codeBlock->shrinkToFit(CodeBlock::LateShrink);
     m_codeBlock->setJITCode(
-        adoptRef(new DirectJITCode(result, withArityCheck, JITCode::BaselineJIT)));
+        adoptRef(*new DirectJITCode(result, withArityCheck, JITCode::BaselineJIT)));
 
 #if ENABLE(JIT_VERBOSE)
     dataLogF("JIT generated code for %p at [%p, %p).\n", m_codeBlock, result.executableMemory()->start(), result.executableMemory()->end());

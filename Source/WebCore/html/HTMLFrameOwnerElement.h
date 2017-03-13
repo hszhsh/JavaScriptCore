@@ -57,6 +57,8 @@ public:
 
     void scheduleinvalidateStyleAndLayerComposition();
 
+    virtual bool isURLAllowed(const URL&) const { return true; }
+
 protected:
     HTMLFrameOwnerElement(const QualifiedName& tagName, Document&);
     void setSandboxFlags(SandboxFlags);
@@ -71,15 +73,17 @@ private:
 
 class SubframeLoadingDisabler {
 public:
-    explicit SubframeLoadingDisabler(ContainerNode& root)
+    explicit SubframeLoadingDisabler(ContainerNode* root)
         : m_root(root)
     {
-        disabledSubtreeRoots().add(&m_root);
+        if (m_root)
+            disabledSubtreeRoots().add(m_root);
     }
 
     ~SubframeLoadingDisabler()
     {
-        disabledSubtreeRoots().remove(&m_root);
+        if (m_root)
+            disabledSubtreeRoots().remove(m_root);
     }
 
     static bool canLoadFrame(HTMLFrameOwnerElement&);
@@ -91,7 +95,7 @@ private:
         return nodes;
     }
 
-    ContainerNode& m_root;
+    ContainerNode* m_root;
 };
 
 } // namespace WebCore

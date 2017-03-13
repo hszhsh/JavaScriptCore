@@ -1,5 +1,6 @@
 <script src="../../../resources/js-test-pre.js"></script>
 <script src="../resources/media-controls-loader.js" type="text/javascript"></script>
+<script src="../resources/media-controls-utils.js" type="text/javascript"></script>
 <body>
 <script type="text/javascript">
 
@@ -14,12 +15,12 @@ airplayButton.on = true;
 
 document.body.appendChild(airplayButton.element);
 
-scheduler.frameDidFire = function()
-{
-    shouldBeTrue('airplayButton.element.classList.contains("on")');
+shouldBecomeEqual('airplayButton.element.classList.contains("on")', "true", () => {
     debug(`window.getComputedStyle(airplayButton.element).backgroundColor = ${window.getComputedStyle(airplayButton.element).backgroundColor}`);
-    finishJSTest();
-};
+
+    airplayButton.element.remove();
+    finishMediaControlsTest();
+});
 
 </script>
 <script src="../../../resources/js-test-post.js"></script>

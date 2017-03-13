@@ -236,6 +236,8 @@ public:
 
     RenderBoxModelObject* continuation() const;
 
+    virtual LayoutRect paintRectToClipOutFromBorder(const LayoutRect&) { return LayoutRect(); };
+    
 protected:
     RenderBoxModelObject(Element&, RenderStyle&&, BaseTypeFlags);
     RenderBoxModelObject(Document&, RenderStyle&&, BaseTypeFlags);
@@ -322,6 +324,8 @@ private:
         float thickness, float drawThickness, BoxSide, const RenderStyle&,
         Color, EBorderStyle, BackgroundBleedAvoidance, bool includeLogicalLeftEdge, bool includeLogicalRightEdge);
     void paintMaskForTextFillBox(ImageBuffer*, const IntRect&, InlineFlowBox*, const LayoutRect&);
+    
+    RenderBlock* containingBlockForAutoHeightDetection(Length logicalHeight) const;
 };
 
 } // namespace WebCore

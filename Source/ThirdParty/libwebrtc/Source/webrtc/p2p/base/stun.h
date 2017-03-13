@@ -158,10 +158,8 @@ class StunMessage {
   const StunErrorCodeAttribute* GetErrorCode() const;
   const StunUInt16ListAttribute* GetUnknownAttributes() const;
 
-  // Takes ownership of the specified attribute, verifies it is of the correct
-  // type, and adds it to the message. The return value indicates whether this
-  // was successful.
-  bool AddAttribute(StunAttribute* attr);
+  // Takes ownership of the specified attribute and adds it to the message.
+  void AddAttribute(StunAttribute* attr);
 
   // Validates that a raw STUN message has a correct MESSAGE-INTEGRITY value.
   // This can't currently be done on a StunMessage, since it is affected by
@@ -217,7 +215,7 @@ class StunAttribute {
   virtual StunAttributeValueType value_type() const = 0;
 
   // Only XorAddressAttribute needs this so far.
-  virtual void SetOwner(StunMessage* owner) {}
+  virtual void SetOwner(StunMessage*) {}
 
   // Reads the body (not the type or length) for this type of attribute from
   // the given buffer.  Return value is true if successful.

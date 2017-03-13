@@ -39,7 +39,7 @@ public:
 
     static JSC::JSObject* createPrototype(JSC::VM&, JSC::JSGlobalObject*);
     static JSC::JSObject* prototype(JSC::VM&, JSC::JSGlobalObject*);
-    static TestObj* toWrapped(JSC::JSValue);
+    static TestObj* toWrapped(JSC::VM&, JSC::JSValue);
     static bool getOwnPropertySlot(JSC::JSObject*, JSC::ExecState*, JSC::PropertyName, JSC::PropertySlot&);
     static bool getOwnPropertySlotByIndex(JSC::JSObject*, JSC::ExecState*, unsigned propertyName, JSC::PropertySlot&);
     static void destroy(JSC::JSCell*);
@@ -53,6 +53,7 @@ public:
 
     static void getOwnPropertyNames(JSC::JSObject*, JSC::ExecState*, JSC::PropertyNameArray&, JSC::EnumerationMode = JSC::EnumerationMode());
     static JSC::JSValue getConstructor(JSC::VM&, const JSC::JSGlobalObject*);
+    static JSC::JSObject* serialize(JSC::ExecState*, JSTestObj* thisObject, JSC::ThrowScope&);
     mutable JSC::WriteBarrier<JSC::Unknown> m_cachedAttribute1;
     mutable JSC::WriteBarrier<JSC::Unknown> m_cachedAttribute2;
     static void visitChildren(JSCell*, JSC::SlotVisitor&);

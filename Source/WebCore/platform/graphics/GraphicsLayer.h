@@ -374,6 +374,9 @@ public:
     bool contentsOpaque() const { return m_contentsOpaque; }
     virtual void setContentsOpaque(bool b) { m_contentsOpaque = b; }
 
+    bool supportsSubpixelAntialiasedText() const { return m_supportsSubpixelAntialiasedText; }
+    virtual void setSupportsSubpixelAntialiasedText(bool b) { m_supportsSubpixelAntialiasedText = b; }
+
     bool backfaceVisibility() const { return m_backfaceVisibility; }
     virtual void setBackfaceVisibility(bool b) { m_backfaceVisibility = b; }
 
@@ -441,7 +444,7 @@ public:
     static String animationNameForTransition(AnimatedPropertyID);
     
     // Return true if the animation is handled by the compositing system. If this returns
-    // false, the animation will be run by AnimationController.
+    // false, the animation will be run by CSSAnimationController.
     // These methods handle both transitions and keyframe animations.
     virtual bool addAnimation(const KeyframeValueList&, const FloatSize& /*boxSize*/, const Animation*, const String& /*animationName*/, double /*timeOffset*/)  { return false; }
     virtual void pauseAnimation(const String& /*animationName*/, double /*timeOffset*/) { }
@@ -517,6 +520,8 @@ public:
     virtual void deviceOrPageScaleFactorChanged() { }
     WEBCORE_EXPORT void noteDeviceOrPageScaleFactorChangedIncludingDescendants();
 
+    void setIsInWindow(bool);
+
     // Some compositing systems may do internal batching to synchronize compositing updates
     // with updates drawn into the window. These methods flush internal batched state on this layer
     // and descendant layers, and this layer only.
@@ -541,7 +546,6 @@ public:
     // Return an estimate of the backing store memory cost (in bytes). May be incorrect for tiled layers.
     WEBCORE_EXPORT virtual double backingStoreMemoryEstimate() const;
 
-    bool usingTiledBacking() const { return m_usingTiledBacking; }
     virtual TiledBacking* tiledBacking() const { return 0; }
 
     void resetTrackedRepaints();
@@ -550,6 +554,7 @@ public:
     static bool supportsBackgroundColorContent();
     static bool supportsLayerType(Type);
     static bool supportsContentsTiling();
+    static bool supportsSubpixelAntialiasedLayerText();
 
     void updateDebugIndicators();
 
@@ -559,6 +564,8 @@ public:
     virtual bool isGraphicsLayerCARemote() const { return false; }
     virtual bool isGraphicsLayerTextureMapper() const { return false; }
     virtual bool isCoordinatedGraphicsLayer() const { return false; }
+
+    static void traverse(GraphicsLayer&, std::function<void (GraphicsLayer&)>);
 
 protected:
     WEBCORE_EXPORT explicit GraphicsLayer(Type, GraphicsLayerClient&);
@@ -628,9 +635,9 @@ protected:
     const Type m_type;
 
     bool m_contentsOpaque : 1;
+    bool m_supportsSubpixelAntialiasedText : 1;
     bool m_preserves3D: 1;
     bool m_backfaceVisibility : 1;
-    bool m_usingTiledBacking : 1;
     bool m_masksToBounds : 1;
     bool m_drawsContent : 1;
     bool m_contentsVisible : 1;

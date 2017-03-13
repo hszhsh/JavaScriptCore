@@ -22,7 +22,7 @@
 
 import time
 
-from webkitpy.port.ios import IOSSimulatorPort
+from webkitpy.port.ios_simulator import IOSSimulatorPort
 from webkitpy.port import darwin_testcase
 from webkitpy.common.system.filesystem_mock import MockFileSystem
 from webkitpy.common.system.outputcapture import OutputCapture
@@ -70,7 +70,7 @@ class iosTest(darwin_testcase.DarwinTest):
         port._run_script = run_script
         self.assertEqual(port.architecture(), 'x86')
         port._build_driver()
-        self.assertEqual(self.args, ['--ios-simulator'])
+        self.assertEqual(self.args, ['ARCHS=i386', '--sdk', 'iphonesimulator'])
 
     def test_64bit(self):
         # Apple Mac port is 64-bit by default
@@ -82,7 +82,7 @@ class iosTest(darwin_testcase.DarwinTest):
 
         port._run_script = run_script
         port._build_driver()
-        self.assertEqual(self.args, ['--ios-simulator'])
+        self.assertEqual(self.args, ['--sdk', 'iphonesimulator'])
 
     def test_sdk_name(self):
         port = self.make_port()

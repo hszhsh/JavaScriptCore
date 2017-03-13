@@ -17,6 +17,7 @@
 #include "RTCUIApplication.h"
 #endif
 #include "libyuv/convert.h"
+#include "webrtc/api/video/video_frame.h"
 #include "webrtc/base/checks.h"
 #include "webrtc/base/logging.h"
 #include "webrtc/common_video/include/corevideo_frame_buffer.h"
@@ -96,7 +97,7 @@ int H264VideoToolboxDecoder::Decode(
     int64_t render_time_ms) {
   RTC_DCHECK(input_image._buffer);
 
-#if defined(WEBRTC_IOS)
+#if defined(WEBRTC_IOS) && !defined(WEBRTC_WEBKIT_BUILD)
   if (!RTCIsUIApplicationActive()) {
     // Ignore all decode requests when app isn't active. In this state, the
     // hardware decoder has been invalidated by the OS.

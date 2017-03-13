@@ -54,10 +54,8 @@ StyleRareNonInheritedData::StyleRareNonInheritedData()
 #if ENABLE(FILTERS_LEVEL_2)
     , backdropFilter(StyleFilterData::create())
 #endif
-#if ENABLE(CSS_GRID_LAYOUT)
     , grid(StyleGridData::create())
     , gridItem(StyleGridItemData::create())
-#endif
 #if ENABLE(CSS_SCROLL_SNAP)
     , scrollSnapPort(StyleScrollSnapPort::create())
     , scrollSnapArea(StyleScrollSnapArea::create())
@@ -109,7 +107,7 @@ StyleRareNonInheritedData::StyleRareNonInheritedData()
     , breakInside(RenderStyle::initialBreakInside())
     , resize(RenderStyle::initialResize())
     , hasAttrContent(false)
-    , isPlaceholderStyle(false)
+    , isNotFinal(false)
 {
     maskBoxImage.setMaskDefaults();
 }
@@ -133,10 +131,8 @@ inline StyleRareNonInheritedData::StyleRareNonInheritedData(const StyleRareNonIn
 #if ENABLE(FILTERS_LEVEL_2)
     , backdropFilter(o.backdropFilter)
 #endif
-#if ENABLE(CSS_GRID_LAYOUT)
     , grid(o.grid)
     , gridItem(o.gridItem)
-#endif
 #if ENABLE(CSS_SCROLL_SNAP)
     , scrollSnapPort(o.scrollSnapPort)
     , scrollSnapArea(o.scrollSnapArea)
@@ -204,7 +200,7 @@ inline StyleRareNonInheritedData::StyleRareNonInheritedData(const StyleRareNonIn
     , breakInside(o.breakInside)
     , resize(o.resize)
     , hasAttrContent(o.hasAttrContent)
-    , isPlaceholderStyle(o.isPlaceholderStyle)
+    , isNotFinal(o.isNotFinal)
 {
 }
 
@@ -239,10 +235,8 @@ bool StyleRareNonInheritedData::operator==(const StyleRareNonInheritedData& o) c
 #if ENABLE(FILTERS_LEVEL_2)
         && backdropFilter == o.backdropFilter
 #endif
-#if ENABLE(CSS_GRID_LAYOUT)
         && grid == o.grid
         && gridItem == o.gridItem
-#endif
 #if ENABLE(CSS_SCROLL_SNAP)
         && scrollSnapPort == o.scrollSnapPort
         && scrollSnapArea == o.scrollSnapArea
@@ -310,7 +304,7 @@ bool StyleRareNonInheritedData::operator==(const StyleRareNonInheritedData& o) c
         && breakInside == o.breakInside
         && resize == o.resize
         && hasAttrContent == o.hasAttrContent
-        && isPlaceholderStyle == o.isPlaceholderStyle;
+        && isNotFinal == o.isNotFinal;
 }
 
 bool StyleRareNonInheritedData::contentDataEquivalent(const StyleRareNonInheritedData& other) const

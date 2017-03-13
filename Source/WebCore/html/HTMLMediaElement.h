@@ -57,6 +57,7 @@ namespace WebCore {
 class AudioSourceProvider;
 class AudioTrackList;
 class AudioTrackPrivate;
+class Blob;
 class DOMError;
 class DeferredPromise;
 class DisplaySleepDisabler;
@@ -91,6 +92,15 @@ using CueIntervalTree = PODIntervalTree<MediaTime, TextTrackCue*>;
 using CueInterval = CueIntervalTree::IntervalType;
 using CueList = Vector<CueInterval>;
 #endif
+
+using MediaProvider = std::optional<Variant<
+#if ENABLE(MEDIA_STREAM)
+    RefPtr<MediaStream>,
+#endif
+#if ENABLE(MEDIA_SOURCE)
+    RefPtr<MediaSource>,
+#endif
+    RefPtr<Blob>>>;
 
 class HTMLMediaElement
     : public HTMLElement
@@ -164,10 +174,8 @@ public:
     void setSrc(const String&);
     const URL& currentSrc() const { return m_currentSrc; }
 
-#if ENABLE(MEDIA_STREAM)
-    MediaStream* srcObject() const { return m_mediaStreamSrcObject.get(); }
-    void setSrcObject(ScriptExecutionContext&, MediaStream*);
-#endif
+    const MediaProvider& srcObject() const { return m_mediaProvider; }
+    void setSrcObject(MediaProvider&&);
 
     WEBCORE_EXPORT void setCrossOrigin(const AtomicString&);
     WEBCORE_EXPORT String crossOrigin() const;
@@ -250,7 +258,7 @@ public:
 #endif
 
 #if ENABLE(LEGACY_ENCRYPTED_MEDIA)
-    WebKitMediaKeys* webkitKeys() const { return m_mediaKeys.get(); }
+    WebKitMediaKeys* webkitKeys() const { return m_webKitMediaKeys.get(); }
     void webkitSetMediaKeys(WebKitMediaKeys*);
 
     void keyAdded();
@@ -281,6 +289,8 @@ public:
     WEBCORE_EXPORT bool canPlay() const override;
 
     double percentLoaded() const;
+
+    bool shouldForceControlsDisplay() const;
 
 #if ENABLE(VIDEO_TRACK)
     ExceptionOr<TextTrack&> addTextTrack(const String& kind, const String& label, const String& language);
@@ -457,9 +467,9 @@ public:
     void pageScaleFactorChanged();
     void userInterfaceLayoutDirectionChanged();
     WEBCORE_EXPORT String getCurrentMediaControlsStatus();
-#endif
 
     MediaControlsHost* mediaControlsHost() { return m_mediaControlsHost.get(); }
+#endif
 
     bool isDisablingSleep() const { return m_sleepDisabler.get(); }
 
@@ -484,6 +494,8 @@ public:
     bool hasEverHadVideo() const { return m_hasEverHadVideo; }
 
     double playbackStartedTime() const { return m_playbackStartedTime; }
+
+    bool isTemporarilyAllowingInlinePlaybackAfterFullscreen() const {return m_temporarilyAllowingInlinePlaybackAfterFullscreen; }
 
 protected:
     HTMLMediaElement(const QualifiedName&, Document&, bool createdByParser);
@@ -698,7 +710,6 @@ private:
 #endif
 
     // These "internal" functions do not check user gesture restrictions.
-    void loadInternal();
     bool playInternal();
     void pauseInternal();
 
@@ -719,7 +730,12 @@ private:
     bool stoppedDueToErrors() const;
     bool pausedForUserInteraction() const;
     bool couldPlayIfEnoughData() const;
-    bool canTransitionFromAutoplayToPlay() const;
+    void dispatchPlayPauseEventsIfNeedsQuirks();
+    SuccessOr<MediaPlaybackDenialReason> canTransitionFromAutoplayToPlay() const;
+
+    enum class PlaybackWithoutUserGesture { None, Started, Prevented };
+    void setPlaybackWithoutUserGesture(PlaybackWithoutUserGesture);
+    void userDidInterfereWithAutoplay();
 
     MediaTime minTimeSeekable() const;
     MediaTime maxTimeSeekable() const;
@@ -776,6 +792,7 @@ private:
     bool supportsSeeking() const override;
     bool shouldOverrideBackgroundPlaybackRestriction(PlatformMediaSession::InterruptionType) const override;
     bool shouldOverrideBackgroundLoadingRestriction() const override;
+    bool canProduceAudio() const final;
 
     void pageMutedStateDidChange() override;
 
@@ -827,6 +844,7 @@ private:
     GenericTaskQueue<Timer> m_pauseAfterDetachedTaskQueue;
     GenericTaskQueue<Timer> m_updatePlaybackControlsManagerQueue;
     GenericTaskQueue<Timer> m_playbackControlsManagerBehaviorRestrictionsQueue;
+    GenericTaskQueue<Timer> m_resourceSelectionTaskQueue;
     RefPtr<TimeRanges> m_playedTimeRanges;
     GenericEventQueue m_asyncEventQueue;
 
@@ -881,6 +899,8 @@ private:
     VideoFullscreenMode m_videoFullscreenMode { VideoFullscreenModeNone };
     bool m_preparedForInline;
     std::function<void()> m_preparedForInlineCompletionHandler;
+
+    bool m_temporarilyAllowingInlinePlaybackAfterFullscreen { false };
 
 #if PLATFORM(IOS) || (PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE))
     RetainPtr<PlatformLayer> m_videoFullscreenLayer;
@@ -977,6 +997,9 @@ private:
     bool m_haveVisibleTextTrack : 1;
     bool m_processingPreferenceChange : 1;
 
+    PlaybackWithoutUserGesture m_playbackWithoutUserGesture;
+    std::optional<MediaTime> m_playbackWithoutUserGestureStartedTime;
+
     String m_subtitleTrackLanguage;
     MediaTime m_lastTextTrackUpdateTime { -1, 1 };
 
@@ -1010,8 +1033,11 @@ private:
 
     friend class TrackDisplayUpdateScope;
 
+    RefPtr<Blob> m_blob;
+    MediaProvider m_mediaProvider;
+
 #if ENABLE(LEGACY_ENCRYPTED_MEDIA)
-    RefPtr<WebKitMediaKeys> m_mediaKeys;
+    RefPtr<WebKitMediaKeys> m_webKitMediaKeys;
 #endif
 
     std::unique_ptr<MediaElementSession> m_mediaSession;

@@ -45,7 +45,6 @@
 #include "RenderPtr.h"
 #include "ScriptExecutionContext.h"
 #include "StringWithDirection.h"
-#include "StyleChange.h"
 #include "Supplementable.h"
 #include "TextResourceDecoder.h"
 #include "Timer.h"
@@ -78,6 +77,7 @@ class CSSFontSelector;
 class CSSStyleDeclaration;
 class CSSStyleSheet;
 class CachedCSSStyleSheet;
+class CachedFrameBase;
 class CachedResourceLoader;
 class CachedScript;
 class CanvasRenderingContext;
@@ -229,7 +229,7 @@ enum NodeListInvalidationType {
     InvalidateOnClassAttrChange,
     InvalidateOnIdNameAttrChange,
     InvalidateOnNameAttrChange,
-    InvalidateOnForAttrChange,
+    InvalidateOnForTypeAttrChange,
     InvalidateForFormControls,
     InvalidateOnHRefAttrChange,
     InvalidateOnAnyAttrChange,
@@ -382,9 +382,7 @@ public:
 
     static CustomElementNameValidationStatus validateCustomElementName(const AtomicString&);
 
-#if ENABLE(CSS_GRID_LAYOUT)
     bool isCSSGridLayoutEnabled() const;
-#endif
 #if ENABLE(CSS_REGIONS)
     RefPtr<DOMNamedFlowCollection> webkitGetNamedFlows();
 #endif
@@ -485,9 +483,8 @@ public:
 
     CSSFontSelector& fontSelector() { return m_fontSelector; }
 
-    void notifyRemovePendingSheetIfNeeded();
-
     WEBCORE_EXPORT bool haveStylesheetsLoaded() const;
+    bool isIgnoringPendingStylesheets() const { return m_ignorePendingStylesheets; }
 
     WEBCORE_EXPORT StyleSheetList& styleSheets();
 
@@ -507,7 +504,8 @@ public:
 
     WEBCORE_EXPORT FrameView* view() const; // can be NULL
     WEBCORE_EXPORT Page* page() const; // can be NULL
-    WEBCORE_EXPORT Settings* settings() const; // can be NULL
+    const Settings& settings() const { return m_settings.get(); }
+    Settings& mutableSettings() { return m_settings.get(); }
 
     float deviceScaleFactor() const;
 
@@ -523,7 +521,8 @@ public:
     WEBCORE_EXPORT Ref<CSSStyleDeclaration> createCSSStyleDeclaration();
     Ref<Text> createEditingTextNode(const String&);
 
-    void recalcStyle(Style::Change = Style::NoChange);
+    enum class ResolveStyleType { Normal, Rebuild };
+    void resolveStyle(ResolveStyleType = ResolveStyleType::Normal);
     WEBCORE_EXPORT void updateStyleIfNeeded();
     bool needsStyleRecalc() const;
     unsigned lastStyleUpdateSizeForTesting() const { return m_lastStyleUpdateSizeForTesting; }
@@ -553,7 +552,6 @@ public:
 
     void didBecomeCurrentDocumentInFrame();
     void destroyRenderTree();
-    void disconnectFromFrame();
     void prepareForDestruction();
 
     // Override ScriptExecutionContext methods to do additional work
@@ -886,7 +884,7 @@ public:
     static bool hasValidNamespaceForElements(const QualifiedName&);
     static bool hasValidNamespaceForAttributes(const QualifiedName&);
 
-    HTMLBodyElement* body() const;
+    WEBCORE_EXPORT HTMLBodyElement* body() const;
     WEBCORE_EXPORT HTMLElement* bodyOrFrameset() const;
     WEBCORE_EXPORT ExceptionOr<void> setBodyOrFrameset(RefPtr<HTMLElement>&&);
 
@@ -938,12 +936,8 @@ public:
     WEBCORE_EXPORT Ref<XPathNSResolver> createNSResolver(Node* nodeResolver);
     WEBCORE_EXPORT ExceptionOr<Ref<XPathResult>> evaluate(const String& expression, Node* contextNode, RefPtr<XPathNSResolver>&&, unsigned short type, XPathResult*);
 
-    enum PendingSheetLayout { NoLayoutWithPendingSheets, DidLayoutWithPendingSheets, IgnoreLayoutWithPendingSheets };
-
-    bool didLayoutWithPendingStylesheets() const { return m_pendingSheetLayout == DidLayoutWithPendingSheets; }
-
-    bool hasNodesWithPlaceholderStyle() const { return m_hasNodesWithPlaceholderStyle; }
-    void setHasNodesWithPlaceholderStyle() { m_hasNodesWithPlaceholderStyle = true; }
+    bool hasNodesWithNonFinalStyle() const { return m_hasNodesWithNonFinalStyle; }
+    void setHasNodesWithNonFinalStyle() { m_hasNodesWithNonFinalStyle = true; }
 
     void updateFocusAppearanceSoon(SelectionRestorationMode);
     void cancelFocusAppearanceUpdate();
@@ -960,7 +954,6 @@ public:
     ScriptedAnimationController* scriptedAnimationController() { return m_scriptedAnimationController.get(); }
     void suspendScriptedAnimationControllerCallbacks();
     void resumeScriptedAnimationControllerCallbacks();
-    void scriptedAnimationControllerSetThrottled(bool);
     
     void windowScreenDidChange(PlatformDisplayID);
 
@@ -983,6 +976,9 @@ public:
     void registerForMediaVolumeCallbacks(Element*);
     void unregisterForMediaVolumeCallbacks(Element*);
     void mediaVolumeDidChange();
+
+    bool audioPlaybackRequiresUserGesture() const;
+    bool videoPlaybackRequiresUserGesture() const;
 
 #if ENABLE(MEDIA_SESSION)
     MediaSession& defaultMediaSession();
@@ -1111,6 +1107,7 @@ public:
     void incrementLoadEventDelayCount() { ++m_loadEventDelayCount; }
     void decrementLoadEventDelayCount();
     bool isDelayingLoadEvent() const { return m_loadEventDelayCount; }
+    void checkCompleted();
 
 #if ENABLE(IOS_TOUCH_EVENTS)
 #include <WebKitAdditions/DocumentIOS.h>
@@ -1201,7 +1198,6 @@ public:
     DocumentSharedObjectPool* sharedObjectPool() { return m_sharedObjectPool.get(); }
 
     void didRemoveAllPendingStylesheet();
-    void setNeedsNotifyRemoveAllPendingStylesheet() { m_needsNotifyRemoveAllPendingStylesheet = true; }
     void didClearStyleResolver();
 
     bool inStyleRecalc() const { return m_inStyleRecalc; }
@@ -1279,6 +1275,9 @@ public:
     void didRemoveInDocumentShadowRoot(ShadowRoot&);
     const HashSet<ShadowRoot*>& inDocumentShadowRoots() const { return m_inDocumentShadowRoots; }
 
+    void attachToCachedFrame(CachedFrameBase&);
+    void detachFromCachedFrame(CachedFrameBase&);
+
 protected:
     enum ConstructionFlags { Synthesized = 1, NonRenderedPlaceholder = 1 << 1 };
     Document(Frame*, const URL&, unsigned = DefaultDocumentClass, unsigned constructionFlags = 0);
@@ -1291,6 +1290,8 @@ private:
     friend class Node;
     friend class IgnoreDestructiveWriteCountIncrementer;
     friend class IgnoreOpensDuringUnloadCountIncrementer;
+
+    void detachFromFrame() { observeFrame(nullptr); }
 
     void updateTitleElement(Element* newTitleElement);
     void frameDestroyed() final;
@@ -1321,9 +1322,9 @@ private:
 
     void addMessage(MessageSource, MessageLevel, const String& message, const String& sourceURL, unsigned lineNumber, unsigned columnNumber, RefPtr<Inspector::ScriptCallStack>&&, JSC::ExecState* = nullptr, unsigned long requestIdentifier = 0) final;
 
-    std::chrono::milliseconds minimumTimerInterval() const final;
+    Seconds minimumDOMTimerInterval() const final;
 
-    std::chrono::milliseconds timerAlignmentInterval(bool hasReachedMaxNestingLevel) const final;
+    Seconds domTimerAlignmentInterval(bool hasReachedMaxNestingLevel) const final;
 
     void updateTitleFromTitleElement();
     void updateTitle(const StringWithDirection&);
@@ -1377,17 +1378,13 @@ private:
 
     unsigned m_referencingNodeCount;
 
+    const Ref<Settings> m_settings;
+
     std::unique_ptr<StyleResolver> m_userAgentShadowTreeStyleResolver;
-    bool m_hasNodesWithPlaceholderStyle;
-    bool m_needsNotifyRemoveAllPendingStylesheet;
+    bool m_hasNodesWithNonFinalStyle;
     // But sometimes you need to ignore pending stylesheet count to
     // force an immediate layout when requested by JS.
     bool m_ignorePendingStylesheets;
-
-    // If we do ignore the pending stylesheet count, then we need to add a boolean
-    // to track that this happened so that we can do a full repaint when the stylesheets
-    // do eventually load.
-    PendingSheetLayout m_pendingSheetLayout;
 
     RefPtr<DOMWindow> m_domWindow;
     WeakPtr<Document> m_contextDocument;
@@ -1744,12 +1741,6 @@ private:
 };
 
 Element* eventTargetElementForDocument(Document*);
-
-inline void Document::notifyRemovePendingSheetIfNeeded()
-{
-    if (m_needsNotifyRemoveAllPendingStylesheet)
-        didRemoveAllPendingStylesheet();
-}
 
 inline TextEncoding Document::textEncoding() const
 {

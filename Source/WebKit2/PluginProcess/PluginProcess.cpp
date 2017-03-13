@@ -36,8 +36,8 @@
 #include "PluginProcessCreationParameters.h"
 #include "PluginProcessProxyMessages.h"
 #include "WebProcessConnection.h"
-#include <WebCore/MemoryPressureHandler.h>
 #include <WebCore/NotImplemented.h>
+#include <wtf/MemoryPressureHandler.h>
 #include <wtf/RunLoop.h>
 
 #if PLATFORM(MAC)
@@ -119,10 +119,6 @@ void PluginProcess::didClose(IPC::Connection&)
     // The UI process has crashed, just quit.
     // FIXME: If the plug-in is spinning in the main loop, we'll never get this message.
     stopRunLoop();
-}
-
-void PluginProcess::didReceiveInvalidMessage(IPC::Connection&, IPC::StringReference, IPC::StringReference)
-{
 }
 
 void PluginProcess::initializePluginProcess(PluginProcessCreationParameters&& parameters)

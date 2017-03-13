@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2016-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,15 +23,19 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef WebResourceLoadStatisticsStore_h
-#define WebResourceLoadStatisticsStore_h
+#pragma once
 
 #include "APIObject.h"
 #include "Connection.h"
+#include "ResourceLoadStatisticsClassifier.h"
 #include "WebsiteDataRecord.h"
 #include <WebCore/ResourceLoadStatisticsStore.h>
 #include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
+
+#if PLATFORM(COCOA)
+#include "ResourceLoadStatisticsClassifierCocoa.h"
+#endif
 
 namespace WTF {
 class WorkQueue;
@@ -51,10 +55,15 @@ class WebProcessProxy;
 class WebResourceLoadStatisticsStore : public IPC::Connection::WorkQueueMessageReceiver {
 public:
     static Ref<WebResourceLoadStatisticsStore> create(const String&);
+    static void setNotifyPagesWhenDataRecordsWereScanned(bool);
+    static void setShouldClassifyResourcesBeforeDataRecordsRemoval(bool);
+    static void setMinimumTimeBetweeenDataRecordsRemoval(double);
     virtual ~WebResourceLoadStatisticsStore();
     
     void setResourceLoadStatisticsEnabled(bool);
     bool resourceLoadStatisticsEnabled() const;
+    void registerSharedResourceLoadObserver();
+    void registerSharedResourceLoadObserver(std::function<void(const Vector<String>& primaryDomain, bool value)>&& shouldPartitionCookiesForDomainsHandler);
     
     void resourceLoadStatisticsUpdated(const Vector<WebCore::ResourceLoadStatistics>& origins);
 
@@ -64,15 +73,14 @@ public:
 
     void readDataFromDiskIfNeeded();
 
-    void mergeStatistics(const Vector<WebCore::ResourceLoadStatistics>&);
-
-    WebCore::ResourceLoadStatisticsStore& coreStore() { return m_resourceStatisticsStore.get(); }
-    const WebCore::ResourceLoadStatisticsStore& coreStore() const { return m_resourceStatisticsStore.get(); }
+    WebCore::ResourceLoadStatisticsStore& coreStore() { return m_resourceLoadStatisticsStore.get(); }
+    const WebCore::ResourceLoadStatisticsStore& coreStore() const { return m_resourceLoadStatisticsStore.get(); }
 
 private:
     explicit WebResourceLoadStatisticsStore(const String&);
 
-    bool hasPrevalentResourceCharacteristics(const WebCore::ResourceLoadStatistics&);
+    void processStatisticsAndDataRecords();
+
     void classifyResource(WebCore::ResourceLoadStatistics&);
     void removeDataRecords();
 
@@ -81,12 +89,18 @@ private:
     // IPC::MessageReceiver
     void didReceiveMessage(IPC::Connection&, IPC::Decoder&) override;
 
+    void writeStoreToDisk();
     void writeEncoderToDisk(WebCore::KeyedEncoder&, const String& label) const;
     std::unique_ptr<WebCore::KeyedDecoder> createDecoderFromDisk(const String& label) const;
 
-    Ref<WebCore::ResourceLoadStatisticsStore> m_resourceStatisticsStore;
+    Ref<WebCore::ResourceLoadStatisticsStore> m_resourceLoadStatisticsStore;
+#if PLATFORM(COCOA)
+    ResourceLoadStatisticsClassifierCocoa m_resourceLoadStatisticsClassifier;
+#else
+    ResourceLoadStatisticsClassifier m_resourceLoadStatisticsClassifier;
+#endif
     Ref<WTF::WorkQueue> m_statisticsQueue;
-    String m_storagePath;
+    String m_statisticsStoragePath;
     bool m_resourceLoadStatisticsEnabled { false };
 
     double m_lastTimeDataRecordsWereRemoved { 0 };
@@ -94,5 +108,3 @@ private:
 };
 
 } // namespace WebKit
-
-#endif // WebResourceLoadStatisticsStore_h

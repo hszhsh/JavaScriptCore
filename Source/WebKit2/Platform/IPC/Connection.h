@@ -47,7 +47,7 @@
 #include <wtf/spi/darwin/XPCSPI.h>
 #endif
 
-#if PLATFORM(GTK)
+#if USE(GLIB)
 #include "GSocketMonitor.h"
 #endif
 
@@ -79,6 +79,7 @@ enum class WaitForOption {
 while (0)
 
 class MachMessage;
+class UnixMessage;
 
 class Connection : public ThreadSafeRefCounted<Connection> {
 public:
@@ -308,12 +309,16 @@ private:
     // Called on the connection queue.
     void readyReadHandler();
     bool processMessage();
+    bool sendOutputMessage(UnixMessage&);
 
     Vector<uint8_t> m_readBuffer;
     Vector<int> m_fileDescriptors;
     int m_socketDescriptor;
-#if PLATFORM(GTK)
-    GSocketMonitor m_socketMonitor;
+    std::unique_ptr<UnixMessage> m_pendingOutputMessage;
+#if USE(GLIB)
+    GRefPtr<GSocket> m_socket;
+    GSocketMonitor m_readSocketMonitor;
+    GSocketMonitor m_writeSocketMonitor;
 #endif
 #elif OS(DARWIN)
     // Called on the connection queue.

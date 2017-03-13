@@ -918,6 +918,8 @@ void Structure::willStoreValueSlow(
         table->makeTop(vm, propertyName, age);
         entry->hasInferredType = false;
     }
+    
+    propertyTable->use(); // This makes it safe to use entry above.
 }
 
 #if DUMP_PROPERTYMAP_STATS
@@ -1143,10 +1145,10 @@ bool Structure::prototypeChainMayInterceptStoreTo(VM& vm, PropertyName propertyN
     }
 }
 
-PassRefPtr<StructureShape> Structure::toStructureShape(JSValue value)
+Ref<StructureShape> Structure::toStructureShape(JSValue value)
 {
-    RefPtr<StructureShape> baseShape = StructureShape::create();
-    RefPtr<StructureShape> curShape = baseShape;
+    Ref<StructureShape> baseShape = StructureShape::create();
+    RefPtr<StructureShape> curShape = baseShape.ptr();
     Structure* curStructure = this;
     JSValue curValue = value;
     while (curStructure) {
@@ -1168,7 +1170,7 @@ PassRefPtr<StructureShape> Structure::toStructureShape(JSValue value)
 
         if (curStructure->storedPrototypeStructure()) {
             auto newShape = StructureShape::create();
-            curShape->setProto(newShape.ptr());
+            curShape->setProto(newShape.copyRef());
             curShape = WTFMove(newShape);
             curValue = curStructure->storedPrototype();
         }
@@ -1176,7 +1178,7 @@ PassRefPtr<StructureShape> Structure::toStructureShape(JSValue value)
         curStructure = curStructure->storedPrototypeStructure();
     }
     
-    return WTFMove(baseShape);
+    return baseShape;
 }
 
 bool Structure::canUseForAllocationsOf(Structure* other)

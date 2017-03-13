@@ -34,6 +34,7 @@
 #include "MarkedSpaceInlines.h"
 #include "Parser.h"
 #include "Protect.h"
+#include "VMEntryScope.h"
 
 namespace {
 
@@ -55,7 +56,7 @@ struct GatherSourceProviders : public MarkedBlock::VoidFunctor {
         
         JSCell* cell = static_cast<JSCell*>(heapCell);
         
-        JSFunction* function = jsDynamicCast<JSFunction*>(cell);
+        JSFunction* function = jsDynamicCast<JSFunction*>(*cell->vm(), cell);
         if (!function)
             return IterationStatus::Continue;
 
@@ -118,6 +119,11 @@ private:
     Debugger& m_debugger;
 };
 
+
+Debugger::ProfilingClient::~ProfilingClient()
+{
+}
+
 Debugger::Debugger(VM& vm)
     : m_vm(vm)
     , m_pauseOnExceptionsState(DontPauseOnExceptions)
@@ -166,7 +172,8 @@ void Debugger::detach(JSGlobalObject* globalObject, ReasonForDetach reason)
     // If we're detaching from the currently executing global object, manually tear down our
     // stack, since we won't get further debugger callbacks to do so. Also, resume execution,
     // since there's no point in staying paused once a window closes.
-    if (m_isPaused && m_currentCallFrame && m_currentCallFrame->vmEntryGlobalObject() == globalObject) {
+    // We know there is an entry scope, otherwise, m_currentCallFrame would be null.
+    if (m_isPaused && m_currentCallFrame && globalObject->vm().entryScope->globalObject() == globalObject) {
         m_currentCallFrame = nullptr;
         m_pauseOnCallFrame = nullptr;
         continueProgram();
@@ -497,9 +504,9 @@ bool Debugger::hasBreakpoint(SourceID sourceID, const TextPosition& position, Br
     TemporaryPausedState pausedState(*this);
 
     NakedPtr<Exception> exception;
-    DebuggerCallFrame* debuggerCallFrame = currentDebuggerCallFrame();
+    DebuggerCallFrame& debuggerCallFrame = currentDebuggerCallFrame();
     JSObject* scopeExtensionObject = nullptr;
-    JSValue result = debuggerCallFrame->evaluateWithScopeExtension(breakpoint->condition, scopeExtensionObject, exception);
+    JSValue result = debuggerCallFrame.evaluateWithScopeExtension(breakpoint->condition, scopeExtensionObject, exception);
 
     // We can lose the debugger while executing JavaScript.
     if (!m_currentCallFrame)
@@ -906,11 +913,11 @@ void Debugger::didReachBreakpoint(CallFrame* callFrame)
     updateCallFrame(callFrame, AttemptPause);
 }
 
-DebuggerCallFrame* Debugger::currentDebuggerCallFrame()
+DebuggerCallFrame& Debugger::currentDebuggerCallFrame()
 {
     if (!m_currentDebuggerCallFrame)
         m_currentDebuggerCallFrame = DebuggerCallFrame::create(m_currentCallFrame);
-    return m_currentDebuggerCallFrame.get();
+    return *m_currentDebuggerCallFrame;
 }
 
 bool Debugger::isBlacklisted(SourceID sourceID) const

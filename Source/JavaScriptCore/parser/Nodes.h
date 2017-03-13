@@ -190,7 +190,7 @@ namespace JSC {
         virtual bool isNewTarget() const { return false; }
         virtual bool isBytecodeIntrinsicNode() const { return false; }
 
-        virtual void emitBytecodeInConditionContext(BytecodeGenerator&, Label*, Label*, FallThroughMode);
+        virtual void emitBytecodeInConditionContext(BytecodeGenerator&, Label&, Label&, FallThroughMode);
 
         virtual ExpressionNode* stripUnaryPlus() { return this; }
 
@@ -258,7 +258,7 @@ namespace JSC {
         virtual JSValue jsValue(BytecodeGenerator&) const = 0;
     private:
         RegisterID* emitBytecode(BytecodeGenerator&, RegisterID* = 0) override;
-        void emitBytecodeInConditionContext(BytecodeGenerator&, Label* trueTarget, Label* falseTarget, FallThroughMode) override;
+        void emitBytecodeInConditionContext(BytecodeGenerator&, Label& trueTarget, Label& falseTarget, FallThroughMode) override;
     };
 
     class NullNode : public ConstantNode {
@@ -490,16 +490,16 @@ namespace JSC {
 
     class TemplateStringNode : public ExpressionNode {
     public:
-        TemplateStringNode(const JSTokenLocation&, const Identifier& cooked, const Identifier& raw);
+        TemplateStringNode(const JSTokenLocation&, const Identifier* cooked, const Identifier* raw);
 
-        const Identifier& cooked() { return m_cooked; }
-        const Identifier& raw() { return m_raw; }
+        const Identifier* cooked() { return m_cooked; }
+        const Identifier* raw() { return m_raw; }
 
     private:
         RegisterID* emitBytecode(BytecodeGenerator&, RegisterID* = 0) override;
 
-        const Identifier& m_cooked;
-        const Identifier& m_raw;
+        const Identifier* m_cooked;
+        const Identifier* m_raw;
     };
 
     class TemplateStringListNode : public ParserArenaFreeable {
@@ -1033,7 +1033,7 @@ namespace JSC {
     public:
         LogicalNotNode(const JSTokenLocation&, ExpressionNode*);
     private:
-        void emitBytecodeInConditionContext(BytecodeGenerator&, Label* trueTarget, Label* falseTarget, FallThroughMode) override;
+        void emitBytecodeInConditionContext(BytecodeGenerator&, Label& trueTarget, Label& falseTarget, FallThroughMode) override;
     };
 
     class BinaryOpNode : public ExpressionNode {
@@ -1042,7 +1042,7 @@ namespace JSC {
         BinaryOpNode(const JSTokenLocation&, ResultType, ExpressionNode* expr1, ExpressionNode* expr2, OpcodeID, bool rightHasAssignments);
 
         RegisterID* emitStrcat(BytecodeGenerator& generator, RegisterID* destination, RegisterID* lhs = 0, ReadModifyResolveNode* emitExpressionInfoForMe = 0);
-        void emitBytecodeInConditionContext(BytecodeGenerator&, Label* trueTarget, Label* falseTarget, FallThroughMode) override;
+        void emitBytecodeInConditionContext(BytecodeGenerator&, Label& trueTarget, Label& falseTarget, FallThroughMode) override;
 
         ExpressionNode* lhs() { return m_expr1; };
         ExpressionNode* rhs() { return m_expr2; };
@@ -1152,6 +1152,9 @@ namespace JSC {
     class InNode : public ThrowableBinaryOpNode {
     public:
         InNode(const JSTokenLocation&, ExpressionNode* expr1, ExpressionNode* expr2, bool rightHasAssignments);
+
+    private:
+        RegisterID* emitBytecode(BytecodeGenerator&, RegisterID* = 0) override;
     };
 
     class EqualNode : public BinaryOpNode {
@@ -1202,7 +1205,7 @@ namespace JSC {
 
     private:
         RegisterID* emitBytecode(BytecodeGenerator&, RegisterID* = 0) override;
-        void emitBytecodeInConditionContext(BytecodeGenerator&, Label* trueTarget, Label* falseTarget, FallThroughMode) override;
+        void emitBytecodeInConditionContext(BytecodeGenerator&, Label& trueTarget, Label& falseTarget, FallThroughMode) override;
 
         ExpressionNode* m_expr1;
         ExpressionNode* m_expr2;
@@ -2126,19 +2129,28 @@ namespace JSC {
         Vector<Entry> m_targetPatterns;
     };
     
-    class ObjectPatternNode : public DestructuringPatternNode, public ParserArenaDeletable {
+    class ObjectPatternNode : public DestructuringPatternNode, public ThrowableExpressionData, public ParserArenaDeletable {
     public:
         using ParserArenaDeletable::operator new;
         
         ObjectPatternNode();
-        void appendEntry(const JSTokenLocation&, const Identifier& identifier, bool wasString, DestructuringPatternNode* pattern, ExpressionNode* defaultValue)
+        enum class BindingType {
+            Element,
+            RestElement
+        };
+        void appendEntry(const JSTokenLocation&, const Identifier& identifier, bool wasString, DestructuringPatternNode* pattern, ExpressionNode* defaultValue, BindingType bindingType)
         {
-            m_targetPatterns.append(Entry{ identifier, nullptr, wasString, pattern, defaultValue });
+            m_targetPatterns.append(Entry{ identifier, nullptr, wasString, pattern, defaultValue, bindingType });
         }
 
-        void appendEntry(const JSTokenLocation&, ExpressionNode* propertyExpression, DestructuringPatternNode* pattern, ExpressionNode* defaultValue)
+        void appendEntry(const JSTokenLocation&, ExpressionNode* propertyExpression, DestructuringPatternNode* pattern, ExpressionNode* defaultValue, BindingType bindingType)
         {
-            m_targetPatterns.append(Entry{ Identifier(), propertyExpression, false, pattern, defaultValue });
+            m_targetPatterns.append(Entry{ Identifier(), propertyExpression, false, pattern, defaultValue, bindingType });
+        }
+        
+        void setContainsRestElement(bool containsRestElement)
+        {
+            m_containsRestElement = containsRestElement;
         }
 
     private:
@@ -2151,7 +2163,9 @@ namespace JSC {
             bool wasString;
             DestructuringPatternNode* pattern;
             ExpressionNode* defaultValue;
+            BindingType bindingType;
         };
+        bool m_containsRestElement { false };
         Vector<Entry> m_targetPatterns;
     };
 

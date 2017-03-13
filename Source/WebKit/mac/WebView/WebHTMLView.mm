@@ -778,6 +778,7 @@ const float _WebHTMLViewPrintingMaximumShrinkFactor = PrintContext::maximumShrin
 // Fake URL scheme.
 #define WebDataProtocolScheme @"webkit-fake-url"
 
+#if !PLATFORM(IOS)
 // <rdar://problem/4985524> References to WebCoreScrollView as a subview of a WebHTMLView may be present
 // in some NIB files, so NSUnarchiver must be still able to look up this now-unused class.
 @interface WebCoreScrollView : NSScrollView
@@ -786,7 +787,6 @@ const float _WebHTMLViewPrintingMaximumShrinkFactor = PrintContext::maximumShrin
 @implementation WebCoreScrollView
 @end
 
-#if !PLATFORM(IOS)
 // We need this to be able to safely reference the CachedImage for the promised drag data
 static CachedImageClient& promisedDataClient()
 {
@@ -1066,6 +1066,11 @@ static NSCellStateValue kit(TriState state)
 #if !PLATFORM(IOS)
     if (promisedDragTIFFDataSource)
         promisedDragTIFFDataSource->removeClient(promisedDataClient());
+
+    if (flagsChangedEventMonitor) {
+        [NSEvent removeMonitor:flagsChangedEventMonitor];
+        flagsChangedEventMonitor = nil;
+    }
 #endif
 
     [super dealloc];
@@ -2384,7 +2389,8 @@ static bool mouseEventIsPartOfClickOrDrag(NSEvent *event)
     if (!coreFrame)
         return nil;
 
-    auto dragImage = createDragImageForSelection(*coreFrame);
+    TextIndicatorData textIndicator;
+    auto dragImage = createDragImageForSelection(*coreFrame, textIndicator);
     [dragImage _web_dissolveToFraction:WebDragImageAlpha];
 
     return dragImage.autorelease();
@@ -3504,8 +3510,9 @@ WEBCORE_COMMAND(toggleUnderline)
 
 #if !PLATFORM(IOS)
         if (!_private->flagsChangedEventMonitor) {
+            __block WebHTMLView *weakSelf = self;
             _private->flagsChangedEventMonitor = [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskFlagsChanged handler:^(NSEvent *flagsChangedEvent) {
-                [self _postFakeMouseMovedEventForFlagsChangedEvent:flagsChangedEvent];
+                [weakSelf _postFakeMouseMovedEventForFlagsChangedEvent:flagsChangedEvent];
                 return flagsChangedEvent;
             }];
         }
@@ -3866,9 +3873,6 @@ static RetainPtr<NSArray> fixMenusReceivedFromOldClients(NSArray *delegateSuppli
 
 static RetainPtr<NSMenuItem> createShareMenuItem(const HitTestResult& hitTestResult)
 {
-    if (![[NSMenuItem class] respondsToSelector:@selector(standardShareMenuItemWithItems:)])
-        return nil;
-
     auto items = adoptNS([[NSMutableArray alloc] init]);
 
     if (!hitTestResult.absoluteLinkURL().isEmpty()) {
@@ -3894,7 +3898,7 @@ static RetainPtr<NSMenuItem> createShareMenuItem(const HitTestResult& hitTestRes
     if (![items count])
         return nil;
 
-    return [NSMenuItem standardShareMenuItemWithItems:items.get()];
+    return [NSMenuItem standardShareMenuItemForItems:items.get()];
 }
 
 static RetainPtr<NSMutableArray> createMenuItems(const HitTestResult&, const Vector<ContextMenuItem>&);
@@ -4544,7 +4548,7 @@ static BOOL currentScrollIsBlit(NSView *clipView)
 }
 #endif
 
-#if ENABLE(DRAG_SUPPORT)
+#if ENABLE(DRAG_SUPPORT) && PLATFORM(MAC)
 - (void)dragImage:(NSImage *)dragImage
                at:(NSPoint)at
            offset:(NSSize)offset
@@ -4688,7 +4692,43 @@ static bool matchesExtensionOrEquivalent(NSString *filename, NSString *extension
     
     return [NSArray arrayWithObject:[path lastPathComponent]];
 }
-#endif
+
+// MARK: NSDraggingSource
+
+- (NSDragOperation)draggingSession:(NSDraggingSession *)session sourceOperationMaskForDraggingContext:(NSDraggingContext)context
+{
+    ASSERT(![self _webView] || [self _isTopHTMLView]);
+
+    Page* page = core([self _webView]);
+    if (!page)
+        return NSDragOperationNone;
+
+    return (NSDragOperation)page->dragController().sourceDragOperation();
+}
+
+- (void)draggingSession:(NSDraggingSession *)session endedAtPoint:(NSPoint)screenPoint operation:(NSDragOperation)operation
+{
+    ASSERT(![self _webView] || [self _isTopHTMLView]);
+
+    NSPoint windowLocation = [self.window convertRectFromScreen:{ screenPoint, NSZeroSize }].origin;
+
+    if (Page* page = core([self _webView]))
+        page->dragController().dragEnded();
+
+    [[self _frame] _dragSourceEndedAt:windowLocation operation:operation];
+
+    // Prevent queued mouseDragged events from coming after the drag and fake mouseUp event.
+    _private->ignoringMouseDraggedEvents = YES;
+
+    // Once the dragging machinery kicks in, we no longer get mouse drags or the up event.
+    // WebCore expects to get balanced down/up's, so we must fake up a mouseup.
+    NSEvent *fakeEvent = [NSEvent mouseEventWithType:NSEventTypeLeftMouseUp location:windowLocation modifierFlags:[NSApp currentEvent].modifierFlags timestamp:[NSDate timeIntervalSinceReferenceDate] windowNumber:self.window. windowNumber context:nullptr eventNumber:0 clickCount:0 pressure:0];
+
+    // This will also update the mouseover state.
+    [self mouseUp:fakeEvent];
+}
+
+#endif // ENABLE(DRAG_SUPPORT) && PLATFORM(MAC)
 
 #if !PLATFORM(IOS)
 - (void)mouseUp:(NSEvent *)event
@@ -5343,7 +5383,10 @@ static PassRefPtr<KeyboardEvent> currentKeyboardEvent(Frame* coreFrame)
 
 - (NSDictionary *)_fontAttributesFromFontPasteboard
 {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     NSPasteboard *fontPasteboard = [NSPasteboard pasteboardWithName:NSFontPboard];
+#pragma clang diagnostic pop
     if (fontPasteboard == nil)
         return nil;
     NSData *data = [fontPasteboard dataForType:NSFontPboardType];
@@ -5545,7 +5588,10 @@ static PassRefPtr<KeyboardEvent> currentKeyboardEvent(Frame* coreFrame)
 
     // Put RTF with font attributes on the pasteboard.
     // Maybe later we should add a pasteboard type that contains CSS text for "native" copy and paste font.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     NSPasteboard *fontPasteboard = [NSPasteboard pasteboardWithName:NSFontPboard];
+#pragma clang diagnostic pop
     [fontPasteboard declareTypes:[NSArray arrayWithObject:NSFontPboardType] owner:nil];
     [fontPasteboard setData:[self _selectionStartFontAttributesAsRTF] forType:NSFontPboardType];
 }
@@ -5583,7 +5629,7 @@ static RetainPtr<CFStringRef> fontNameForDescription(NSString *familyName, BOOL 
     // Find the font the same way the rendering code would later if it encountered this CSS.
     FontDescription fontDescription;
     fontDescription.setIsItalic(italic);
-    fontDescription.setWeight(bold ? FontWeight900 : FontWeight500);
+    fontDescription.setWeight(bold ? FontSelectionValue(900) : FontSelectionValue(500));
     RefPtr<Font> font = FontCache::singleton().fontForFamily(fontDescription, familyName);
     return adoptCF(CTFontCopyPostScriptName(font->getCTFont()));
 }
@@ -6092,8 +6138,7 @@ static BOOL writingDirectionKeyBindingsEnabled()
 #if !PLATFORM(IOS)
 - (void)otherMouseDown:(NSEvent *)event
 {
-    if ([event buttonNumber] != 2 || ([NSMenu respondsToSelector:@selector(menuTypeForEvent:)]
-        && [NSMenu menuTypeForEvent:event] == NSMenuTypeContextMenu)) {
+    if (event.buttonNumber != 2 || [NSMenu menuTypeForEvent:event] == NSMenuTypeContextMenu) {
         [super otherMouseDown:event];
         return;
     }
@@ -7329,7 +7374,8 @@ static CGImageRef selectionImage(Frame* frame, bool forceBlackText)
 #if PLATFORM(IOS)
     return selectionImage(coreFrame, forceBlackText);
 #else
-    return createDragImageForSelection(*coreFrame, forceBlackText).autorelease();
+    TextIndicatorData textIndicator;
+    return createDragImageForSelection(*coreFrame, textIndicator, forceBlackText).autorelease();
 #endif
 }
 

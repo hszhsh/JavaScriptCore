@@ -55,6 +55,11 @@
 #include "UserContentController.h"
 #endif
 
+#if USE(QUICK_LOOK)
+#include "PreviewConverter.h"
+#include "QuickLook.h"
+#endif
+
 namespace WebCore {
 
 ResourceLoader::ResourceLoader(Frame& frame, ResourceLoaderOptions options)
@@ -176,7 +181,8 @@ void ResourceLoader::deliverResponseAndData(const ResourceResponse& response, Re
             return;
     }
 
-    didFinishLoading(0);
+    NetworkLoadMetrics emptyMetrics;
+    didFinishLoading(emptyMetrics);
 }
 
 void ResourceLoader::start()
@@ -266,8 +272,10 @@ void ResourceLoader::loadDataURL()
         if (!protectedThis->reachedTerminalState() && dataSize)
             protectedThis->didReceiveBuffer(result.data.releaseNonNull(), dataSize, DataPayloadWholeResource);
 
-        if (!protectedThis->reachedTerminalState())
-            protectedThis->didFinishLoading(currentTime());
+        if (!protectedThis->reachedTerminalState()) {
+            NetworkLoadMetrics emptyMetrics;
+            protectedThis->didFinishLoading(emptyMetrics);
+        }
     });
 }
 
@@ -371,6 +379,11 @@ void ResourceLoader::willSendRequestInternal(ResourceRequest& request, const Res
     else
         InspectorInstrumentation::willSendRequest(m_frame.get(), m_identifier, m_frame->loader().documentLoader(), request, redirectResponse);
 
+#if USE(QUICK_LOOK)
+    if (auto previewConverter = m_documentLoader->previewConverter())
+        request = previewConverter->safeRequest(request);
+#endif
+
     bool isRedirect = !redirectResponse.isNull();
     if (isRedirect)
         platformStrategies()->loaderStrategy()->crossOriginRedirectReceived(this, request.url());
@@ -422,7 +435,7 @@ static void logResourceResponseSource(Frame* frame, ResourceResponse::Source sou
         return;
     }
 
-    frame->page()->diagnosticLoggingClient().logDiagnosticMessageWithValue(DiagnosticLoggingKeys::resourceResponseKey(), DiagnosticLoggingKeys::sourceKey(), sourceKey, ShouldSample::Yes);
+    frame->page()->diagnosticLoggingClient().logDiagnosticMessage(DiagnosticLoggingKeys::resourceResponseSourceKey(), sourceKey, ShouldSample::Yes);
 }
 
 void ResourceLoader::didReceiveResponse(const ResourceResponse& r)
@@ -478,9 +491,9 @@ void ResourceLoader::didReceiveDataOrBuffer(const char* data, unsigned length, R
         frameLoader()->notifier().didReceiveData(this, buffer ? buffer->data() : data, buffer ? buffer->size() : length, static_cast<int>(encodedDataLength));
 }
 
-void ResourceLoader::didFinishLoading(double finishTime)
+void ResourceLoader::didFinishLoading(const NetworkLoadMetrics& networkLoadMetrics)
 {
-    didFinishLoadingOnePart(finishTime);
+    didFinishLoadingOnePart(networkLoadMetrics);
 
     // If the load has been cancelled by a delegate in response to didFinishLoad(), do not release
     // the resources a second time, they have been released by cancel.
@@ -489,7 +502,7 @@ void ResourceLoader::didFinishLoading(double finishTime)
     releaseResources();
 }
 
-void ResourceLoader::didFinishLoadingOnePart(double finishTime)
+void ResourceLoader::didFinishLoadingOnePart(const NetworkLoadMetrics& networkLoadMetrics)
 {
     // If load has been cancelled after finishing (which could happen with a
     // JavaScript that changes the window location), do nothing.
@@ -501,7 +514,7 @@ void ResourceLoader::didFinishLoadingOnePart(double finishTime)
         return;
     m_notifiedLoadComplete = true;
     if (m_options.sendLoadCallbacks == SendCallbacks)
-        frameLoader()->notifier().didFinishLoad(this, finishTime);
+        frameLoader()->notifier().didFinishLoad(this, networkLoadMetrics);
 }
 
 void ResourceLoader::didFail(const ResourceError& error)
@@ -635,9 +648,10 @@ void ResourceLoader::didReceiveBuffer(ResourceHandle*, Ref<SharedBuffer>&& buffe
     didReceiveBuffer(WTFMove(buffer), encodedDataLength, DataPayloadBytes);
 }
 
-void ResourceLoader::didFinishLoading(ResourceHandle*, double finishTime)
+void ResourceLoader::didFinishLoading(ResourceHandle*)
 {
-    didFinishLoading(finishTime);
+    NetworkLoadMetrics emptyMetrics;
+    didFinishLoading(emptyMetrics);
 }
 
 void ResourceLoader::didFail(ResourceHandle*, const ResourceError& error)
@@ -732,10 +746,9 @@ void ResourceLoader::unschedule(SchedulePair& pair)
 #endif
 
 #if USE(QUICK_LOOK)
-void ResourceLoader::didCreateQuickLookHandle(QuickLookHandle& handle)
+bool ResourceLoader::isQuickLookResource() const
 {
-    m_isQuickLookResource = true;
-    frameLoader()->client().didCreateQuickLookHandle(handle);
+    return !!m_quickLookHandle;
 }
 #endif
 

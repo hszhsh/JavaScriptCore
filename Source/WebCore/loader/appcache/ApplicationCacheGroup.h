@@ -66,7 +66,7 @@ public:
 
     ApplicationCacheStorage& storage() { return m_storage; }
     const URL& manifestURL() const { return m_manifestURL; }
-    const SecurityOrigin* origin() const { return m_origin.get(); }
+    const SecurityOrigin& origin() const { return m_origin.get(); }
     UpdateStatus updateStatus() const { return m_updateStatus; }
     void setUpdateStatus(UpdateStatus status);
 
@@ -108,9 +108,10 @@ private:
     // the existing client callback cannot be used, so assume that any client that enables application cache also wants it to use credential storage.
     bool shouldUseCredentialStorage(ResourceHandle*) override { return true; }
 
+    // ResourceHandleClient
     void didReceiveResponse(ResourceHandle*, ResourceResponse&&) override;
     void didReceiveData(ResourceHandle*, const char*, unsigned length, int encodedDataLength) override;
-    void didFinishLoading(ResourceHandle*, double finishTime) override;
+    void didFinishLoading(ResourceHandle*) override;
     void didFail(ResourceHandle*, const ResourceError&) override;
 
     void didReceiveManifestResponse(const ResourceResponse&);
@@ -135,7 +136,7 @@ private:
     Ref<ApplicationCacheStorage> m_storage;
 
     URL m_manifestURL;
-    RefPtr<SecurityOrigin> m_origin;
+    Ref<SecurityOrigin> m_origin;
     UpdateStatus m_updateStatus { Idle };
     
     // This is the newest complete cache in the group.

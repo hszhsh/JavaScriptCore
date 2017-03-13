@@ -36,6 +36,7 @@
 #include "ChildListMutationScope.h"
 #include "DocumentFragment.h"
 #include "DocumentType.h"
+#include "Editing.h"
 #include "Editor.h"
 #include "ElementIterator.h"
 #include "ExceptionCode.h"
@@ -62,7 +63,6 @@
 #include "TypedElementDescendantIterator.h"
 #include "VisibleSelection.h"
 #include "VisibleUnits.h"
-#include "htmlediting.h"
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/StringBuilder.h>
 
@@ -598,7 +598,7 @@ static String createMarkupInternal(Document& document, const Range& range, Vecto
     Node* specialCommonAncestor = highestAncestorToWrapMarkup(&range, shouldAnnotate);
 
     bool needsPositionStyleConversion = body && fullySelectedRoot == body
-        && document.settings() && document.settings()->shouldConvertPositionStyleOnCopy();
+        && document.settings().shouldConvertPositionStyleOnCopy();
     StyledMarkupAccumulator accumulator(nodes, shouldResolveURLs, shouldAnnotate, &range, needsPositionStyleConversion, specialCommonAncestor);
     Node* pastEnd = range.pastLastNode();
 
@@ -1015,25 +1015,6 @@ ExceptionOr<void> replaceChildrenWithFragment(ContainerNode& container, Ref<Docu
 
     containerNode->removeChildren();
     return containerNode->appendChild(fragment);
-}
-
-ExceptionOr<void> replaceChildrenWithText(ContainerNode& container, const String& text)
-{
-    Ref<ContainerNode> containerNode(container);
-    ChildListMutationScope mutation(containerNode);
-
-    if (hasOneTextChild(containerNode)) {
-        downcast<Text>(*containerNode->firstChild()).setData(text);
-        return { };
-    }
-
-    auto textNode = Text::create(containerNode->document(), text);
-
-    if (hasOneChild(containerNode))
-        return containerNode->replaceChild(textNode, *containerNode->firstChild());
-
-    containerNode->removeChildren();
-    return containerNode->appendChild(textNode);
 }
 
 }

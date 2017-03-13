@@ -16,19 +16,9 @@ class AnalysisTaskChartPane extends ChartPaneBase {
             this._page._chartSelectionDidChange();
     }
 
-    _updateStatus()
-    {
-        super._updateStatus();
-        this._page.enqueueToRender();
-    }
-
     selectedPoints()
     {
-        var selection = this._mainChart ? this._mainChart.currentSelection() : null;
-        if (!selection)
-            return null;
-
-        return this._mainChart.sampledDataBetween('current', selection[0], selection[1]);
+        return this._mainChart ? this._mainChart.selectedPoints('current') : null;
     }
 }
 
@@ -62,9 +52,9 @@ class AnalysisTaskPage extends PageWithHeading {
         this._analysisResultsViewer.setRangeSelectorLabels(['A', 'B']);
         this._analysisResultsViewer.setRangeSelectorCallback(this._selectedRowInAnalysisResultsViewer.bind(this));
         this._testGroupResultsTable = this.content().querySelector('test-group-results-table').component();
+
         this._taskNameLabel = this.content().querySelector('.analysis-task-name editable-text').component();
-        this._taskNameLabel.setStartedEditingCallback(this._didStartEditingTaskName.bind(this));
-        this._taskNameLabel.setUpdateCallback(this._updateTaskName.bind(this));
+        this._taskNameLabel.listenToAction('update', () => this._updateTaskName());
 
         this.content().querySelector('.change-type-form').onsubmit = this._updateChangeType.bind(this);
         this._taskStatusControl = this.content().querySelector('.change-type-form select');
@@ -306,8 +296,8 @@ class AnalysisTaskPage extends PageWithHeading {
             this._chartPane.setMainSelection([this._startPoint.time, this._endPoint.time]);
 
         var points = this._chartPane.selectedPoints();
-        this._newTestGroupFormForChart.setRootSetMap(points && points.length >= 2 ?
-                {'A': points[0].rootSet(), 'B': points[points.length - 1].rootSet()} : null);
+        this._newTestGroupFormForChart.setRootSetMap(points && points.length() >= 2 ?
+                {'A': points.firstPoint().rootSet(), 'B': points.lastPoint().rootSet()} : null);
         this._newTestGroupFormForChart.enqueueToRender();
         this._newTestGroupFormForChart.element().style.display = this._triggerable ? null : 'none';
 
@@ -364,8 +354,7 @@ class AnalysisTaskPage extends PageWithHeading {
     _createTestGroupListItem(group)
     {
         var text = new EditableText(group.label());
-        text.setStartedEditingCallback(() => { return text.enqueueToRender(); });
-        text.setUpdateCallback(this._updateTestGroupName.bind(this, group));
+        text.listenToAction('update', () => this._updateTestGroupName(group));
 
         this._testGroupLabelMap.set(group, text);
         return ComponentBase.createElement('li', {class: 'test-group-list-' + group.id()},
@@ -416,11 +405,6 @@ class AnalysisTaskPage extends PageWithHeading {
         this._currentTestGroup = testGroup;        
         this._testGroupResultsTable.setTestGroup(this._currentTestGroup);
         this.enqueueToRender();
-    }
-
-    _didStartEditingTaskName()
-    {
-        this._taskNameLabel.enqueueToRender();
     }
 
     _updateTaskName()

@@ -131,6 +131,7 @@ class Port(object):
         self._web_platform_test_server = None
         self._image_differ = None
         self._server_process_constructor = server_process.ServerProcess  # overridable for testing
+        self._test_runner_process_constructor = server_process.ServerProcess
 
         if not hasattr(options, 'configuration') or not options.configuration:
             self.set_option_default('configuration', self.default_configuration())
@@ -806,6 +807,12 @@ class Port(object):
         """Returns the full path to the file for a given test name. This is the
         inverse of relative_test_filename()."""
         return self._filesystem.join(self.layout_tests_dir(), test_name)
+
+    def jsc_results_directory(self):
+        return self._build_path()
+
+    def bindings_results_directory(self):
+        return self._build_path()
 
     def results_directory(self):
         """Absolute path to the place to store the test results (uses --results-directory)."""

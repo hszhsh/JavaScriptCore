@@ -61,7 +61,7 @@ public:
         , m_lineNumber(lineNumber)
         , m_columnNumber(columnNumber)
         , m_sourceURL(sourceURL)
-        , m_callStack(callStack)
+        , m_callStack(WTFMove(callStack))
     {
     }
     String m_errorMessage;
@@ -392,8 +392,7 @@ bool ScriptExecutionContext::dispatchErrorEvent(const String& errorMessage, int 
 
 #if PLATFORM(IOS)
     if (target->toDOMWindow() && is<Document>(*this)) {
-        Settings* settings = downcast<Document>(*this).settings();
-        if (settings && !settings->shouldDispatchJavaScriptWindowOnErrorEvents())
+        if (!downcast<Document>(*this).settings().shouldDispatchJavaScriptWindowOnErrorEvents())
             return false;
     }
 #endif
@@ -428,15 +427,15 @@ PublicURLManager& ScriptExecutionContext::publicURLManager()
     return *m_publicURLManager;
 }
 
-void ScriptExecutionContext::adjustMinimumTimerInterval(std::chrono::milliseconds oldMinimumTimerInterval)
+void ScriptExecutionContext::adjustMinimumDOMTimerInterval(Seconds oldMinimumTimerInterval)
 {
-    if (minimumTimerInterval() != oldMinimumTimerInterval) {
+    if (minimumDOMTimerInterval() != oldMinimumTimerInterval) {
         for (auto& timer : m_timeouts.values())
             timer->updateTimerIntervalIfNecessary();
     }
 }
 
-std::chrono::milliseconds ScriptExecutionContext::minimumTimerInterval() const
+Seconds ScriptExecutionContext::minimumDOMTimerInterval() const
 {
     // The default implementation returns the DOMTimer's default
     // minimum timer interval. FIXME: to make it work with dedicated
@@ -452,7 +451,7 @@ void ScriptExecutionContext::didChangeTimerAlignmentInterval()
         timer->didChangeAlignmentInterval();
 }
 
-std::chrono::milliseconds ScriptExecutionContext::timerAlignmentInterval(bool) const
+Seconds ScriptExecutionContext::domTimerAlignmentInterval(bool) const
 {
     return DOMTimer::defaultAlignmentInterval();
 }

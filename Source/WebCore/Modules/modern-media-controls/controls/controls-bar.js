@@ -28,18 +28,18 @@ class ControlsBar extends LayoutNode
 
     constructor(mediaControls)
     {
-        super(`<div class="controls-bar">`);
+        super(`<div class="controls-bar"></div>`);
 
         this._translation = new DOMPoint;
         this._mediaControls = mediaControls;
 
-        this.fadesWhileIdle = false;
-        this.userInteractionEnabled = true;
+        if (GestureRecognizer.SupportsTouches)
+            this._tapGestureRecognizer = new TapGestureRecognizer(this._mediaControls.element, this);
 
         this.autoHideDelay = ControlsBar.DefaultAutoHideDelay;
 
-        if (GestureRecognizer.SupportsTouches)
-            this._tapGestureRecognizer = new TapGestureRecognizer(this._mediaControls.element, this);
+        this.fadesWhileIdle = false;
+        this.userInteractionEnabled = true;
     }
 
     // Public
@@ -52,7 +52,7 @@ class ControlsBar extends LayoutNode
     set translation(point)
     {
         if (this._translation.x === point.x && this._translation.y === point.y)
-            return
+            return;
 
         this._translation = new DOMPoint(point.x, point.y);
         this.markDirtyProperty("translation");
@@ -70,6 +70,10 @@ class ControlsBar extends LayoutNode
 
         this._userInteractionEnabled = flag;
         this.markDirtyProperty("userInteractionEnabled");
+
+        if (this._userInteractionEnabled && this._controlsShouldFadeWhenUserInteractionBecomesEnabled)
+            this.faded = true;
+        delete this._controlsShouldFadeWhenUserInteractionBecomesEnabled;
     }
 
     get fadesWhileIdle()
@@ -84,7 +88,9 @@ class ControlsBar extends LayoutNode
 
         this._fadesWhileIdle = flag;
 
-        if (!GestureRecognizer.SupportsTouches) {
+        if (GestureRecognizer.SupportsTouches)
+            this._tapGestureRecognizer.enabled = flag;
+        else {
             if (flag) {
                 this._mediaControls.element.addEventListener("mousemove", this);
                 this._mediaControls.element.addEventListener("mouseleave", this);
@@ -111,13 +117,18 @@ class ControlsBar extends LayoutNode
 
     set visible(flag)
     {
+        if (this.visible === flag)
+            return;
+
         // If we just got made visible again, let's fade the controls in.
         if (flag && !this.visible)
             this.faded = false;
         else if (!flag)
-            this._cancelAutoHideTimer();
+            this._cancelNonEnforcedAutoHideTimer();
 
         super.visible = flag;
+
+        this._mediaControls.controlsBarVisibilityDidChange(this);
     }
 
     get faded()
@@ -152,7 +163,7 @@ class ControlsBar extends LayoutNode
         } else if (event.currentTarget === this.element) {
             if (event.type === "mouseenter") {
                 this._disableAutoHiding = true;
-                this._cancelAutoHideTimer();
+                this._cancelNonEnforcedAutoHideTimer();
             } else if (event.type === "mouseleave") {
                 delete this._disableAutoHiding;
                 this._resetAutoHideTimer(true);
@@ -169,8 +180,16 @@ class ControlsBar extends LayoutNode
         if (this.faded)
             this.faded = false;
         else {
+            let ancestor = this.element.parentNode;
+            while (ancestor && !(ancestor instanceof ShadowRoot))
+                ancestor = ancestor.parentNode;
+
+            const shadowRoot = ancestor;
+            if (!shadowRoot)
+                return;
+
             const tapLocation = recognizer.locationInClient();
-            const tappedElement = document.elementFromPoint(tapLocation.x, tapLocation.y);
+            const tappedElement = shadowRoot.elementFromPoint(tapLocation.x, tapLocation.y);
             if (!this.element.contains(tappedElement))
                 this.faded = true;
         }
@@ -190,11 +209,15 @@ class ControlsBar extends LayoutNode
 
     // Private
 
+    _cancelNonEnforcedAutoHideTimer()
+    {
+        if (!this._enforceAutoHideTimer)
+            this._cancelAutoHideTimer();
+
+    }
+
     _cancelAutoHideTimer()
     {
-        if (this._enforceAutoHideTimer)
-            return;
-
         window.clearTimeout(this._autoHideTimer);
         delete this._autoHideTimer;
     }
@@ -221,7 +244,16 @@ class ControlsBar extends LayoutNode
             return;
 
         this._cancelAutoHideTimer();
-        this.faded = this._fadesWhileIdle;
+        if (!this._fadesWhileIdle)
+            return;
+
+        // We don't want to fade the controls when user interaction becomes disabled
+        // because secondary UI attached to the controls is being shown and we want
+        // to wait until it no longer is to fade the controls out.
+        if (!this._userInteractionEnabled)
+            this._controlsShouldFadeWhenUserInteractionBecomesEnabled = true;
+        else
+            this.faded = true;
     }
 
 }

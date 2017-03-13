@@ -74,6 +74,10 @@ void UIScriptController::doAfterPresentationUpdate(JSValueRef)
 void UIScriptController::doAfterNextStablePresentationUpdate(JSValueRef)
 {
 }
+
+void UIScriptController::doAfterVisibleContentRectUpdate(JSValueRef)
+{
+}
 #endif
 
 void UIScriptController::setDidStartFormControlInteractionCallback(JSValueRef callback)
@@ -336,6 +340,11 @@ JSRetainPtr<JSStringRef> UIScriptController::scrollingTreeAsText() const
     return nullptr;
 }
 
+JSObjectRef UIScriptController::propertiesOfLayerWithID(uint64_t layerID) const
+{
+    return nullptr;
+}
+
 void UIScriptController::platformSetDidStartFormControlInteractionCallback()
 {
 }
@@ -375,9 +384,35 @@ void UIScriptController::platformSetDidHideKeyboardCallback()
 void UIScriptController::platformClearAllCallbacks()
 {
 }
+
+void UIScriptController::retrieveSpeakSelectionContent(JSValueRef)
+{
+}
+
+JSRetainPtr<JSStringRef> UIScriptController::accessibilitySpeakSelectionContent() const
+{
+    return nullptr;
+}
+
 #endif
 
+#if !PLATFORM(COCOA)
+
+void UIScriptController::removeViewFromWindow(JSValueRef)
+{
+}
+
+void UIScriptController::addViewToWindow(JSValueRef)
+{
+}
+
+#endif // !PLATFORM(COCOA)
+
 #if !PLATFORM(MAC)
+
+void UIScriptController::overridePreference(JSStringRef, JSStringRef)
+{
+}
 
 void UIScriptController::insertText(JSStringRef, int, int)
 {

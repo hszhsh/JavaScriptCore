@@ -36,7 +36,7 @@ class PlacardSupport extends MediaControllerSupport
 
     get mediaEvents()
     {
-        return ["error", "webkitpresentationmodechanged", "webkitcurrentplaybacktargetiswirelesschanged"];
+        return ["loadstart", "error", "webkitpresentationmodechanged", "webkitcurrentplaybacktargetiswirelesschanged"];
     }
 
     handleEvent(event)
@@ -58,7 +58,7 @@ class PlacardSupport extends MediaControllerSupport
         else if (media instanceof HTMLVideoElement && media.error !== null && media.played.length === 0)
             controls.showPlacard(controls.invalidPlacard);
         else
-            controls.hidePlacard();    
+            controls.hidePlacard();
     }
 
 }

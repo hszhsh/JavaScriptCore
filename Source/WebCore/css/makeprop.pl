@@ -32,7 +32,8 @@ use Getopt::Long;
 use JSON::PP;
 
 sub addProperty($$);
-sub isPropertyEnabled($);
+sub isPropertyEnabled($$);
+sub removeInactiveCodegenProperties($$);
 
 my $inputFile = "CSSProperties.json";
 
@@ -58,6 +59,7 @@ die "We've reached more than 1024 CSS properties, please make sure to update CSS
 my %defines = map { $_ => 1 } split(/ /, $defines);
 
 my @names;
+my @internalProprerties;
 my $numPredefinedProperties = 2;
 my %nameIsInherited;
 my %nameIsHighPriority;
@@ -86,35 +88,86 @@ my %nameToAliases;
 for my $name (@allNames) {
     my $value = $propertiesHashRef->{$name};
     my $valueType = ref($value);
+    
     if ($valueType eq "HASH") {
-        if (isPropertyEnabled($value)) {
+        removeInactiveCodegenProperties($name, \%$value);
+        if (isPropertyEnabled($name, $value)) {
             addProperty($name, $value);
         }
-    } elsif ($valueType eq "ARRAY") {
-        for my $v (@$value) {
-            if (isPropertyEnabled($v)) {
-                addProperty($name, $v);
-                last;
-            }
-        }
     } else {
-        die "$name does not have a supported value type. Only dictionary and array types are supported.";
+        die "$name does not have a supported value type. Only dictionary types are supported.";
     }
 }
 
-sub isPropertyEnabled($)
+sub matchEnableFlags($)
 {
-    my ($optionsHashRef) = @_;
-    if (!$optionsHashRef->{"codegen-properties"} || !$optionsHashRef->{"codegen-properties"}{"enable-if"}) {
+    my ($enable_flag) = @_;
+    
+    if (exists($defines{$enable_flag})) {
         return 1;
     }
-    if (exists($defines{$optionsHashRef->{"codegen-properties"}{"enable-if"}})) {
+
+    if (substr($enable_flag, 0, 1) eq "!" && !exists($defines{substr($enable_flag, 1)})) {
         return 1;
     }
-    if (substr($optionsHashRef->{"codegen-properties"}{"enable-if"}, 0, 1) eq "!" && !exists($defines{substr($optionsHashRef->{"codegen-properties"}{"enable-if"}, 1)})) {
-        return 1;
-    }
+    
     return 0;
+}
+
+sub removeInactiveCodegenProperties($$)
+{
+    my ($name, $propertyValue) = @_;
+
+    if (!exists($propertyValue->{"codegen-properties"})) {
+        return;
+    }
+    
+    my $codegen_properties = $propertyValue->{"codegen-properties"};
+    my $valueType = ref($codegen_properties);
+
+    if ($valueType ne "ARRAY") {
+        return;
+    }
+
+    # Pick one based on "enable-if"
+    my $matching_codegen_options;
+    foreach my $entry (@{$codegen_properties}) {
+        if (!exists($entry->{"enable-if"})) {
+            print "Found 'codegen-properties' array with an unconditional entry under '$name'. This is probably unintentional.\n";
+            $matching_codegen_options = $entry;
+            last;
+        }
+
+        my $enable_flags = $entry->{"enable-if"};
+        if (matchEnableFlags($enable_flags)) {
+            $matching_codegen_options = $entry;
+            last;
+        }
+
+        $matching_codegen_options = $entry;
+    }
+    
+    $propertyValue->{"codegen-properties"} = $matching_codegen_options;
+}
+
+sub isPropertyEnabled($$)
+{
+    my ($name, $propertyValue) = @_;
+
+    if (!exists($propertyValue->{"codegen-properties"})) {
+        return 1;
+    }
+    
+    my $codegen_properties = $propertyValue->{"codegen-properties"};
+    if ($codegen_properties->{"skip-codegen"}) {
+        return 0;
+    }
+
+    if (!exists($codegen_properties->{"enable-if"})) {
+        return 1;
+    }
+
+    return matchEnableFlags($codegen_properties->{"enable-if"});
 }
 
 sub addProperty($$)
@@ -133,14 +186,19 @@ sub addProperty($$)
             for my $codegenOptionName (keys %$codegenProperties) {
                 if ($codegenOptionName eq "enable-if") {
                     next;
+                } elsif ($codegenOptionName eq "skip-codegen") {
+                    next;
                 } elsif ($codegenOptionName eq "high-priority") {
                     $nameIsHighPriority{$name} = 1;
                 } elsif ($codegenOptionName eq "aliases") {
                     $nameToAliases{$name} = $codegenProperties->{"aliases"};
                 } elsif ($styleBuilderOptions{$codegenOptionName}) {
                     $propertiesWithStyleBuilderOptions{$name}{$codegenOptionName} = $codegenProperties->{$codegenOptionName};
+                } elsif ($codegenOptionName eq "internal-only") {
+                    # internal-only properties exist to make it easier to parse compound properties (e.g. background-repeat) as if they were shorthands.
+                    push @internalProprerties, $name
                 } else {
-                    die "Unrecognized codegen property \"$optionName\" for $name property.";
+                    die "Unrecognized codegen property \"$codegenOptionName\" for $name property.";
                 }
             }
         } elsif ($optionName eq "animatable") {
@@ -240,11 +298,27 @@ for my $name (@names) {
     }
 }
 
-print GPERF<< "EOF";
+print GPERF << "EOF";
 %%
 const Property* findProperty(const char* str, unsigned int len)
 {
     return CSSPropertyNamesHash::findPropertyImpl(str, len);
+}
+
+bool isInternalCSSProperty(const CSSPropertyID id)
+{
+    switch (id) {
+EOF
+
+foreach my $name (sort @internalProprerties) {
+  print GPERF "    case CSSPropertyID::CSSProperty" . $nameToId{$name} . ":\n";
+}
+
+print GPERF << "EOF";
+        return true;
+    default:
+        return false;
+    }
 }
 
 const char* getPropertyName(CSSPropertyID id)
@@ -378,6 +452,7 @@ print HEADER "const CSSPropertyID lastHighPriorityProperty = CSSProperty" . $nam
 
 print HEADER << "EOF";
 
+bool isInternalCSSProperty(const CSSPropertyID);
 const char* getPropertyName(CSSPropertyID);
 const WTF::AtomicString& getPropertyNameAtomicString(CSSPropertyID id);
 WTF::String getPropertyNameString(CSSPropertyID id);

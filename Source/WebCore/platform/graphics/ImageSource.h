@@ -53,8 +53,11 @@ public:
     ImageSource(Image*, AlphaOption = AlphaOption::Premultiplied, GammaAndColorProfileOption = GammaAndColorProfileOption::Applied);
     ~ImageSource();
 
-    void destroyDecodedData(SharedBuffer* data, bool destroyAll = true, size_t count = 0);
-    bool destroyDecodedDataIfNecessary(SharedBuffer* data, bool destroyAll = true, size_t count = 0);
+    void destroyAllDecodedData() { m_frameCache->destroyAllDecodedData(); }
+    void destroyAllDecodedDataExcludeFrame(size_t excludeFrame) { m_frameCache->destroyAllDecodedDataExcludeFrame(excludeFrame); }
+    void destroyDecodedDataBeforeFrame(size_t beforeFrame) { m_frameCache->destroyDecodedDataBeforeFrame(beforeFrame); }
+    void clearFrameBufferCache(size_t);
+    void clear(SharedBuffer* data);
 
     bool ensureDecoderAvailable(SharedBuffer*);
     bool isDecoderAvailable() const { return m_decoder.get(); }
@@ -65,8 +68,10 @@ public:
     unsigned decodedSize() const { return m_frameCache->decodedSize(); }
     bool isAllDataReceived();
 
-    bool isAsyncDecodingRequired();
-    bool requestFrameAsyncDecodingAtIndex(size_t index, SubsamplingLevel subsamplingLevel) { return m_frameCache->requestFrameAsyncDecodingAtIndex(index, subsamplingLevel); }
+    bool shouldUseAsyncDecoding();
+    bool requestFrameAsyncDecodingAtIndex(size_t index, SubsamplingLevel subsamplingLevel, const IntSize& sizeForDrawing) { return m_frameCache->requestFrameAsyncDecodingAtIndex(index, subsamplingLevel, sizeForDrawing); }
+    bool hasAsyncDecodingQueue() const { return m_frameCache->hasAsyncDecodingQueue(); }
+    bool isAsyncDecodingQueueIdle() const  { return m_frameCache->isAsyncDecodingQueueIdle(); }
     void stopAsyncDecodingQueue() { m_frameCache->stopAsyncDecodingQueue(); }
 
     // Image metadata which is calculated by the decoder or can deduced by the case of the memory NativeImage.
@@ -82,11 +87,12 @@ public:
     Color singlePixelSolidColor() { return m_frameCache->singlePixelSolidColor(); }
 
     // ImageFrame metadata which does not require caching the ImageFrame.
-    bool frameIsBeingDecodedAtIndex(size_t index) { return m_frameCache->frameIsBeingDecodedAtIndex(index); }
+    bool frameIsBeingDecodedAtIndex(size_t index, const std::optional<IntSize>& sizeForDrawing) { return m_frameCache->frameIsBeingDecodedAtIndex(index, sizeForDrawing); }
     bool frameIsCompleteAtIndex(size_t index) { return m_frameCache->frameIsCompleteAtIndex(index); }
     bool frameHasAlphaAtIndex(size_t index) { return m_frameCache->frameHasAlphaAtIndex(index); }
     bool frameHasImageAtIndex(size_t index) { return m_frameCache->frameHasImageAtIndex(index); }
-    bool frameHasValidNativeImageAtIndex(size_t index, SubsamplingLevel subsamplingLevel) { return m_frameCache->frameHasValidNativeImageAtIndex(index, subsamplingLevel); }
+    bool frameHasValidNativeImageAtIndex(size_t index, const std::optional<SubsamplingLevel>& subsamplingLevel, const std::optional<IntSize>& sizeForDrawing) { return m_frameCache->frameHasValidNativeImageAtIndex(index, subsamplingLevel, sizeForDrawing); }
+    bool frameHasDecodedNativeImage(size_t index) { return m_frameCache->frameHasDecodedNativeImage(index); }
     SubsamplingLevel frameSubsamplingLevelAtIndex(size_t index) { return m_frameCache->frameSubsamplingLevelAtIndex(index); }
 
     // ImageFrame metadata which forces caching or re-caching the ImageFrame.
@@ -94,15 +100,13 @@ public:
     unsigned frameBytesAtIndex(size_t index, SubsamplingLevel subsamplingLevel = SubsamplingLevel::Default) { return m_frameCache->frameBytesAtIndex(index, subsamplingLevel); }
     float frameDurationAtIndex(size_t index) { return m_frameCache->frameDurationAtIndex(index); }
     ImageOrientation frameOrientationAtIndex(size_t index) { return m_frameCache->frameOrientationAtIndex(index); }
-    NativeImagePtr frameImageAtIndex(size_t index, SubsamplingLevel = SubsamplingLevel::Default, const GraphicsContext* targetContext = nullptr);
+    NativeImagePtr frameImageAtIndex(size_t index, const std::optional<SubsamplingLevel>& = { }, const std::optional<IntSize>& sizeForDrawing = { }, const GraphicsContext* targetContext = nullptr);
 
     SubsamplingLevel maximumSubsamplingLevel();
     SubsamplingLevel subsamplingLevelForScale(float);
     NativeImagePtr createFrameImageAtIndex(size_t, SubsamplingLevel = SubsamplingLevel::Default);
 
 private:
-    void clearFrameBufferCache(size_t);
-    void clear(bool destroyAll, size_t count, SharedBuffer* data);
     void dump(TextStream&);
 
     void setDecoderTargetContext(const GraphicsContext*);

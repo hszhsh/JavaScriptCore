@@ -678,6 +678,11 @@ static void invalidateAnyPreviousWaitToDumpWatchdog()
 
 void dump()
 {
+    if (done) {
+        fprintf(stderr, "dump() has already been called!\n");
+        return;
+    }
+
     ::InvalidateRect(webViewWindow, 0, TRUE);
     ::SendMessage(webViewWindow, WM_PAINT, 0, 0);
 
@@ -722,7 +727,7 @@ void dump()
             if (::gTestRunner->dumpBackForwardList())
                 dumpBackForwardListForAllWindows();
         } else
-            fprintf(testResult, "ERROR: nil result from %s", ::gTestRunner->dumpAsText() ? "IDOMElement::innerText" : "IFrameViewPrivate::renderTreeAsExternalRepresentation");
+            fprintf(testResult, "ERROR: nil result from %s\n", ::gTestRunner->dumpAsText() ? "IDOMElement::innerText" : "IFrameViewPrivate::renderTreeAsExternalRepresentation");
 
         if (printSeparators)
             fputs("#EOF\n", testResult); // terminate the content block
@@ -738,7 +743,6 @@ void dump()
 
 fail:
     // This will exit from our message loop.
-    ::PostQuitMessage(0);
     done = true;
 }
 
@@ -762,9 +766,29 @@ static bool shouldEnableDeveloperExtras(const char* pathOrURL)
     return true;
 }
 
+static void enableExperimentalFeatures(IWebPreferences* preferences)
+{
+    COMPtr<IWebPreferencesPrivate4> prefsPrivate4(Query, preferences);    
+
+    // FIXME: CSSGridLayout
+    // FIXME: SpringTimingFunction
+    // FIXME: Gamepads
+    prefsPrivate4->setLinkPreloadEnabled(TRUE);
+    // FIXME: ModernMediaControls
+    // FIXME: InputEvents
+    prefsPrivate4->setResourceTimingEnabled(TRUE);
+    // FIXME: SubtleCrypto
+    prefsPrivate4->setUserTimingEnabled(TRUE);
+    prefsPrivate4->setWebAnimationsEnabled(TRUE);
+    // FIXME: WebGL2
+    // FIXME: WebRTC
+}
+
 static void resetWebPreferencesToConsistentValues(IWebPreferences* preferences)
 {
     ASSERT(preferences);
+
+    enableExperimentalFeatures(preferences);
 
     preferences->setAutosaves(FALSE);
 
@@ -850,13 +874,12 @@ static void resetWebPreferencesToConsistentValues(IWebPreferences* preferences)
 
     preferences->setFontSmoothing(FontSmoothingTypeStandard);
 
-    COMPtr<IWebPreferencesPrivate3> prefsPrivate3(Query, preferences);
-    ASSERT(prefsPrivate3);
-    prefsPrivate3->setFetchAPIEnabled(TRUE);
-    prefsPrivate3->setShadowDOMEnabled(TRUE);
-    prefsPrivate3->setCustomElementsEnabled(TRUE);
-
-    prefsPrivate3->setModernMediaControlsEnabled(FALSE);
+    COMPtr<IWebPreferencesPrivate4> prefsPrivate4(Query, preferences);
+    ASSERT(prefsPrivate4);
+    prefsPrivate4->setFetchAPIEnabled(TRUE);
+    prefsPrivate4->setShadowDOMEnabled(TRUE);
+    prefsPrivate4->setCustomElementsEnabled(TRUE);
+    prefsPrivate4->setModernMediaControlsEnabled(FALSE);
 
     setAlwaysAcceptCookies(false);
 }
@@ -1187,7 +1210,7 @@ static void runTest(const string& inputLine)
     request->setHTTPMethod(methodBStr);
     frame->loadRequest(request.get());
 
-    while (true) {
+    while (!done) {
 #if USE(CF)
         CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, true);
 #endif

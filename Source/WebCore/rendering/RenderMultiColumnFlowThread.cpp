@@ -153,6 +153,14 @@ void RenderMultiColumnFlowThread::populate()
     LayoutStateDisabler layoutStateDisabler(view());
     RenderTreeInternalMutationScope reparentingIsOn(view());
     multicolContainer->moveChildrenTo(this, multicolContainer->firstChild(), this, true);
+    
+    if (multicolContainer->isFieldset()) {
+        // Keep legends out of the flow thread.
+        for (auto& box : childrenOfType<RenderBox>(*this)) {
+            if (box.isLegend())
+                moveChildTo(multicolContainer, &box, true);
+        }
+    }
 }
 
 void RenderMultiColumnFlowThread::evacuateAndDestroy()
@@ -216,6 +224,9 @@ void RenderMultiColumnFlowThread::willBeRemovedFromTree()
 
 RenderObject* RenderMultiColumnFlowThread::resolveMovedChild(RenderObject* child) const
 {
+    if (!child)
+        return nullptr;
+
     if (child->style().columnSpan() != ColumnSpanAll || !is<RenderBox>(*child)) {
         // We only need to resolve for column spanners.
         return child;

@@ -33,6 +33,7 @@
 #import "DataTransfer.h"
 #import "DocumentFragment.h"
 #import "DocumentLoader.h"
+#import "Editing.h"
 #import "Editor.h"
 #import "EditorClient.h"
 #import "File.h"
@@ -64,7 +65,6 @@
 #import "TypingCommand.h"
 #import "UUID.h"
 #import "WebNSAttributedStringExtras.h"
-#import "htmlediting.h"
 #import "markup.h"
 
 namespace WebCore {
@@ -90,8 +90,11 @@ void Editor::pasteWithPasteboard(Pasteboard* pasteboard, bool allowPlainText, Ma
 {
     RefPtr<Range> range = selectedRange();
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     // FIXME: How can this hard-coded pasteboard name be right, given that the passed-in pasteboard has a name?
     client()->setInsertionPasteboard(NSGeneralPboard);
+#pragma clang diagnostic pop
 
     bool chosePlainText;
     RefPtr<DocumentFragment> fragment = webContentFromPasteboard(*pasteboard, *range, allowPlainText, chosePlainText);
@@ -117,8 +120,11 @@ void Editor::takeFindStringFromSelection()
 
     Vector<String> types;
     types.append(String(NSStringPboardType));
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     platformStrategies()->pasteboardStrategy()->setTypes(types, NSFindPboard);
     platformStrategies()->pasteboardStrategy()->setStringForType(m_frame.displayStringModifiedByEncoding(selectedTextForDataTransfer()), NSStringPboardType, NSFindPboard);
+#pragma clang diagnostic pop
 }
 
 void Editor::readSelectionFromPasteboard(const String& pasteboardName, MailBlockquoteHandling mailBlockquoteHandling)
@@ -172,8 +178,11 @@ void Editor::replaceNodeFromPasteboard(Node* node, const String& pasteboardName)
         return;
     }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     // FIXME: How can this hard-coded pasteboard name be right, given that the passed-in pasteboard has a name?
     client()->setInsertionPasteboard(NSGeneralPboard);
+#pragma clang diagnostic pop
 
     bool chosePlainText;
     if (RefPtr<DocumentFragment> fragment = webContentFromPasteboard(pasteboard, *range, true, chosePlainText)) {
@@ -242,9 +251,9 @@ static void getImage(Element& imageElement, RefPtr<Image>& image, CachedImage*& 
     cachedImage = tentativeCachedImage;
 }
 
-void Editor::fillInUserVisibleForm(PasteboardURL& pasteboardURL)
+String Editor::userVisibleString(const URL& url)
 {
-    pasteboardURL.userVisibleForm = client()->userVisibleString(pasteboardURL.url);
+    return client()->userVisibleString(url);
 }
 
 void Editor::selectionWillChange()
@@ -477,24 +486,13 @@ RefPtr<DocumentFragment> Editor::webContentFromPasteboard(Pasteboard& pasteboard
     return WTFMove(reader.fragment);
 }
 
-Ref<DocumentFragment> Editor::createFragmentForImageAndURL(const String& url)
-{
-    auto imageElement = HTMLImageElement::create(*m_frame.document());
-    imageElement->setAttributeWithoutSynchronization(HTMLNames::srcAttr, url);
-
-    auto fragment = document().createDocumentFragment();
-    fragment->appendChild(imageElement);
-
-    return fragment;
-}
-
 void Editor::applyFontStyles(const String& fontFamily, double fontSize, unsigned fontTraits)
 {
     auto& cssValuePool = CSSValuePool::singleton();
     Ref<MutableStyleProperties> style = MutableStyleProperties::create();
     style->setProperty(CSSPropertyFontFamily, cssValuePool.createFontFamilyValue(fontFamily));
     style->setProperty(CSSPropertyFontStyle, (fontTraits & NSFontItalicTrait) ? CSSValueItalic : CSSValueNormal);
-    style->setProperty(CSSPropertyFontWeight, cssValuePool.createValue(fontTraits & NSFontBoldTrait ? FontWeightBold : FontWeightNormal));
+    style->setProperty(CSSPropertyFontWeight, (fontTraits & NSFontBoldTrait) ? CSSValueBold : CSSValueNormal);
     style->setProperty(CSSPropertyFontSize, cssValuePool.createValue(fontSize, CSSPrimitiveValue::CSS_PX));
     applyStyleToSelection(style.ptr(), EditActionSetFont);
 }

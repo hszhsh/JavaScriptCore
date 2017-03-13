@@ -22,7 +22,7 @@
 
 #pragma once
 
-#include "AnimationController.h"
+#include "CSSAnimationController.h"
 #include "LengthFunctions.h"
 #include "RenderObject.h"
 #include "StyleInheritedData.h"
@@ -36,7 +36,8 @@ class RenderElement : public RenderObject {
 public:
     virtual ~RenderElement();
 
-    static RenderPtr<RenderElement> createFor(Element&, RenderStyle&&);
+    enum RendererCreationType { CreateAllRenderers, OnlyCreateBlockAndFlexboxRenderers };
+    static RenderPtr<RenderElement> createFor(Element&, RenderStyle&&, RendererCreationType = CreateAllRenderers);
 
     bool hasInitializedStyle() const { return m_hasInitializedStyle; }
 
@@ -215,6 +216,10 @@ public:
     RespectImageOrientationEnum shouldRespectImageOrientation() const;
 
     void removeFromRenderFlowThread();
+
+    // Called before anonymousChild.setStyle(). Override to set custom styles for
+    // the child.
+    virtual void updateAnonymousChildStyle(const RenderObject&, RenderStyle&) const { };
 
 protected:
     enum BaseTypeFlag {

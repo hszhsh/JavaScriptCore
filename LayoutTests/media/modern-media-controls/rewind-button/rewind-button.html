@@ -1,5 +1,6 @@
 <script src="../../../resources/js-test-pre.js"></script>
 <script src="../resources/media-controls-loader.js" type="text/javascript"></script>
+<script src="../resources/media-controls-utils.js" type="text/javascript"></script>
 <body>
 <script type="text/javascript">
 
@@ -16,14 +17,7 @@ shouldBeTrue('rewindButton.element.classList.contains("icon")');
 shouldBeTrue('rewindButton.element.classList.contains("rewind")');
 shouldBeEqualToString("rewindButton.iconName", `${Icons.Rewind}`);
 
-scheduler.frameDidFire = function()
-{
-    if (rewindButton.width == 0)
-        return;
-
-    shouldBeTrue('rewindButton.element.style.webkitMaskImage.includes("macOS/rewind@")');
-    finishJSTest();
-};
+shouldBecomeEqual('rewindButton.element.style.webkitMaskImage.includes("macOS/rewind@")', "true", finishJSTest);
 
 </script>
 <script src="../../../resources/js-test-post.js"></script>

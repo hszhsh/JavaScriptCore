@@ -62,6 +62,7 @@
 #include "WebKitWebViewBasePrivate.h"
 #include "WebKitWebViewPrivate.h"
 #include "WebKitWebViewSessionStatePrivate.h"
+#include "WebKitWebsiteDataManagerPrivate.h"
 #include "WebKitWindowPropertiesPrivate.h"
 #include <JavaScriptCore/APICast.h>
 #include <WebCore/CertificateInfo.h>
@@ -153,6 +154,7 @@ enum {
     PROP_ZOOM_LEVEL,
     PROP_IS_LOADING,
     PROP_IS_PLAYING_AUDIO,
+    PROP_IS_EPHEMERAL,
     PROP_EDITABLE
 };
 
@@ -177,6 +179,7 @@ struct _WebKitWebViewPrivate {
     CString customTextEncoding;
     CString activeURI;
     bool isLoading;
+    bool isEphemeral;
 
     std::unique_ptr<PageLoadStateObserver> loadObserver;
 
@@ -208,6 +211,7 @@ struct _WebKitWebViewPrivate {
     SnapshotResultsMap snapshotResultsMap;
     GRefPtr<WebKitAuthenticationRequest> authenticationRequest;
 
+    GRefPtr<WebKitWebsiteDataManager> websiteDataManager;
 };
 
 static guint signals[LAST_SIGNAL] = { 0, };
@@ -532,11 +536,11 @@ static gboolean webkitWebViewAuthenticate(WebKitWebView* webView, WebKitAuthenti
     return TRUE;
 }
 
-static void fileChooserDialogResponseCallback(GtkDialog* dialog, gint responseID, WebKitFileChooserRequest* request)
+static void fileChooserDialogResponseCallback(GtkFileChooser* dialog, gint responseID, WebKitFileChooserRequest* request)
 {
     GRefPtr<WebKitFileChooserRequest> adoptedRequest = adoptGRef(request);
     if (responseID == GTK_RESPONSE_ACCEPT) {
-        GUniquePtr<GSList> filesList(gtk_file_chooser_get_filenames(GTK_FILE_CHOOSER(dialog)));
+        GUniquePtr<GSList> filesList(gtk_file_chooser_get_filenames(dialog));
         GRefPtr<GPtrArray> filesArray = adoptGRef(g_ptr_array_new());
         for (GSList* file = filesList.get(); file; file = g_slist_next(file))
             g_ptr_array_add(filesArray.get(), file->data);
@@ -545,7 +549,11 @@ static void fileChooserDialogResponseCallback(GtkDialog* dialog, gint responseID
     } else
         webkit_file_chooser_request_cancel(adoptedRequest.get());
 
+#if GTK_CHECK_VERSION(3, 20, 0)
+    g_object_unref(dialog);
+#else
     gtk_widget_destroy(GTK_WIDGET(dialog));
+#endif
 }
 
 static gboolean webkitWebViewRunFileChooser(WebKitWebView* webView, WebKitFileChooserRequest* request)
@@ -555,12 +563,22 @@ static gboolean webkitWebViewRunFileChooser(WebKitWebView* webView, WebKitFileCh
         toplevel = 0;
 
     gboolean allowsMultipleSelection = webkit_file_chooser_request_get_select_multiple(request);
+
+#if GTK_CHECK_VERSION(3, 20, 0)
+    GtkFileChooserNative* dialog = gtk_file_chooser_native_new(allowsMultipleSelection ? _("Select Files") : _("Select File"),
+        toplevel ? GTK_WINDOW(toplevel) : nullptr, GTK_FILE_CHOOSER_ACTION_OPEN, nullptr, nullptr);
+    if (toplevel)
+        gtk_native_dialog_set_modal(GTK_NATIVE_DIALOG(dialog), TRUE);
+#else
     GtkWidget* dialog = gtk_file_chooser_dialog_new(allowsMultipleSelection ? _("Select Files") : _("Select File"),
                                                     toplevel ? GTK_WINDOW(toplevel) : 0,
                                                     GTK_FILE_CHOOSER_ACTION_OPEN,
                                                     GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
                                                     GTK_STOCK_OPEN, GTK_RESPONSE_ACCEPT,
                                                     NULL);
+    if (toplevel)
+        gtk_window_set_modal(GTK_WINDOW(dialog), TRUE);
+#endif
 
     if (GtkFileFilter* filter = webkit_file_chooser_request_get_mime_types_filter(request))
         gtk_file_chooser_set_filter(GTK_FILE_CHOOSER(dialog), filter);
@@ -570,7 +588,12 @@ static gboolean webkitWebViewRunFileChooser(WebKitWebView* webView, WebKitFileCh
         gtk_file_chooser_select_filename(GTK_FILE_CHOOSER(dialog), selectedFiles[0]);
 
     g_signal_connect(dialog, "response", G_CALLBACK(fileChooserDialogResponseCallback), g_object_ref(request));
+
+#if GTK_CHECK_VERSION(3, 20, 0)
+    gtk_native_dialog_show(GTK_NATIVE_DIALOG(dialog));
+#else
     gtk_widget_show(dialog);
+#endif
 
     return TRUE;
 }
@@ -641,12 +664,24 @@ static void webkitWebViewConstructed(GObject* object)
 
     WebKitWebView* webView = WEBKIT_WEB_VIEW(object);
     WebKitWebViewPrivate* priv = webView->priv;
-    if (priv->relatedView)
+    if (priv->relatedView) {
         priv->context = webkit_web_view_get_context(priv->relatedView);
-    else if (!priv->context)
+        priv->isEphemeral = webkit_web_view_is_ephemeral(priv->relatedView);
+    } else if (!priv->context)
         priv->context = webkit_web_context_get_default();
+    else if (!priv->isEphemeral)
+        priv->isEphemeral = webkit_web_context_is_ephemeral(priv->context.get());
+
     if (!priv->settings)
         priv->settings = adoptGRef(webkit_settings_new());
+
+    if (!priv->userContentManager)
+        priv->userContentManager = adoptGRef(webkit_user_content_manager_new());
+
+    if (priv->isEphemeral && !webkit_web_context_is_ephemeral(priv->context.get())) {
+        priv->websiteDataManager = adoptGRef(webkit_website_data_manager_new_ephemeral());
+        webkitWebsiteDataManagerAddProcessPool(priv->websiteDataManager.get(), webkitWebContextGetProcessPool(priv->context.get()));
+    }
 
     webkitWebContextCreatePageForWebView(priv->context.get(), webView, priv->userContentManager.get(), priv->relatedView);
 
@@ -701,6 +736,9 @@ static void webkitWebViewSetProperty(GObject* object, guint propId, const GValue
     case PROP_ZOOM_LEVEL:
         webkit_web_view_set_zoom_level(webView, g_value_get_double(value));
         break;
+    case PROP_IS_EPHEMERAL:
+        webView->priv->isEphemeral = g_value_get_boolean(value);
+        break;
     case PROP_EDITABLE:
         webkit_web_view_set_editable(webView, g_value_get_boolean(value));
         break;
@@ -744,6 +782,9 @@ static void webkitWebViewGetProperty(GObject* object, guint propId, GValue* valu
     case PROP_IS_PLAYING_AUDIO:
         g_value_set_boolean(value, webkit_web_view_is_playing_audio(webView));
         break;
+    case PROP_IS_EPHEMERAL:
+        g_value_set_boolean(value, webkit_web_view_is_ephemeral(webView));
+        break;
     case PROP_EDITABLE:
         g_value_set_boolean(value, webkit_web_view_is_editable(webView));
         break;
@@ -762,9 +803,17 @@ static void webkitWebViewDispose(GObject* object)
     if (webView->priv->loadObserver) {
         getPage(webView)->pageLoadState().removeObserver(*webView->priv->loadObserver);
         webView->priv->loadObserver.reset();
+
+        // We notify the context here to ensure it's called only once. Ideally we should
+        // call this in finalize, not dispose, but finalize is used internally and we don't
+        // have access to the instance pointer from the private struct destructor.
+        webkitWebContextWebViewDestroyed(webView->priv->context.get(), webView);
     }
 
-    webkitWebContextWebViewDestroyed(webView->priv->context.get(), webView);
+    if (webView->priv->websiteDataManager) {
+        webkitWebsiteDataManagerRemoveProcessPool(webView->priv->websiteDataManager.get(), webkitWebContextGetProcessPool(webView->priv->context.get()));
+        webView->priv->websiteDataManager = nullptr;
+    }
 
     G_OBJECT_CLASS(webkit_web_view_parent_class)->dispose(object);
 }
@@ -976,6 +1025,29 @@ static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
             WEBKIT_PARAM_READABLE));
 
     /**
+     * WebKitWebView:is-ephemeral:
+     *
+     * Whether the #WebKitWebView is ephemeral. An ephemeral web view never writes
+     * website data to the client storage, no matter what #WebKitWebsiteDataManager
+     * its context is using. This is normally used to implement private browsing mode.
+     * This is a %G_PARAM_CONSTRUCT_ONLY property, so you have to create a ephemeral
+     * #WebKitWebView and it can't be changed. Note that all #WebKitWebView<!-- -->s
+     * created with an ephemeral #WebKitWebContext will be ephemeral automatically.
+     * See also webkit_web_context_new_ephemeral().
+     *
+     * Since: 2.16
+     */
+    g_object_class_install_property(
+        gObjectClass,
+        PROP_IS_EPHEMERAL,
+        g_param_spec_boolean(
+            "is-ephemeral",
+            "Is Ephemeral",
+            _("Whether the web view is ephemeral"),
+            FALSE,
+            static_cast<GParamFlags>(WEBKIT_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY)));
+
+    /**
      * WebKitWebView:editable:
      *
      * Whether the pages loaded inside #WebKitWebView are editable. For more
@@ -998,7 +1070,7 @@ static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
      * @web_view: the #WebKitWebView on which the signal is emitted
      * @load_event: the #WebKitLoadEvent
      *
-     * Emitted when the a load operation in @web_view changes.
+     * Emitted when a load operation in @web_view changes.
      * The signal is always emitted with %WEBKIT_LOAD_STARTED when a
      * new load request is made and %WEBKIT_LOAD_FINISHED when the load
      * finishes successfully or due to an error. When the ongoing load
@@ -1183,7 +1255,7 @@ static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
      * <function>window.showModalDialog</function>. The purpose of
      * this signal is to allow the client application to prepare the
      * new view to behave as modal. Once the signal is emitted a new
-     * mainloop will be run to block user interaction in the parent
+     * main loop will be run to block user interaction in the parent
      * #WebKitWebView until the new dialog is closed.
      */
     signals[RUN_AS_MODAL] =
@@ -1410,7 +1482,7 @@ static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
      * @web_view: the #WebKitWebView on which the signal is emitted
      * @print_operation: the #WebKitPrintOperation that will handle the print request
      *
-     * Emitted when printing is requested on @web_view, usually by a javascript call,
+     * Emitted when printing is requested on @web_view, usually by a JavaScript call,
      * before the print dialog is shown. This signal can be used to set the initial
      * print settings and page setup of @print_operation to be used as default values in
      * the print dialog. You can call webkit_print_operation_set_print_settings() and
@@ -1538,8 +1610,8 @@ static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
      * @event: the #GdkEvent that triggered the context menu
      * @hit_test_result: a #WebKitHitTestResult
      *
-     * Emmited when a context menu is about to be displayed to give the application
-     * a chance to customize the proposed menu, prevent the menu from being displayed
+     * Emitted when a context menu is about to be displayed to give the application
+     * a chance to customize the proposed menu, prevent the menu from being displayed,
      * or build its own context menu.
      * <itemizedlist>
      * <listitem><para>
@@ -1563,6 +1635,21 @@ static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
      * <listitem><para>
      *  If you just want the default menu to be shown always, simply don't connect to this
      *  signal because showing the proposed context menu is the default behaviour.
+     * </para></listitem>
+     * </itemizedlist>
+     *
+     * The @event is expected to be one of the following types:
+     * <itemizedlist>
+     * <listitem><para>
+     * a #GdkEventButton of type %GDK_BUTTON_PRESS when the context menu
+     * was triggered with mouse.
+     * <listitem><para>
+     * a #GdkEventKey of type %GDK_KEY_PRESS if the keyboard was used to show
+     * the menu.
+     * </para></listitem>
+     * <listitem><para>
+     * a generic #GdkEvent of type %GDK_NOTHING when the #GtkWidget:popup-menu
+     * signal was used to show the context menu.
      * </para></listitem>
      * </itemizedlist>
      *
@@ -2021,7 +2108,9 @@ void webkitWebViewSubmitFormRequest(WebKitWebView* webView, WebKitFormSubmission
 
 void webkitWebViewHandleAuthenticationChallenge(WebKitWebView* webView, AuthenticationChallengeProxy* authenticationChallenge)
 {
-    gboolean privateBrowsingEnabled = webkit_settings_get_enable_private_browsing(webView->priv->settings.get());
+    G_GNUC_BEGIN_IGNORE_DEPRECATIONS;
+    gboolean privateBrowsingEnabled = webView->priv->isEphemeral || webkit_settings_get_enable_private_browsing(webView->priv->settings.get());
+    G_GNUC_END_IGNORE_DEPRECATIONS;
     webView->priv->authenticationRequest = adoptGRef(webkitAuthenticationRequestCreate(authenticationChallenge, privateBrowsingEnabled));
     gboolean returnValue;
     g_signal_emit(webView, signals[AUTHENTICATE], 0, webView->priv->authenticationRequest.get(), &returnValue);
@@ -2064,6 +2153,11 @@ void webkitWebViewRequestInstallMissingMediaPlugins(WebKitWebView* webView, Inst
 #endif
 }
 
+WebKitWebsiteDataManager* webkitWebViewGetWebsiteDataManager(WebKitWebView* webView)
+{
+    return webView->priv->websiteDataManager.get();
+}
+
 /**
  * webkit_web_view_new:
  *
@@ -2095,7 +2189,10 @@ GtkWidget* webkit_web_view_new_with_context(WebKitWebContext* context)
 {
     g_return_val_if_fail(WEBKIT_IS_WEB_CONTEXT(context), 0);
 
-    return GTK_WIDGET(g_object_new(WEBKIT_TYPE_WEB_VIEW, "web-context", context, NULL));
+    return GTK_WIDGET(g_object_new(WEBKIT_TYPE_WEB_VIEW,
+        "is-ephemeral", webkit_web_context_is_ephemeral(context),
+        "web-context", context,
+        nullptr));
 }
 
 /**
@@ -2184,8 +2281,7 @@ WebKitWebContext* webkit_web_view_get_context(WebKitWebView *webView)
  * webkit_web_view_get_user_content_manager:
  * @web_view: a #WebKitWebView
  *
- * Gets the user content manager associated to @web_view, or %NULL if the
- * view does not have an user content manager.
+ * Gets the user content manager associated to @web_view.
  *
  * Returns: (transfer none): the #WebKitUserContentManager associated with the view
  *
@@ -2196,6 +2292,49 @@ WebKitUserContentManager* webkit_web_view_get_user_content_manager(WebKitWebView
     g_return_val_if_fail(WEBKIT_IS_WEB_VIEW(webView), nullptr);
 
     return webView->priv->userContentManager.get();
+}
+
+/**
+ * webkit_web_view_is_ephemeral:
+ * @web_view: a #WebKitWebView
+ *
+ * Get whether a #WebKitWebView is ephemeral. To create an ephemeral #WebKitWebView you need to
+ * use g_object_new() and pass is-ephemeral property with %TRUE value. See
+ * #WebKitWebView:is-ephemeral for more details.
+ * If @web_view was created with a ephemeral #WebKitWebView:related-view or an
+ * ephemeral #WebKitWebView:web-context it will also be ephemeral.
+ *
+ * Returns: %TRUE if @web_view is ephemeral or %FALSE otherwise.
+ *
+ * Since: 2.16
+ */
+gboolean webkit_web_view_is_ephemeral(WebKitWebView* webView)
+{
+    g_return_val_if_fail(WEBKIT_IS_WEB_VIEW(webView), FALSE);
+
+    return webView->priv->isEphemeral;
+}
+
+/**
+ * webkit_web_view_get_website_data_manager:
+ * @web_view: a #WebKitWebView
+ *
+ * Get the #WebKitWebsiteDataManager associated to @web_view. If @web_view is not ephemeral,
+ * the returned #WebKitWebsiteDataManager will be the same as the #WebKitWebsiteDataManager
+ * of @web_view's #WebKitWebContext.
+ *
+ * Returns: (transfer none): a #WebKitWebsiteDataManager
+ *
+ * Since: 2.16
+ */
+WebKitWebsiteDataManager* webkit_web_view_get_website_data_manager(WebKitWebView* webView)
+{
+    g_return_val_if_fail(WEBKIT_IS_WEB_VIEW(webView), nullptr);
+
+    if (webView->priv->websiteDataManager)
+        return webView->priv->websiteDataManager.get();
+
+    return webkit_web_context_get_website_data_manager(webView->priv->context.get());
 }
 
 /**
@@ -2268,7 +2407,7 @@ void webkit_web_view_load_html(WebKitWebView* webView, const gchar* content, con
  * Load the given @content string for the URI @content_uri.
  * This allows clients to display page-loading errors in the #WebKitWebView itself.
  * When this method is called from #WebKitWebView::load-failed signal to show an
- * error page, the the back-forward list is maintained appropriately.
+ * error page, then the back-forward list is maintained appropriately.
  * For everything else this method works the same way as webkit_web_view_load_html().
  */
 void webkit_web_view_load_alternate_html(WebKitWebView* webView, const gchar* content, const gchar* contentURI, const gchar* baseURI)
@@ -2444,7 +2583,7 @@ void webkit_web_view_stop_loading(WebKitWebView* webView)
  * Gets the value of the #WebKitWebView:is-loading property.
  * You can monitor when a #WebKitWebView is loading a page by connecting to
  * notify::is-loading signal of @web_view. This is useful when you are
- * interesting in knowing when the view is loding something but not in the
+ * interesting in knowing when the view is loading something but not in the
  * details about the status of the load operation, for example to start a spinner
  * when the view is loading a page and stop it when it finishes.
  *
@@ -2834,7 +2973,7 @@ gdouble webkit_web_view_get_zoom_level(WebKitWebView* webView)
  * @callback: (scope async): a #GAsyncReadyCallback to call when the request is satisfied
  * @user_data: (closure): the data to pass to callback function
  *
- * Asynchronously execute the given editing command.
+ * Asynchronously check if it is possible to execute the given editing command.
  *
  * When the operation is finished, @callback will be called. You can then call
  * webkit_web_view_can_execute_editing_command_finish() to get the result of the operation.
@@ -3346,7 +3485,7 @@ gboolean webkit_web_view_save_to_file_finish(WebKitWebView* webView, GAsyncResul
  *
  * Requests downloading of the specified URI string for @web_view.
  *
- * Returns: (transfer full): a new #WebKitDownload representing the
+ * Returns: (transfer full): a new #WebKitDownload representing
  *    the download operation.
  */
 WebKitDownload* webkit_web_view_download_uri(WebKitWebView* webView, const char* uri)

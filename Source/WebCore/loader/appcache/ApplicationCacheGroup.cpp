@@ -41,6 +41,7 @@
 #include "HTTPHeaderNames.h"
 #include "InspectorInstrumentation.h"
 #include "ManifestParser.h"
+#include "NetworkLoadMetrics.h"
 #include "Page.h"
 #include "ProgressTracker.h"
 #include "ResourceHandle.h"
@@ -570,9 +571,11 @@ void ApplicationCacheGroup::didReceiveData(ResourceHandle* handle, const char* d
     m_currentResource->data().append(data, length);
 }
 
-void ApplicationCacheGroup::didFinishLoading(ResourceHandle* handle, double finishTime)
+void ApplicationCacheGroup::didFinishLoading(ResourceHandle* handle)
 {
-    InspectorInstrumentation::didFinishLoading(m_frame, m_frame->loader().documentLoader(), m_currentResourceIdentifier, finishTime);
+    // FIXME: We should have NetworkLoadMetrics for ApplicationCache loads.
+    NetworkLoadMetrics emptyMetrics;
+    InspectorInstrumentation::didFinishLoading(m_frame, m_frame->loader().documentLoader(), m_currentResourceIdentifier, emptyMetrics);
 
     if (handle == m_manifestHandle) {
         didFinishLoadingManifest();
@@ -784,7 +787,7 @@ void ApplicationCacheGroup::cacheUpdateFailed()
 
 void ApplicationCacheGroup::recalculateAvailableSpaceInQuota()
 {
-    if (!m_frame->page()->applicationCacheStorage().calculateRemainingSizeForOriginExcludingCache(m_origin.get(), m_newestCache.get(), m_availableSpaceInQuota)) {
+    if (!m_frame->page()->applicationCacheStorage().calculateRemainingSizeForOriginExcludingCache(m_origin, m_newestCache.get(), m_availableSpaceInQuota)) {
         // Failed to determine what is left in the quota. Fallback to allowing anything.
         m_availableSpaceInQuota = ApplicationCacheStorage::noQuota();
     }

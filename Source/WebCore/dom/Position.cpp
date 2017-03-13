@@ -27,6 +27,7 @@
 #include "Position.h"
 
 #include "CSSComputedStyleDeclaration.h"
+#include "Editing.h"
 #include "HTMLBRElement.h"
 #include "HTMLBodyElement.h"
 #include "HTMLHtmlElement.h"
@@ -50,7 +51,6 @@
 #include "TextStream.h"
 #include "VisiblePosition.h"
 #include "VisibleUnits.h"
-#include "htmlediting.h"
 #include <stdio.h>
 #include <wtf/text/CString.h>
 #include <wtf/unicode/CharacterNames.h>
@@ -1011,11 +1011,7 @@ bool Position::isCandidate() const
     if (is<HTMLHtmlElement>(*m_anchorNode))
         return false;
 
-    if (is<RenderBlockFlow>(*renderer)
-#if ENABLE(CSS_GRID_LAYOUT)
-        || is<RenderGrid>(*renderer)
-#endif
-        || is<RenderFlexibleBox>(*renderer)) {
+    if (is<RenderBlockFlow>(*renderer) || is<RenderGrid>(*renderer) || is<RenderFlexibleBox>(*renderer)) {
         RenderBlock& block = downcast<RenderBlock>(*renderer);
         if (block.logicalHeight() || is<HTMLBodyElement>(*m_anchorNode)) {
             if (!Position::hasRenderedNonAnonymousDescendantsWithHeight(block))

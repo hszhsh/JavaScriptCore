@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2010-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,6 +29,7 @@
 #include "APIFrameHandle.h"
 #include "APIPageGroupHandle.h"
 #include "APIPageHandle.h"
+#include "BackgroundProcessResponsivenessTimer.h"
 #include "DataReference.h"
 #include "DownloadProxyMap.h"
 #include "Logging.h"
@@ -88,18 +89,22 @@ static WebProcessProxy::WebPageProxyMap& globalPageMap()
     return pageMap;
 }
 
-Ref<WebProcessProxy> WebProcessProxy::create(WebProcessPool& processPool)
+Ref<WebProcessProxy> WebProcessProxy::create(WebProcessPool& processPool, WebsiteDataStore* websiteDataStore)
 {
-    return adoptRef(*new WebProcessProxy(processPool));
+    return adoptRef(*new WebProcessProxy(processPool, websiteDataStore));
 }
 
-WebProcessProxy::WebProcessProxy(WebProcessPool& processPool)
-    : m_responsivenessTimer(*this)
+WebProcessProxy::WebProcessProxy(WebProcessPool& processPool, WebsiteDataStore* websiteDataStore)
+    : ChildProcessProxy(processPool.alwaysRunsAtBackgroundPriority())
+    , m_responsivenessTimer(*this)
     , m_processPool(processPool)
     , m_mayHaveUniversalFileReadSandboxExtension(false)
     , m_numberOfTimesSuddenTerminationWasDisabled(0)
     , m_throttler(*this)
     , m_isResponsive(NoOrMaybe::Maybe)
+    , m_visiblePageCounter([this](RefCounterEvent) { updateBackgroundResponsivenessTimer(); })
+    , m_backgroundResponsivenessTimer(std::make_unique<BackgroundProcessResponsivenessTimer>(*this))
+    , m_websiteDataStore(websiteDataStore)
 {
     WebPasteboardProxy::singleton().addWebProcessProxy(*this);
 
@@ -199,6 +204,62 @@ WebPageProxy* WebProcessProxy::webPage(uint64_t pageID)
     return globalPageMap().get(pageID);
 }
 
+void WebProcessProxy::deleteWebsiteDataForTopPrivatelyOwnedDomainsInAllPersistentDataStores(OptionSet<WebsiteDataType> dataTypes, Vector<String>& topPrivatelyOwnedDomains, bool shouldNotifyPage, std::function<void(Vector<String>)> completionHandler)
+{
+    struct CallbackAggregator : ThreadSafeRefCounted<CallbackAggregator> {
+        explicit CallbackAggregator(std::function<void(Vector<String>)> completionHandler)
+            : completionHandler(WTFMove(completionHandler))
+        {
+        }
+        void addDomainsWithDeletedWebsiteData(const Vector<String>& domains)
+        {
+            domainsWithDeletedWebsiteData.appendVector(domains);
+        }
+        
+        void addPendingCallback()
+        {
+            ++pendingCallbacks;
+        }
+        
+        void removePendingCallback()
+        {
+            ASSERT(pendingCallbacks);
+            --pendingCallbacks;
+            
+            callIfNeeded();
+        }
+        
+        void callIfNeeded()
+        {
+            if (!pendingCallbacks)
+                completionHandler(domainsWithDeletedWebsiteData);
+        }
+        
+        unsigned pendingCallbacks = 0;
+        std::function<void(Vector<String>)> completionHandler;
+        Vector<String> domainsWithDeletedWebsiteData;
+    };
+    
+    RefPtr<CallbackAggregator> callbackAggregator = adoptRef(new CallbackAggregator(WTFMove(completionHandler)));
+
+    HashSet<WebCore::SessionID> visitedSessionIDs;
+    for (auto& page : globalPageMap()) {
+        auto& dataStore = page.value->websiteDataStore();
+        if (!dataStore.isPersistent() || visitedSessionIDs.contains(dataStore.sessionID()))
+            continue;
+        visitedSessionIDs.add(dataStore.sessionID());
+        callbackAggregator->addPendingCallback();
+        dataStore.removeDataForTopPrivatelyOwnedDomains(dataTypes, { }, topPrivatelyOwnedDomains, [callbackAggregator, shouldNotifyPage, page](auto domainsWithDeletedWebsiteData) {
+            if (shouldNotifyPage)
+                page.value->postMessageToInjectedBundle("WebsiteDataDeletionForTopPrivatelyOwnedDomainsFinished", nullptr);
+            WTF::RunLoop::main().dispatch([callbackAggregator, domainsWithDeletedWebsiteData] {
+                callbackAggregator->addDomainsWithDeletedWebsiteData(domainsWithDeletedWebsiteData);
+                callbackAggregator->removePendingCallback();
+            });
+        });
+    }
+}
+
 Ref<WebPageProxy> WebProcessProxy::createWebPage(PageClient& pageClient, Ref<API::PageConfiguration>&& pageConfiguration)
 {
     uint64_t pageID = generatePageID();
@@ -206,6 +267,8 @@ Ref<WebPageProxy> WebProcessProxy::createWebPage(PageClient& pageClient, Ref<API
 
     m_pageMap.set(pageID, webPage.ptr());
     globalPageMap().set(pageID, webPage.ptr());
+
+    updateBackgroundResponsivenessTimer();
 
     return webPage;
 }
@@ -217,12 +280,16 @@ void WebProcessProxy::addExistingWebPage(WebPageProxy* webPage, uint64_t pageID)
 
     m_pageMap.set(pageID, webPage);
     globalPageMap().set(pageID, webPage);
+
+    updateBackgroundResponsivenessTimer();
 }
 
 void WebProcessProxy::removeWebPage(uint64_t pageID)
 {
     m_pageMap.remove(pageID);
     globalPageMap().remove(pageID);
+
+    updateBackgroundResponsivenessTimer();
     
     Vector<uint64_t> itemIDsToRemove;
     for (auto& idAndItem : m_backForwardListItemMap) {
@@ -660,6 +727,11 @@ size_t WebProcessProxy::frameCountInPage(WebPageProxy* page) const
     return result;
 }
 
+auto WebProcessProxy::visiblePageToken() const -> VisibleWebPageToken
+{
+    return m_visiblePageCounter.count();
+}
+
 RefPtr<API::UserInitiatedAction> WebProcessProxy::userInitiatedActivity(uint64_t identifier)
 {
     if (!UserInitiatedActionMap::isValidKey(identifier) || !identifier)
@@ -923,11 +995,6 @@ void WebProcessProxy::sendProcessDidResume()
         send(Messages::WebProcess::ProcessDidResume(), 0);
 }
 
-bool WebProcessProxy::alwaysRunsAtBackgroundPriority()
-{
-    return m_processPool->alwaysRunsAtBackgroundPriority();
-}
-
 void WebProcessProxy::processReadyToSuspend()
 {
     m_throttler.processReadyToSuspend();
@@ -1028,6 +1095,12 @@ void WebProcessProxy::didReceiveMainThreadPing()
     bool isWebProcessResponsive = true;
     for (auto& callback : isResponsiveCallbacks)
         callback(isWebProcessResponsive);
+}
+
+void WebProcessProxy::updateBackgroundResponsivenessTimer()
+{
+    if (m_backgroundResponsivenessTimer)
+        m_backgroundResponsivenessTimer->updateState();
 }
 
 #if !PLATFORM(COCOA)

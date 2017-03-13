@@ -36,7 +36,7 @@ class CommitLogFetcher {
     function fetch_between($repository_id, $first, $second, $keyword = NULL) {
         $statements = 'SELECT commit_id as "id",
             commit_revision as "revision",
-            commit_parent as "parent",
+            commit_previous_commit as "previousCommit",
             commit_time as "time",
             committer_name as "authorName",
             committer_account as "authorEmail",
@@ -84,19 +84,19 @@ class CommitLogFetcher {
     }
 
     function fetch_oldest($repository_id) {
-        return $this->format_single_commit($this->db->select_first_row('commits', 'commit', array('repository' => $repository_id), 'time'));
+        return $this->format_single_commit($this->db->select_first_row('commits', 'commit', array('repository' => $repository_id), array('time', 'order')));
     }
 
     function fetch_latest($repository_id) {
-        return $this->format_single_commit($this->db->select_first_row('commits', 'commit', array('repository' => $repository_id), 'time'));
+        return $this->format_single_commit($this->db->select_last_row('commits', 'commit', array('repository' => $repository_id), array('time', 'order')));
     }
 
     function fetch_last_reported($repository_id) {
-        return $this->format_single_commit($this->db->select_last_row('commits', 'commit', array('repository' => $repository_id, 'reported' => true), 'time'));
+        return $this->format_single_commit($this->db->select_last_row('commits', 'commit', array('repository' => $repository_id, 'reported' => true), array('time', 'order')));
     }
 
     function fetch_revision($repository_id, $revision) {
-        return $this->format_single_commit($this->db->commit_for_revision($repository_id, $revision));
+        return $this->format_single_commit($this->commit_for_revision($repository_id, $revision));
     }
 
     private function commit_for_revision($repository_id, $revision) {
@@ -111,6 +111,8 @@ class CommitLogFetcher {
     }
 
     private function format_single_commit($commit_row) {
+        if (!$commit_row)
+            return array();
         $committer = $this->db->select_first_row('committers', 'committer', array('id' => $commit_row['commit_committer']));
         return array($this->format_commit($commit_row, $committer));
     }
@@ -119,7 +121,7 @@ class CommitLogFetcher {
         return array(
             'id' => $commit_row['commit_id'],
             'revision' => $commit_row['commit_revision'],
-            'parent' => $commit_row['commit_parent'],
+            'previousCommit' => $commit_row['commit_previous_commit'],
             'time' => Database::to_js_time($commit_row['commit_time']),
             'order' => $commit_row['commit_order'],
             'authorName' => $committer_row ? $committer_row['committer_name'] : null,

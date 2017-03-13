@@ -12,105 +12,104 @@
 #include "webrtc/base/logging.h"
 #include "webrtc/common_video/h264/profile_level_id.h"
 #include "webrtc/media/base/codec.h"
-#if defined(WEBRTC_IOS)
-#include "webrtc/sdk/objc/Framework/Classes/h264_video_toolbox_encoder.h"
 #include "webrtc/sdk/objc/Framework/Classes/h264_video_toolbox_decoder.h"
-#endif
-
-// TODO(kthelgason): delete this when CreateVideoDecoder takes
-// a cricket::VideoCodec instead of webrtc::VideoCodecType.
-static const char* NameFromCodecType(webrtc::VideoCodecType type) {
-  switch (type) {
-    case webrtc::kVideoCodecVP8:
-      return cricket::kVp8CodecName;
-    case webrtc::kVideoCodecVP9:
-      return cricket::kVp9CodecName;
-    case webrtc::kVideoCodecH264:
-      return cricket::kH264CodecName;
-    default:
-      return "Unknown codec";
-  }
-}
+#include "webrtc/sdk/objc/Framework/Classes/h264_video_toolbox_encoder.h"
+#include "webrtc/system_wrappers/include/field_trial.h"
 
 namespace webrtc {
+
+namespace {
+const char kHighProfileExperiment[] = "WebRTC-H264HighProfile";
+
+bool IsHighProfileEnabled() {
+  return field_trial::IsEnabled(kHighProfileExperiment);
+}
+}
 
 // VideoToolboxVideoEncoderFactory
 
 VideoToolboxVideoEncoderFactory::VideoToolboxVideoEncoderFactory() {
-// Hardware H264 encoding only supported on iOS for now.
-#if defined(WEBRTC_IOS)
-  // TODO(magjed): Push Constrained High profile as well when negotiation is
-  // ready, http://crbug/webrtc/6337.
-  cricket::VideoCodec constrained_baseline(cricket::kH264CodecName);
-  // TODO(magjed): Enumerate actual level instead of using hardcoded level 3.1.
-  // Level 3.1 is 1280x720@30fps which is enough for now.
-  const H264::ProfileLevelId constrained_baseline_profile(
-      H264::kProfileConstrainedBaseline, H264::kLevel3_1);
-  constrained_baseline.SetParam(
-      cricket::kH264FmtpProfileLevelId,
-      *H264::ProfileLevelIdToString(constrained_baseline_profile));
-  constrained_baseline.SetParam(cricket::kH264FmtpLevelAsymmetryAllowed, "1");
-  constrained_baseline.SetParam(cricket::kH264FmtpPacketizationMode, "1");
-  supported_codecs_.push_back(constrained_baseline);
-#endif
 }
 
 VideoToolboxVideoEncoderFactory::~VideoToolboxVideoEncoderFactory() {}
 
 VideoEncoder* VideoToolboxVideoEncoderFactory::CreateVideoEncoder(
     const cricket::VideoCodec& codec) {
-#if defined(WEBRTC_IOS)
   if (FindMatchingCodec(supported_codecs_, codec)) {
     LOG(LS_INFO) << "Creating HW encoder for " << codec.name;
     return new H264VideoToolboxEncoder(codec);
   }
-#endif
   LOG(LS_INFO) << "No HW encoder found for codec " << codec.name;
   return nullptr;
 }
 
 void VideoToolboxVideoEncoderFactory::DestroyVideoEncoder(
     VideoEncoder* encoder) {
-#if defined(WEBRTC_IOS)
   delete encoder;
   encoder = nullptr;
-#endif
 }
 
 const std::vector<cricket::VideoCodec>&
 VideoToolboxVideoEncoderFactory::supported_codecs() const {
+  supported_codecs_.clear();
+
+  // TODO(magjed): Enumerate actual level instead of using hardcoded level 3.1.
+  // Level 3.1 is 1280x720@30fps which is enough for now.
+  const H264::Level level = H264::kLevel3_1;
+
+  if (IsHighProfileEnabled()) {
+    cricket::VideoCodec constrained_high(cricket::kH264CodecName);
+    const H264::ProfileLevelId constrained_high_profile(
+        H264::kProfileConstrainedHigh, level);
+    constrained_high.SetParam(
+        cricket::kH264FmtpProfileLevelId,
+        *H264::ProfileLevelIdToString(constrained_high_profile));
+    constrained_high.SetParam(cricket::kH264FmtpLevelAsymmetryAllowed, "1");
+    constrained_high.SetParam(cricket::kH264FmtpPacketizationMode, "1");
+    supported_codecs_.push_back(constrained_high);
+  }
+
+  cricket::VideoCodec constrained_baseline(cricket::kH264CodecName);
+  const H264::ProfileLevelId constrained_baseline_profile(
+      H264::kProfileConstrainedBaseline, level);
+  constrained_baseline.SetParam(
+      cricket::kH264FmtpProfileLevelId,
+      *H264::ProfileLevelIdToString(constrained_baseline_profile));
+  constrained_baseline.SetParam(cricket::kH264FmtpLevelAsymmetryAllowed, "1");
+  constrained_baseline.SetParam(cricket::kH264FmtpPacketizationMode, "1");
+  supported_codecs_.push_back(constrained_baseline);
+
   return supported_codecs_;
 }
 
 // VideoToolboxVideoDecoderFactory
 
 VideoToolboxVideoDecoderFactory::VideoToolboxVideoDecoderFactory() {
-#if defined(WEBRTC_IOS)
   supported_codecs_.push_back(cricket::VideoCodec("H264"));
-#endif
 }
 
 VideoToolboxVideoDecoderFactory::~VideoToolboxVideoDecoderFactory() {}
 
 VideoDecoder* VideoToolboxVideoDecoderFactory::CreateVideoDecoder(
     VideoCodecType type) {
-  const auto codec = cricket::VideoCodec(NameFromCodecType(type));
-#if defined(WEBRTC_IOS)
+  const rtc::Optional<const char*> codec_name = CodecTypeToPayloadName(type);
+  if (!codec_name) {
+    LOG(LS_ERROR) << "Invalid codec type: " << type;
+    return nullptr;
+  }
+  const cricket::VideoCodec codec(*codec_name);
   if (FindMatchingCodec(supported_codecs_, codec)) {
     LOG(LS_INFO) << "Creating HW decoder for " << codec.name;
     return new H264VideoToolboxDecoder();
   }
-#endif
   LOG(LS_INFO) << "No HW decoder found for codec " << codec.name;
   return nullptr;
 }
 
 void VideoToolboxVideoDecoderFactory::DestroyVideoDecoder(
     VideoDecoder* decoder) {
-#if defined(WEBRTC_IOS)
   delete decoder;
   decoder = nullptr;
-#endif
 }
 
 }  // namespace webrtc

@@ -103,6 +103,7 @@ typedef const char* optionString;
 #define JSC_OPTIONS(v) \
     v(bool, validateOptions, false, Normal, "crashes if mis-typed JSC options were passed to the VM") \
     v(unsigned, dumpOptions, 0, Normal, "dumps JSC options (0 = None, 1 = Overridden only, 2 = All, 3 = Verbose)") \
+    v(optionString, configFile, nullptr, Normal, "file to configure JSC options and logging location") \
     \
     v(bool, useLLInt,  true, Normal, "allows the LLINT to be used if true") \
     v(bool, useJIT,    true, Normal, "allows the baseline JIT to be used if true") \
@@ -131,6 +132,7 @@ typedef const char* optionString;
     v(bool, dumpBytecodeLivenessResults, false, Normal, nullptr) \
     v(bool, validateBytecode, false, Normal, nullptr) \
     v(bool, forceDebuggerBytecodeGeneration, false, Normal, nullptr) \
+    v(bool, dumpBytecodesBeforeGeneratorification, false, Normal, nullptr) \
     \
     v(bool, useFunctionDotArguments, true, Normal, nullptr) \
     v(bool, useTailCalls, true, Normal, nullptr) \
@@ -158,6 +160,7 @@ typedef const char* optionString;
     v(bool, dumpB3GraphAtEachPhase, false, Normal, "dumps the B3 graph at each phase of compilation") \
     v(bool, dumpAirGraphAtEachPhase, false, Normal, "dumps the Air graph at each phase of compilation") \
     v(bool, verboseDFGByteCodeParsing, false, Normal, nullptr) \
+    v(bool, safepointBeforeEachPhase, true, Normal, nullptr) \
     v(bool, verboseCompilation, false, Normal, nullptr) \
     v(bool, verboseFTLCompilation, false, Normal, nullptr) \
     v(bool, logCompilationChanges, false, Normal, nullptr) \
@@ -197,11 +200,17 @@ typedef const char* optionString;
     v(double, mediumHeapRAMFraction, 0.5, Normal, nullptr) \
     v(double, mediumHeapGrowthFactor, 1.5, Normal, nullptr) \
     v(double, largeHeapGrowthFactor, 1.24, Normal, nullptr) \
-    v(bool, useCollectorTimeslicing, true, Normal, nullptr) \
     v(double, minimumMutatorUtilization, 0, Normal, nullptr) \
     v(double, maximumMutatorUtilization, 0.7, Normal, nullptr) \
+    v(double, epsilonMutatorUtilization, 0.01, Normal, nullptr) \
     v(double, concurrentGCMaxHeadroom, 1.5, Normal, nullptr) \
     v(double, concurrentGCPeriodMS, 2, Normal, nullptr) \
+    v(bool, useStochasticMutatorScheduler, true, Normal, nullptr) \
+    v(double, minimumGCPauseMS, 0.3, Normal, nullptr) \
+    v(double, gcPauseScale, 0.3, Normal, nullptr) \
+    v(double, gcIncrementBytes, 10000, Normal, nullptr) \
+    v(double, gcIncrementMaxBytes, 100000, Normal, nullptr) \
+    v(double, gcIncrementScale, 0, Normal, nullptr) \
     v(bool, scribbleFreeCells, false, Normal, nullptr) \
     v(double, sizeClassProgression, 1.4, Normal, nullptr) \
     v(unsigned, largeAllocationCutoff, 100000, Normal, nullptr) \
@@ -222,7 +231,6 @@ typedef const char* optionString;
     v(bool, clobberAllRegsInFTLICSlowPath, !ASSERT_DISABLED, Normal, nullptr) \
     v(bool, useAccessInlining, true, Normal, nullptr) \
     v(unsigned, maxAccessVariantListSize, 8, Normal, nullptr) \
-    v(unsigned, megamorphicLoadCost, 999, Normal, nullptr) /* This used to be 10, but we're temporarily testing what happens when the feature is disabled. */\
     v(bool, usePolyvariantDevirtualization, true, Normal, nullptr) \
     v(bool, usePolymorphicAccessInlining, true, Normal, nullptr) \
     v(bool, usePolymorphicCallInlining, true, Normal, nullptr) \
@@ -336,9 +344,9 @@ typedef const char* optionString;
     v(bool, forceWeakRandomSeed, false, Normal, nullptr) \
     v(unsigned, forcedWeakRandomSeed, 0, Normal, nullptr) \
     \
-    v(bool, useZombieMode, false, Normal, "debugging option to scribble over dead objects with 0xdeadbeef") \
+    v(bool, useZombieMode, false, Normal, "debugging option to scribble over dead objects with 0xbadbeef0") \
     v(bool, useImmortalObjects, false, Normal, "debugging option to keep all objects alive forever") \
-    v(bool, dumpObjectStatistics, false, Normal, nullptr) \
+    v(bool, sweepSynchronously, false, Normal, "debugging option to sweep all dead objects synchronously at GC end before resuming mutator") \
     v(unsigned, maxSingleAllocationSize, 0, Configurable, "debugging option to limit individual allocations to a max size (0 = limit not set, N = limit size in bytes)") \
     \
     v(gcLogLevel, logGC, GCLogging::None, Normal, "debugging option to log GC activity (0 = None, 1 = Basic, 2 = Verbose)") \
@@ -358,7 +366,10 @@ typedef const char* optionString;
     v(bool, useSamplingProfiler, false, Normal, nullptr) \
     v(unsigned, sampleInterval, 1000, Normal, "Time between stack traces in microseconds.") \
     v(bool, collectSamplingProfilerDataForJSCShell, false, Normal, "This corresponds to the JSC shell's --sample option.") \
+    v(unsigned, samplingProfilerTopFunctionsCount, 12, Normal, "Number of top functions to report when using the command line interface.") \
+    v(unsigned, samplingProfilerTopBytecodesCount, 40, Normal, "Number of top bytecodes to report when using the command line interface.") \
     v(optionString, samplingProfilerPath, nullptr, Normal, "The path to the directory to write sampiling profiler output to. This probably will not work with WK2 unless the path is in the whitelist.") \
+    v(bool, sampleCCode, false, Normal, "Causes the sampling profiler to record profiling data for C frames.") \
     \
     v(bool, alwaysGeneratePCToCodeOriginMap, false, Normal, "This will make sure we always generate a PCToCodeOriginMap for JITed code.") \
     \
@@ -384,14 +395,18 @@ typedef const char* optionString;
     v(bool, logB3PhaseTimes, false, Normal, nullptr) \
     v(double, rareBlockPenalty, 0.001, Normal, nullptr) \
     v(bool, airSpillsEverything, false, Normal, nullptr) \
+    v(bool, airForceBriggsAllocator, false, Normal, nullptr) \
+    v(bool, airForceIRCAllocator, false, Normal, nullptr) \
     v(bool, logAirRegisterPressure, false, Normal, nullptr) \
     v(unsigned, maxB3TailDupBlockSize, 3, Normal, nullptr) \
     v(unsigned, maxB3TailDupBlockSuccessors, 3, Normal, nullptr) \
     \
     v(bool, useDollarVM, false, Restricted, "installs the $vm debugging tool in global objects") \
     v(optionString, functionOverrides, nullptr, Restricted, "file with debugging overrides for function bodies") \
+    v(bool, useSigillCrashAnalyzer, false, Configurable, "logs data about SIGILL crashes") \
     \
     v(unsigned, watchdog, 0, Normal, "watchdog timeout (0 = Disabled, N = a timeout period of N milliseconds)") \
+    v(bool, usePollingTraps, false, Normal, "use polling (instead of signalling) VM traps") \
     \
     v(bool, useICStats, false, Normal, nullptr) \
     \
@@ -400,9 +415,6 @@ typedef const char* optionString;
     v(bool, dumpModuleRecord, false, Normal, nullptr) \
     v(bool, dumpModuleLoadingState, false, Normal, nullptr) \
     v(bool, exposeInternalModuleLoader, false, Normal, "expose the internal module loader object to the global space for debugging") \
-    \
-    v(bool, dumpAirAsJSBeforeAllocateStack, false, Normal, nullptr) \
-    v(bool, dumpAirAfterAllocateStack, false, Normal, nullptr) \
     \
     v(bool, useSuperSampler, false, Normal, nullptr) \
     \
@@ -414,6 +426,8 @@ typedef const char* optionString;
     \
     v(bool, useWebAssembly, true, Normal, "Expose the WebAssembly global object.") \
     v(bool, simulateWebAssemblyLowMemory, false, Normal, "If true, the Memory object won't mmap the full 'maximum' range and instead will allocate the minimum required amount.") \
+    v(bool, useWebAssemblyFastMemory, true, Normal, "If true, we will try to use a 32-bit address space with a signal handler to bounds check wasm memory.")
+
 
 enum OptionEquivalence {
     SameOption,

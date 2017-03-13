@@ -27,13 +27,69 @@
     Conditional=WEB_RTC,
     ImplementationLacksVTable,
 ] interface RTCStatsReport {
-    readonly attribute Date timestamp;
-    readonly attribute DOMString id;
-    readonly attribute DOMString type;
-    DOMString stat(DOMString name);
-    sequence<DOMString> names();
+    readonly maplike<DOMString, object>;
+};
 
-    // DEPRECATED - fake for old RTCStatsElement object.
-    readonly attribute RTCStatsReport local;
-    readonly attribute RTCStatsReport remote;
+enum RTCStatsType {
+    "codec",
+    "inbound-rtp",
+    "outbound-rtp",
+    "peer-connection",
+    "data-channel",
+    "track",
+    "transport",
+    "candidate-pair",
+    "local-candidate",
+    "remote-candidate",
+    "certificate"
+};
+
+dictionary RTCStats {
+    unsigned long long timestamp;
+    RTCStatsType type;
+    DOMString id;
+
+};
+
+dictionary RTCRTPStreamStats : RTCStats {
+    unsigned long ssrc;
+    DOMString associateStatsId;
+    boolean isRemote = false;
+    DOMString mediaType;
+    DOMString mediaTrackId;
+    DOMString transportId;
+    DOMString codecId;
+    unsigned long firCount;
+    unsigned long pliCount;
+    unsigned long nackCount;
+    unsigned long sliCount;
+    unsigned long long qpSum;
+};
+
+[ JSGenerateToJSObject ]
+dictionary RTCInboundRTPStreamStats : RTCRTPStreamStats {
+    unsigned long packetsReceived;
+    unsigned long long bytesReceived;
+    unsigned long packetsLost;
+    double jitter;
+    double fractionLost;
+    unsigned long packetsDiscarded;
+    unsigned long packetsRepaired;
+    unsigned long burstPacketsLost;
+    unsigned long burstPacketsDiscarded;
+    unsigned long burstLossCount;
+    unsigned long burstDiscardCount;
+    double burstLossRate;
+    double burstDiscardRate;
+    double gapLossRate;
+    double gapDiscardRate;
+    unsigned long framesDecoded;
+};
+
+[ JSGenerateToJSObject ]
+dictionary RTCOutboundRTPStreamStats : RTCRTPStreamStats {
+    unsigned long packetsSent;
+    unsigned long long bytesSent;
+    double targetBitrate;
+    unsigned long framesEncoded;
 };

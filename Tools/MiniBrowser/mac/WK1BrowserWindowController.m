@@ -264,10 +264,12 @@ static BOOL areEssentiallyEqual(double a, double b)
 
     [[WebPreferences standardPreferences] setSubpixelCSSOMElementMetricsEnabled:settings.subPixelCSSOMMetricsEnabled];
     [[WebPreferences standardPreferences] setShowDebugBorders:settings.layerBordersVisible];
+    [[WebPreferences standardPreferences] setSimpleLineLayoutEnabled:settings.simpleLineLayoutEnabled];
     [[WebPreferences standardPreferences] setSimpleLineLayoutDebugBordersEnabled:settings.simpleLineLayoutDebugBordersEnabled];
     [[WebPreferences standardPreferences] setShowRepaintCounter:settings.layerBordersVisible];
     [[WebPreferences standardPreferences] setSuppressesIncrementalRendering:settings.incrementalRenderingSuppressed];
     [[WebPreferences standardPreferences] setAcceleratedDrawingEnabled:settings.acceleratedDrawingEnabled];
+    [[WebPreferences standardPreferences] setSubpixelAntialiasedLayerTextEnabled:settings.subpixelAntialiasedLayerTextEnabled];
     [[WebPreferences standardPreferences] setResourceLoadStatisticsEnabled:settings.resourceLoadStatisticsEnabled];
     [[WebPreferences standardPreferences] setVisualViewportEnabled:settings.visualViewportEnabled];
     [[WebPreferences standardPreferences] setLargeImageAsyncDecodingEnabled:settings.largeImageAsyncDecodingEnabled];
@@ -349,6 +351,15 @@ static BOOL areEssentiallyEqual(double a, double b)
     urlText.stringValue = committedURL._web_userVisibleString;
 
     [self updateTitle:nil];
+}
+
+- (void)webView:(WebView *)sender didChangeLocationWithinPageForFrame:(WebFrame *)frame
+{
+    if (frame != [sender mainFrame])
+        return;
+
+    NSURL *committedURL = [[[frame dataSource] request] URL];
+    urlText.stringValue = committedURL._web_userVisibleString;
 }
 
 - (void)webView:(WebView *)sender didReceiveTitle:(NSString *)title forFrame:(WebFrame *)frame

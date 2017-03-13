@@ -67,8 +67,12 @@ TextPaintStyle computeTextPaintStyle(const Frame& frame, const RenderStyle& line
 #if ENABLE(LETTERPRESS)
     paintStyle.useLetterpressEffect = lineStyle.textDecorationsInEffect() & TextDecorationLetterpress;
 #endif
-    paintStyle.strokeWidth = lineStyle.textStrokeWidth();
-
+    auto viewportSize = frame.view() ? frame.view()->size() : IntSize();
+    paintStyle.strokeWidth = lineStyle.computedStrokeWidth(viewportSize);
+    paintStyle.paintOrder = lineStyle.paintOrder();
+    paintStyle.lineJoin = lineStyle.joinStyle();
+    paintStyle.lineCap = lineStyle.capStyle();
+    
     if (paintInfo.forceTextColor()) {
         paintStyle.fillColor = paintInfo.forcedTextColor();
         paintStyle.strokeColor = paintInfo.forcedTextColor();
@@ -113,10 +117,11 @@ TextPaintStyle computeTextPaintStyle(const Frame& frame, const RenderStyle& line
     return paintStyle;
 }
 
-TextPaintStyle computeTextSelectionPaintStyle(const TextPaintStyle& textPaintStyle, const RenderText& renderer, const RenderStyle& lineStyle, const PaintInfo& paintInfo, bool& paintSelectedTextOnly, bool& paintSelectedTextSeparately, const ShadowData*& selectionShadow)
+TextPaintStyle computeTextSelectionPaintStyle(const TextPaintStyle& textPaintStyle, const RenderText& renderer, const RenderStyle& lineStyle, const PaintInfo& paintInfo, bool& paintSelectedTextOnly, bool& paintSelectedTextSeparately, bool& paintNonSelectedTextOnly, const ShadowData*& selectionShadow)
 {
     paintSelectedTextOnly = (paintInfo.phase == PaintPhaseSelection);
-    paintSelectedTextSeparately = false;
+    paintSelectedTextSeparately = paintInfo.paintBehavior & PaintBehaviorExcludeSelection;
+    paintNonSelectedTextOnly = paintInfo.paintBehavior & PaintBehaviorExcludeSelection;
     selectionShadow = (paintInfo.forceTextColor()) ? nullptr : lineStyle.textShadow();
 
     TextPaintStyle selectionPaintStyle = textPaintStyle;
@@ -144,7 +149,8 @@ TextPaintStyle computeTextSelectionPaintStyle(const TextPaintStyle& textPaintSty
             selectionShadow = shadow;
         }
 
-        float strokeWidth = pseudoStyle->textStrokeWidth();
+        auto viewportSize = renderer.frame().view() ? renderer.frame().view()->size() : IntSize();
+        float strokeWidth = pseudoStyle->computedStrokeWidth(viewportSize);
         if (strokeWidth != selectionPaintStyle.strokeWidth) {
             if (!paintSelectedTextOnly)
                 paintSelectedTextSeparately = true;
@@ -192,6 +198,8 @@ void updateGraphicsContext(GraphicsContext& context, const TextPaintStyle& paint
             context.setStrokeColor(paintStyle.strokeColor);
         if (paintStyle.strokeWidth != context.strokeThickness())
             context.setStrokeThickness(paintStyle.strokeWidth);
+        context.setLineJoin(paintStyle.lineJoin);
+        context.setLineCap(paintStyle.lineCap);
     }
 }
 

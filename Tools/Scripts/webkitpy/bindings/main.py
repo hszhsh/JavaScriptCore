@@ -23,6 +23,7 @@
 #
 
 import fnmatch
+import json
 import os
 import os.path
 import shutil
@@ -35,12 +36,16 @@ from webkitpy.common.system.executive import ScriptError
 
 class BindingsTests:
 
-    def __init__(self, reset_results, generators, executive, verbose, patterns):
+    def __init__(self, reset_results, generators, executive, verbose, patterns, json_file_name):
         self.reset_results = reset_results
         self.generators = generators
         self.executive = executive
         self.verbose = verbose
         self.patterns = patterns
+        self.json_file_name = json_file_name
+
+        if self.json_file_name:
+            self.failures = []
 
     def generate_from_idl(self, generator, idl_file, output_directory, supplemental_dependency_file):
         cmd = ['perl', '-w',
@@ -114,6 +119,8 @@ class BindingsTests:
                 print 'FAIL: (%s) %s' % (generator, output_file)
                 print output
                 changes_found = True
+                if self.json_file_name:
+                    self.failures.append("(%s) %s" % (generator, output_file))
             elif self.verbose:
                 print 'PASS: (%s) %s' % (generator, output_file)
         return changes_found
@@ -189,6 +196,15 @@ class BindingsTests:
         os.remove(window_constructors_file)
         os.remove(workerglobalscope_constructors_file)
         os.remove(dedicatedworkerglobalscope_constructors_file)
+
+        if self.json_file_name:
+            json_data = {
+                'failures': self.failures,
+            }
+
+            with open(self.json_file_name, 'w') as json_file:
+                json.dump(json_data, json_file)
+
         print ''
         if all_tests_passed:
             print 'All tests PASS!'

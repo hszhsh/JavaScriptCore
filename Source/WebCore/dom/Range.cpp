@@ -29,6 +29,7 @@
 #include "ClientRectList.h"
 #include "Comment.h"
 #include "DocumentFragment.h"
+#include "Editing.h"
 #include "Event.h"
 #include "ExceptionCode.h"
 #include "Frame.h"
@@ -47,7 +48,6 @@
 #include "TextIterator.h"
 #include "VisiblePosition.h"
 #include "VisibleUnits.h"
-#include "htmlediting.h"
 #include "markup.h"
 #include <stdio.h>
 #include <wtf/RefCountedLeakCounter.h>
@@ -263,7 +263,7 @@ ExceptionOr<short> Range::comparePoint(Node& refNode, unsigned offset) const
     if (checkNodeResult.hasException()) {
         // DOM4 spec requires us to check whether refNode and start container have the same root first
         // but we do it in the reverse order to avoid O(n) operation here in common case.
-        if (!refNode.inDocument() && !commonAncestorContainer(&refNode, &startContainer()))
+        if (!refNode.isConnected() && !commonAncestorContainer(&refNode, &startContainer()))
             return Exception { WRONG_DOCUMENT_ERR };
         return checkNodeResult.releaseException();
     }
@@ -292,7 +292,7 @@ ExceptionOr<Range::CompareResults> Range::compareNode(Node& refNode) const
     // This method returns 0, 1, 2, or 3 based on if the node is before, after,
     // before and after(surrounds), or inside the range, respectively
 
-    if (!refNode.inDocument()) {
+    if (!refNode.isConnected()) {
         // Firefox doesn't throw an exception for this case; it returns 0.
         return NODE_BEFORE;
     }
@@ -473,7 +473,7 @@ ExceptionOr<void> Range::deleteContents()
 
 ExceptionOr<bool> Range::intersectsNode(Node& refNode) const
 {
-    if (!refNode.inDocument() || &refNode.document() != &ownerDocument())
+    if (!refNode.isConnected() || &refNode.document() != &ownerDocument())
         return false;
 
     ContainerNode* parentNode = refNode.parentNode();
@@ -944,7 +944,7 @@ String Range::toString() const
         if (type == Node::TEXT_NODE || type == Node::CDATA_SECTION_NODE) {
             auto& data = downcast<CharacterData>(*node).data();
             unsigned length = data.length();
-            unsigned start = node == &startContainer() ? std::min(std::max(0U, m_start.offset()), length) : 0U;
+            unsigned start = node == &startContainer() ? std::min(m_start.offset(), length) : 0U;
             unsigned end = node == &endContainer() ? std::min(std::max(start, m_end.offset()), length) : length;
             builder.append(data, start, end - start);
         }
@@ -1266,7 +1266,7 @@ static SelectionRect coalesceSelectionRects(const SelectionRect& original, const
 
 // This function is similar in spirit to addLineBoxRects, but annotates the returned rectangles
 // with additional state which helps iOS draw selections in its unique way.
-void Range::collectSelectionRects(Vector<SelectionRect>& rects)
+int Range::collectSelectionRectsWithoutUnionInteriorLines(Vector<SelectionRect>& rects)
 {
     auto& startContainer = this->startContainer();
     auto& endContainer = this->endContainer();
@@ -1325,7 +1325,7 @@ void Range::collectSelectionRects(Vector<SelectionRect>& rects)
         VisiblePosition endPosition(createLegacyEditingPosition(&endContainer, endOffset), VP_DEFAULT_AFFINITY);
         VisiblePosition brPosition(createLegacyEditingPosition(stopNode, 0), VP_DEFAULT_AFFINITY);
         if (endPosition == brPosition)
-            rects.last().setIsLineBreak(true);    
+            rects.last().setIsLineBreak(true);
     }
 
     int lineTop = std::numeric_limits<int>::max();
@@ -1422,7 +1422,15 @@ void Range::collectSelectionRects(Vector<SelectionRect>& rects)
         } else if (selectionRect.direction() == LTR && selectionRect.isLastOnLine())
             selectionRect.setLogicalWidth(selectionRect.maxX() - selectionRect.logicalLeft());
     }
+    
+    return maxLineNumber;
+}
 
+void Range::collectSelectionRects(Vector<SelectionRect>& rects)
+{
+    int maxLineNumber = collectSelectionRectsWithoutUnionInteriorLines(rects);
+    const size_t numberOfRects = rects.size();
+    
     // Union all the rectangles on interior lines (i.e. not first or last).
     // On first and last lines, just avoid having overlaps by merging intersecting rectangles.
     Vector<SelectionRect> unionedRects;

@@ -664,7 +664,7 @@ public:
         
     const Butterfly* butterfly() const { return m_butterfly.get(); }
     Butterfly* butterfly() { return m_butterfly.get(); }
-        
+    
     ConstPropertyStorage outOfLineStorage() const { return m_butterfly.get()->propertyStorage(); }
     PropertyStorage outOfLineStorage() { return m_butterfly.get()->propertyStorage(); }
 
@@ -858,10 +858,10 @@ protected:
     void finishCreation(VM& vm)
     {
         Base::finishCreation(vm);
-        ASSERT(inherits(info()));
+        ASSERT(inherits(vm, info()));
         ASSERT(getPrototypeDirect().isNull() || Heap::heap(this) == Heap::heap(getPrototypeDirect()));
         ASSERT(structure()->isObject());
-        ASSERT(classInfo());
+        ASSERT(classInfo(vm));
     }
 
     static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
@@ -960,13 +960,14 @@ protected:
         ASSERT(length < MAX_ARRAY_INDEX);
         ASSERT(hasContiguous(indexingType()) || hasInt32(indexingType()) || hasDouble(indexingType()) || hasUndecided(indexingType()));
 
-        bool result = true;
-        if (m_butterfly.get()->vectorLength() < length)
-            result = ensureLengthSlow(vm, length);
+        if (m_butterfly.get()->vectorLength() < length) {
+            if (!ensureLengthSlow(vm, length))
+                return false;
+        }
             
         if (m_butterfly.get()->publicLength() < length)
             m_butterfly.get()->setPublicLength(length);
-        return result;
+        return true;
     }
         
     // Call this if you want to shrink the butterfly backing store, and you're
@@ -1006,7 +1007,7 @@ private:
     void fillCustomGetterPropertySlot(PropertySlot&, JSValue, unsigned, Structure*);
 
     JS_EXPORT_PRIVATE bool getOwnStaticPropertySlot(VM&, PropertyName, PropertySlot&);
-    JS_EXPORT_PRIVATE const HashTableValue* findPropertyHashEntry(PropertyName) const;
+    JS_EXPORT_PRIVATE const HashTableValue* findPropertyHashEntry(VM&, PropertyName) const;
         
     bool putIndexedDescriptor(ExecState*, SparseArrayEntry*, const PropertyDescriptor&, PropertyDescriptor& old);
         
@@ -1064,7 +1065,7 @@ protected:
     {
         Base::finishCreation(vm);
         ASSERT(!this->structure()->hasInlineStorage());
-        ASSERT(classInfo());
+        ASSERT(classInfo(vm));
     }
 };
 
@@ -1117,7 +1118,7 @@ protected:
     {
         Base::finishCreation(vm);
         ASSERT(structure()->totalStorageCapacity() == structure()->inlineCapacity());
-        ASSERT(classInfo());
+        ASSERT(classInfo(vm));
     }
 
 private:

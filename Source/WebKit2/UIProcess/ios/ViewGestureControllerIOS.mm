@@ -129,6 +129,11 @@ static const float swipeSnapshotRemovalRenderTreeSizeTargetFraction = 0.5;
     return [recognizer autorelease];
 }
 
+- (BOOL)isNavigationSwipeGestureRecognizer:(UIGestureRecognizer *)recognizer
+{
+    return recognizer == [_backTransitionController gestureRecognizer] || recognizer == [_forwardTransitionController gestureRecognizer];
+}
+
 @end
 
 namespace WebKit {
@@ -139,6 +144,11 @@ void ViewGestureController::platformTeardown()
     [m_swipeTransitionContext _setInteractor:nil];
     [m_swipeTransitionContext _setAnimator:nil];
     [m_swipeInteractiveTransitionDelegate invalidate];
+}
+
+bool ViewGestureController::isNavigationSwipeGestureRecognizer(UIGestureRecognizer *recognizer) const
+{
+    return [m_swipeInteractiveTransitionDelegate isNavigationSwipeGestureRecognizer:recognizer];
 }
 
 void ViewGestureController::installSwipeHandler(UIView *gestureRecognizerView, UIView *swipingView)
@@ -177,13 +187,18 @@ void ViewGestureController::beginSwipeGesture(_UINavigationInteractiveTransition
 
     RetainPtr<UIViewController> snapshotViewController = adoptNS([[UIViewController alloc] init]);
     m_snapshotView = adoptNS([[UIView alloc] initWithFrame:liveSwipeViewFrame]);
+    [m_snapshotView layer].name = @"SwipeSnapshot";
 
     RetainPtr<UIColor> backgroundColor = [UIColor whiteColor];
     if (ViewSnapshot* snapshot = targetItem->snapshot()) {
         float deviceScaleFactor = m_webPageProxy.deviceScaleFactor();
         FloatSize swipeLayerSizeInDeviceCoordinates(liveSwipeViewFrame.size);
         swipeLayerSizeInDeviceCoordinates.scale(deviceScaleFactor);
-        if (snapshot->hasImage() && snapshot->size() == swipeLayerSizeInDeviceCoordinates && deviceScaleFactor == snapshot->deviceScaleFactor())
+        
+        BOOL shouldRestoreScrollPosition = targetItem->pageState().mainFrameState.shouldRestoreScrollPosition;
+        IntPoint currentScrollPosition = roundedIntPoint(m_webPageProxy.viewScrollPosition());
+
+        if (snapshot->hasImage() && snapshot->size() == swipeLayerSizeInDeviceCoordinates && deviceScaleFactor == snapshot->deviceScaleFactor() && (shouldRestoreScrollPosition || (currentScrollPosition == snapshot->viewScrollPosition())))
             [m_snapshotView layer].contents = snapshot->asLayerContents();
         Color coreColor = snapshot->backgroundColor();
         if (coreColor.isValid())
@@ -196,7 +211,10 @@ void ViewGestureController::beginSwipeGesture(_UINavigationInteractiveTransition
     [snapshotViewController setView:m_snapshotView.get()];
 
     m_transitionContainerView = adoptNS([[UIView alloc] initWithFrame:liveSwipeViewFrame]);
+    [m_transitionContainerView layer].name = @"SwipeTransitionContainer";
     m_liveSwipeViewClippingView = adoptNS([[UIView alloc] initWithFrame:liveSwipeViewFrame]);
+    [m_liveSwipeViewClippingView layer].name = @"LiveSwipeViewClipping";
+
     [m_liveSwipeViewClippingView setClipsToBounds:YES];
 
     [m_liveSwipeView.superview insertSubview:m_transitionContainerView.get() belowSubview:m_liveSwipeView];

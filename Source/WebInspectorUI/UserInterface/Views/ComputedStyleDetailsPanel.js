@@ -103,7 +103,7 @@ WebInspector.ComputedStyleDetailsPanel = class ComputedStyleDetailsPanel extends
         let sourceCode = ownerRule.sourceCodeLocation.sourceCode;
         let {startLine, startColumn} = effectiveProperty.styleSheetTextRange;
         let sourceCodeLocation = sourceCode.createSourceCodeLocation(startLine, startColumn);
-        WebInspector.showSourceCodeLocation(sourceCodeLocation);
+        WebInspector.showSourceCodeLocation(sourceCodeLocation, {ignoreNetworkTab: true});
     }
 
     refresh(significantChange)
@@ -278,12 +278,12 @@ WebInspector.ComputedStyleDetailsPanel = class ComputedStyleDetailsPanel extends
 
     _goToRegionFlowArrowWasClicked()
     {
-        WebInspector.showContentFlowDOMTree(this._regionFlow);
+        WebInspector.showRepresentedObject(this._regionFlow);
     }
 
     _goToContentFlowArrowWasClicked()
     {
-        WebInspector.showContentFlowDOMTree(this._contentFlow, this.nodeStyles.node);
+        WebInspector.showRepresentedObject(this._contentFlow, {nodeToSelect: this.nodeStyles.node});
     }
 };
 

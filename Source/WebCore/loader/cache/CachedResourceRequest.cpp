@@ -80,7 +80,7 @@ const AtomicString& CachedResourceRequest::initiatorName() const
     if (!m_initiatorName.isEmpty())
         return m_initiatorName;
 
-    static NeverDestroyed<AtomicString> defaultName("resource", AtomicString::ConstructFromLiteral);
+    static NeverDestroyed<AtomicString> defaultName("other", AtomicString::ConstructFromLiteral);
     return defaultName;
 }
 
@@ -129,12 +129,15 @@ void CachedResourceRequest::upgradeInsecureRequestIfNeeded(Document& document)
     upgradeInsecureResourceRequestIfNeeded(m_resourceRequest, document);
 }
 
-#if ENABLE(CACHE_PARTITIONING)
 void CachedResourceRequest::setDomainForCachePartition(Document& document)
 {
     m_resourceRequest.setDomainForCachePartition(document.topOrigin().domainForCachePartition());
 }
-#endif
+
+void CachedResourceRequest::setDomainForCachePartition(const String& domain)
+{
+    m_resourceRequest.setDomainForCachePartition(domain);
+}
 
 static inline String acceptHeaderValueFromType(CachedResource::Type type)
 {

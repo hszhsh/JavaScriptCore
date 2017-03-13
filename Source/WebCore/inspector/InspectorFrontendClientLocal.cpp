@@ -169,6 +169,11 @@ void InspectorFrontendClientLocal::frontendLoaded()
     m_evaluateOnLoad.clear();
 }
 
+UserInterfaceLayoutDirection InspectorFrontendClientLocal::userInterfaceLayoutDirection() const
+{
+    return m_frontendPage->userInterfaceLayoutDirection();
+}
+
 void InspectorFrontendClientLocal::requestSetDockSide(DockSide dockSide)
 {
     if (dockSide == DockSide::Undocked) {
@@ -255,6 +260,9 @@ void InspectorFrontendClientLocal::setAttachedWindow(DockSide dockSide)
         break;
     case DockSide::Right:
         side = "right";
+        break;
+    case DockSide::Left:
+        side = "left";
         break;
     case DockSide::Bottom:
         side = "bottom";

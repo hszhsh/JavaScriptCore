@@ -183,7 +183,8 @@ ThreadIdentifier createThreadInternal(ThreadFunction entryPoint, void* data, con
 #if OS(IOS)
     if (floor(NSFoundationVersionNumber) >= 1140.11) // QOS not available before iOS 8.0
 #endif
-    pthread_attr_set_qos_class_np(&attr, QOS_CLASS_USER_INITIATED, 0);
+    pthread_attr_set_qos_class_np(&attr, adjustedQOSClass(QOS_CLASS_USER_INITIATED), 0);
+
 #endif
     int error = pthread_create(&threadHandle, &attr, wtfThreadEntryPoint, invocation.get());
     pthread_attr_destroy(&attr);

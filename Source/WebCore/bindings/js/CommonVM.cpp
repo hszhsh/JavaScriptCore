@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2016-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,8 +30,14 @@
 #include "Settings.h"
 #include "WebCoreJSClientData.h"
 #include <heap/HeapInlines.h>
+#include "heap/MachineStackMarker.h"
 #include <runtime/VM.h>
 #include <wtf/MainThread.h>
+#include <wtf/text/AtomicString.h>
+
+#if PLATFORM(IOS)
+#include "WebCoreThreadInternal.h"
+#endif
 
 using namespace JSC;
 
@@ -46,14 +52,8 @@ VM& commonVMSlow()
     
     ScriptController::initializeThreading();
     g_commonVMOrNull = &VM::createLeaked(LargeHeap).leakRef();
-#if CPU(X86_64) || CPU(ARM64)
-    static const size_t maxGCHeapSize = 4 * GB;
-    g_commonVMOrNull->heap.setMaxLiveSize(maxGCHeapSize);
-#endif
     g_commonVMOrNull->heap.acquireAccess(); // At any time, we may do things that affect the GC.
-#if !PLATFORM(IOS)
-    g_commonVMOrNull->setExclusiveThread(std::this_thread::get_id());
-#else
+#if PLATFORM(IOS)
     g_commonVMOrNull->heap.setRunLoop(WebThreadRunLoop());
     g_commonVMOrNull->heap.machineThreads().addCurrentThread();
 #endif
@@ -63,6 +63,11 @@ VM& commonVMSlow()
     JSVMClientData::initNormalWorld(g_commonVMOrNull);
     
     return *g_commonVMOrNull;
+}
+
+void addImpureProperty(const AtomicString& propertyName)
+{
+    commonVM().addImpureProperty(propertyName);
 }
 
 } // namespace WebCore

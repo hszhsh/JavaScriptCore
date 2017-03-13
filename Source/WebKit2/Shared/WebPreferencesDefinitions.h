@@ -31,12 +31,6 @@
 #define DEFAULT_WEBKIT_TABSTOLINKS_ENABLED false
 #endif
 
-#if PLATFORM(EFL)
-#define DEFAULT_SELECTION_PAINTING_WITHOUT_SELECTION_GAPS_ENABLED true
-#else
-#define DEFAULT_SELECTION_PAINTING_WITHOUT_SELECTION_GAPS_ENABLED false
-#endif
-
 #if ENABLE(SMOOTH_SCROLLING)
 #define DEFAULT_WEBKIT_SCROLL_ANIMATOR_ENABLED true
 #else
@@ -95,6 +89,12 @@
 #define DEFAULT_REQUIRES_USER_GESTURE_FOR_AUDIO_PLAYBACK false
 #endif
 
+#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101300
+#define DEFAULT_SUBPIXEL_ANTIALIASED_LAYER_TEXT_ENABLED true
+#else
+#define DEFAULT_SUBPIXEL_ANTIALIASED_LAYER_TEXT_ENABLED false
+#endif
+
 #if PLATFORM(IOS_SIMULATOR)
 #define DEFAULT_ACCELERATED_DRAWING_ENABLED false
 #define DEFAULT_CANVAS_USES_ACCELERATED_DRAWING false
@@ -130,7 +130,6 @@
     macro(ForceSoftwareWebGLRendering, forceSoftwareWebGLRendering, Bool, bool, false, "", "") \
     macro(Accelerated2dCanvasEnabled, accelerated2dCanvasEnabled, Bool, bool, false, "", "") \
     macro(CSSAnimationTriggersEnabled, cssAnimationTriggersEnabled, Bool, bool, true, "", "") \
-    macro(WebAnimationsEnabled, webAnimationsEnabled, Bool, bool, false, "", "") \
     macro(ForceFTPDirectoryListings, forceFTPDirectoryListings, Bool, bool, false, "", "") \
     macro(TabsToLinks, tabsToLinks, Bool, bool, DEFAULT_WEBKIT_TABSTOLINKS_ENABLED, "", "") \
     macro(DNSPrefetchingEnabled, dnsPrefetchingEnabled, Bool, bool, false, "", "") \
@@ -213,7 +212,7 @@
     macro(SubpixelCSSOMElementMetricsEnabled, subpixelCSSOMElementMetricsEnabled, Bool, bool, false, "", "") \
     macro(UseGiantTiles, useGiantTiles, Bool, bool, false, "", "") \
     macro(MediaStreamEnabled, mediaStreamEnabled, Bool, bool, false, "", "") \
-    macro(PeerConnectionEnabled, peerConnectionEnabled, Bool, bool, false, "", "") \
+    macro(PeerConnectionEnabled, peerConnectionEnabled, Bool, bool, WebCore::LibWebRTCProvider::webRTCAvailable(), "", "") \
     macro(UseLegacyTextAlignPositionedElementBehavior, useLegacyTextAlignPositionedElementBehavior, Bool, bool, false, "", "") \
     macro(SpatialNavigationEnabled, spatialNavigationEnabled, Bool, bool, false, "", "") \
     macro(MediaSourceEnabled, mediaSourceEnabled, Bool, bool, true, "", "") \
@@ -232,10 +231,12 @@
     macro(HTTPEquivEnabled, httpEquivEnabled, Bool, bool, true, "", "") \
     macro(MockCaptureDevicesEnabled, mockCaptureDevicesEnabled, Bool, bool, false, "", "") \
     macro(MediaCaptureRequiresSecureConnection, mediaCaptureRequiresSecureConnection, Bool, bool, true, "", "") \
+    macro(EnumeratingAllNetworkInterfacesEnabled, enumeratingAllNetworkInterfacesEnabled, Bool, bool, false, "", "") \
+    macro(ICECandidateFilteringEnabled, iceCandidateFilteringEnabled, Bool, bool, true, "", "") \
     macro(ShadowDOMEnabled, shadowDOMEnabled, Bool, bool, true, "Shadow DOM", "HTML Shadow DOM prototype") \
     macro(FetchAPIEnabled, fetchAPIEnabled, Bool, bool, true, "", "") \
     macro(DownloadAttributeEnabled, downloadAttributeEnabled, Bool, bool, true, "", "") \
-    macro(SelectionPaintingWithoutSelectionGapsEnabled, selectionPaintingWithoutSelectionGapsEnabled, Bool, bool, DEFAULT_SELECTION_PAINTING_WITHOUT_SELECTION_GAPS_ENABLED, "", "") \
+    macro(SelectionPaintingWithoutSelectionGapsEnabled, selectionPaintingWithoutSelectionGapsEnabled, Bool, bool, false, "", "") \
     macro(ApplePayEnabled, applePayEnabled, Bool, bool, false, "", "") \
     macro(ApplePayCapabilityDisclosureAllowed, applePayCapabilityDisclosureAllowed, Bool, bool, true, "", "") \
     macro(VisualViewportEnabled, visualViewportEnabled, Bool, bool, true, "", "") \
@@ -247,6 +248,10 @@
     macro(IntersectionObserverEnabled, intersectionObserverEnabled, Bool, bool, false, "Intersection Observer", "Enable Intersection Observer support") \
     macro(InteractiveFormValidationEnabled, interactiveFormValidationEnabled, Bool, bool, DEFAULT_HTML_INTERACTIVE_FORM_VALIDATION_ENABLED, "HTML Interactive Form Validation", "HTML interactive form validation") \
     macro(ShouldSuppressKeyboardInputDuringProvisionalNavigation, shouldSuppressKeyboardInputDuringProvisionalNavigation, Bool, bool, false, "", "") \
+    macro(CSSGridLayoutEnabled, cssGridLayoutEnabled, Bool, bool, true, "CSS Grid", "CSS Grid Layout Module support") \
+    macro(GamepadsEnabled, gamepadsEnabled, Bool, bool, true, "Gamepads", "Web Gamepad API support") \
+    macro(InputEventsEnabled, inputEventsEnabled, Bool, bool, true, "Input Events", "Enable InputEvents support") \
+    macro(CredentialManagementEnabled, credentialManagementEnabled, Bool, bool, false, "Credential Management", "Enable Credential Management support") \
     \
 
 #define FOR_EACH_WEBKIT_DOUBLE_PREFERENCE(macro) \
@@ -279,6 +284,7 @@
 
 #define FOR_EACH_WEBKIT_DEBUG_BOOL_PREFERENCE(macro) \
     macro(AcceleratedDrawingEnabled, acceleratedDrawingEnabled, Bool, bool, DEFAULT_ACCELERATED_DRAWING_ENABLED, "", "") \
+    macro(SubpixelAntialiasedLayerTextEnabled, subpixelAntialiasedLayerTextEnabled, Bool, bool, DEFAULT_SUBPIXEL_ANTIALIASED_LAYER_TEXT_ENABLED, "", "") \
     macro(DisplayListDrawingEnabled, displayListDrawingEnabled, Bool, bool, false, "", "") \
     macro(CompositingBordersVisible, compositingBordersVisible, Bool, bool, false, "", "") \
     macro(CompositingRepaintCountersVisible, compositingRepaintCountersVisible, Bool, bool, false, "", "") \
@@ -294,7 +300,7 @@
 #define FOR_EACH_WEBKIT_DEBUG_UINT32_PREFERENCE(macro) \
     macro(VisibleDebugOverlayRegions, visibleDebugOverlayRegions, UInt32, uint32_t, 0, "", "")
 
-// Our XCode build system does not currently have any concept of DEVELOPER_MODE.
+// Our Xcode build system does not currently have any concept of DEVELOPER_MODE.
 // Cocoa ports must disable experimental features on release branches for now.
 #if ENABLE(DEVELOPER_MODE) || PLATFORM(COCOA)
 #define DEFAULT_EXPERIMENTAL_FEATURES_ENABLED true
@@ -302,23 +308,32 @@
 #define DEFAULT_EXPERIMENTAL_FEATURES_ENABLED false
 #endif
 
+#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED < 101200
+// <https://webkit.org/b/168415> El Capitan NetworkLoadTiming values are sometimes jumbled
+#define DEFAULT_RESOURCE_TIMING_ENABLED false
+#else
+#define DEFAULT_RESOURCE_TIMING_ENABLED DEFAULT_EXPERIMENTAL_FEATURES_ENABLED
+#endif
+
 // For experimental features:
 // - The type should be boolean.
 // - You must provide the last two parameters for all experimental features. They
 //   are the text exposed to the user from the WebKit client.
-// - They should be alphabetically ordered by the human readable text.
-// - The default value may be either false (for very unstable features) or
+// - They should be alphabetically ordered by the human readable text (the first string).
+// - The default value may be either false (for unstable features) or
 //   DEFAULT_EXPERIMENTAL_FEATURE_ENABLED (for features that are ready for
 //   wider testing).
 
 #define FOR_EACH_WEBKIT_EXPERIMENTAL_FEATURE_PREFERENCE(macro) \
-    macro(CSSGridLayoutEnabled, cssGridLayoutEnabled, Bool, bool, DEFAULT_EXPERIMENTAL_FEATURES_ENABLED, "CSS Grid", "CSS Grid Layout Module support") \
     macro(SpringTimingFunctionEnabled, springTimingFunctionEnabled, Bool, bool, DEFAULT_EXPERIMENTAL_FEATURES_ENABLED, "CSS Spring Animations", "CSS Spring Animation prototype") \
-    macro(GamepadsEnabled, gamepadsEnabled, Bool, bool, DEFAULT_EXPERIMENTAL_FEATURES_ENABLED, "Gamepads", "Web Gamepad API support") \
-    macro(ModernMediaControlsEnabled, modernMediaControlsEnabled, Bool, bool, false, "Modern Media Controls", "Use modern media controls look") \
-    macro(InputEventsEnabled, inputEventsEnabled, Bool, bool, DEFAULT_EXPERIMENTAL_FEATURES_ENABLED, "Input Events", "Enable InputEvents support") \
+    macro(LinkPreloadEnabled, linkPreloadEnabled, Bool, bool, DEFAULT_EXPERIMENTAL_FEATURES_ENABLED, "Link Preload", "Link preload support") \
+    macro(ModernMediaControlsEnabled, modernMediaControlsEnabled, Bool, bool, DEFAULT_EXPERIMENTAL_FEATURES_ENABLED, "Modern Media Controls", "Use modern media controls look") \
+    macro(ResourceTimingEnabled, resourceTimingEnabled, Bool, bool, DEFAULT_RESOURCE_TIMING_ENABLED, "Resource Timing", "Enable ResourceTiming API") \
     macro(SubtleCryptoEnabled, subtleCryptoEnabled, Bool, bool, DEFAULT_EXPERIMENTAL_FEATURES_ENABLED, "SubtleCrypto", "Enable SubtleCrypto support") \
+    macro(UserTimingEnabled, userTimingEnabled, Bool, bool, DEFAULT_EXPERIMENTAL_FEATURES_ENABLED, "User Timing", "Enable UserTiming API") \
+    macro(WebAnimationsEnabled, webAnimationsEnabled, Bool, bool, false, "Web Animations", "Web Animations prototype") \
     macro(WebGL2Enabled, webGL2Enabled, Bool, bool, DEFAULT_EXPERIMENTAL_FEATURES_ENABLED, "WebGL 2.0", "WebGL 2 prototype") \
+    macro(WebGPUEnabled, webGPUEnabled, Bool, bool, DEFAULT_EXPERIMENTAL_FEATURES_ENABLED, "WebGPU", "WebGPU prototype") \
     \
 
 #if PLATFORM(COCOA)
@@ -342,7 +357,7 @@
     macro(PictographFontFamily, pictographFontFamily, String, String, "Apple Color Emoji", "", "") \
     \
 
-#elif PLATFORM(GTK) || PLATFORM(EFL)
+#elif PLATFORM(GTK)
 
 #define FOR_EACH_WEBKIT_FONT_FAMILY_PREFERENCE(macro) \
     macro(StandardFontFamily, standardFontFamily, String, String, "Times", "", "") \

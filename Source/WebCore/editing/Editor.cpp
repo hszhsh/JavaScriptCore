@@ -42,6 +42,7 @@
 #include "DictationCommand.h"
 #include "DocumentFragment.h"
 #include "DocumentMarkerController.h"
+#include "Editing.h"
 #include "EditorClient.h"
 #include "EventHandler.h"
 #include "EventNames.h"
@@ -95,7 +96,6 @@
 #include "TypingCommand.h"
 #include "UserTypingGestureIndicator.h"
 #include "VisibleUnits.h"
-#include "htmlediting.h"
 #include "markup.h"
 #include <wtf/unicode/CharacterNames.h>
 
@@ -107,8 +107,7 @@ namespace WebCore {
 
 static bool dispatchBeforeInputEvent(Element& element, const AtomicString& inputType, const String& data = { }, RefPtr<DataTransfer>&& dataTransfer = nullptr, const Vector<RefPtr<StaticRange>>& targetRanges = { }, bool cancelable = true)
 {
-    auto* settings = element.document().settings();
-    if (!settings || !settings->inputEventsEnabled())
+    if (!element.document().settings().inputEventsEnabled())
         return true;
 
     return element.dispatchEvent(InputEvent::create(eventNames().beforeinputEvent, inputType, true, cancelable, element.document().defaultView(), data, WTFMove(dataTransfer), targetRanges, 0));
@@ -116,10 +115,13 @@ static bool dispatchBeforeInputEvent(Element& element, const AtomicString& input
 
 static void dispatchInputEvent(Element& element, const AtomicString& inputType, const String& data = { }, RefPtr<DataTransfer>&& dataTransfer = nullptr, const Vector<RefPtr<StaticRange>>& targetRanges = { })
 {
-    auto* settings = element.document().settings();
-    if (settings && settings->inputEventsEnabled())
-        element.dispatchEvent(InputEvent::create(eventNames().inputEvent, inputType, true, false, element.document().defaultView(), data, WTFMove(dataTransfer), targetRanges, 0));
-    else
+    if (element.document().settings().inputEventsEnabled()) {
+        // FIXME: We should not be dispatching to the scoped queue here. Normally, input events are dispatched in CompositeEditCommand::apply after the end of the scope,
+        // but TypingCommands are special in that existing TypingCommands that are applied again fire input events *from within* the scope by calling typingAddedToOpenCommand.
+        // Instead, TypingCommands should always dispatch events synchronously after the end of the scoped queue in CompositeEditCommand::apply. To work around this for the
+        // time being, just revert back to calling dispatchScopedEvent.
+        element.dispatchScopedEvent(InputEvent::create(eventNames().inputEvent, inputType, true, false, element.document().defaultView(), data, WTFMove(dataTransfer), targetRanges, 0));
+    } else
         element.dispatchInputEvent();
 }
 
@@ -1244,13 +1246,13 @@ void Editor::performCutOrCopy(EditorActionSpecifier action)
             imageElement = imageElementFromImageDocument(document());
 
         if (imageElement) {
-#if PLATFORM(COCOA) || PLATFORM(EFL) || PLATFORM(GTK)
+#if PLATFORM(COCOA) || PLATFORM(GTK)
             writeImageToPasteboard(*Pasteboard::createForCopyAndPaste(), *imageElement, document().url(), document().title());
 #else
             Pasteboard::createForCopyAndPaste()->writeImage(*imageElement, document().url(), document().title());
 #endif
         } else {
-#if PLATFORM(COCOA) || PLATFORM(EFL) || PLATFORM(GTK)
+#if PLATFORM(COCOA) || PLATFORM(GTK)
             writeSelectionToPasteboard(*Pasteboard::createForCopyAndPaste());
 #else
             // FIXME: Convert all other platforms to match Mac and delete this.
@@ -1344,10 +1346,23 @@ void Editor::copyURL(const URL& url, const String& title, Pasteboard& pasteboard
     pasteboardURL.title = title;
 
 #if PLATFORM(MAC)
-    fillInUserVisibleForm(pasteboardURL);
+    pasteboardURL.userVisibleForm = userVisibleString(url);
 #endif
 
     pasteboard.write(pasteboardURL);
+}
+
+PasteboardWriterData::URL Editor::pasteboardWriterURL(const URL& url, const String& title)
+{
+    PasteboardWriterData::URL result;
+
+    result.url = url;
+    result.title = title;
+#if PLATFORM(MAC)
+    result.userVisibleForm = userVisibleString(url);
+#endif
+
+    return result;
 }
 
 #if !PLATFORM(IOS)
@@ -1362,7 +1377,7 @@ void Editor::copyImage(const HitTestResult& result)
     if (url.isEmpty())
         url = result.absoluteImageURL();
 
-#if PLATFORM(COCOA) || PLATFORM(EFL) || PLATFORM(GTK)
+#if PLATFORM(COCOA) || PLATFORM(GTK)
     writeImageToPasteboard(*Pasteboard::createForCopyAndPaste(), *element, url, result.altDisplayString());
 #else
     Pasteboard::createForCopyAndPaste()->writeImage(*element, url, result.altDisplayString());
@@ -2943,9 +2958,7 @@ String Editor::selectedText() const
 
 String Editor::selectedTextForDataTransfer() const
 {
-    if (m_frame.settings().selectionIncludesAltImageText())
-        return selectedText(TextIteratorEmitsImageAltText);
-    return selectedText();
+    return selectedText(TextIteratorEmitsImageAltText);
 }
 
 String Editor::selectedText(TextIteratorBehavior behavior) const
@@ -3093,7 +3106,7 @@ void Editor::applyEditingStyleToElement(Element* element) const
     CSSStyleDeclaration* style = downcast<StyledElement>(*element).cssomStyle();
     style->setPropertyInternal(CSSPropertyWordWrap, "break-word", false);
     style->setPropertyInternal(CSSPropertyWebkitNbspMode, "space", false);
-    style->setPropertyInternal(CSSPropertyWebkitLineBreak, "after-white-space", false);
+    style->setPropertyInternal(CSSPropertyLineBreak, "after-white-space", false);
 }
 
 bool Editor::findString(const String& target, FindOptions options)
@@ -3435,7 +3448,7 @@ void Editor::editorUIUpdateTimerFired()
         // When typing we check spelling elsewhere, so don't redo it here.
         // If this is a change in selection resulting from a delete operation,
         // oldSelection may no longer be in the document.
-        if (m_editorUIUpdateTimerShouldCheckSpellingAndGrammar && oldSelection.isContentEditable() && oldSelection.start().deprecatedNode() && oldSelection.start().anchorNode()->inDocument()) {
+        if (m_editorUIUpdateTimerShouldCheckSpellingAndGrammar && oldSelection.isContentEditable() && oldSelection.start().deprecatedNode() && oldSelection.start().anchorNode()->isConnected()) {
             VisiblePosition oldStart(oldSelection.visibleStart());
             VisibleSelection oldAdjacentWords = VisibleSelection(startOfWord(oldStart, LeftWordIfOnBoundary), endOfWord(oldStart, RightWordIfOnBoundary));
             if (oldAdjacentWords != newAdjacentWords) {
@@ -3740,5 +3753,15 @@ const Font* Editor::fontForSelection(bool& hasMultipleFonts) const
     return font;
 }
 
+Ref<DocumentFragment> Editor::createFragmentForImageAndURL(const String& url)
+{
+    auto imageElement = HTMLImageElement::create(*m_frame.document());
+    imageElement->setAttributeWithoutSynchronization(HTMLNames::srcAttr, url);
+
+    auto fragment = document().createDocumentFragment();
+    fragment->appendChild(imageElement);
+
+    return fragment;
+}
 
 } // namespace WebCore

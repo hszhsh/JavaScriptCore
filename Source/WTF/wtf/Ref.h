@@ -35,7 +35,7 @@
 #if ASAN_ENABLED
 extern "C" void __asan_poison_memory_region(void const volatile *addr, size_t size);
 extern "C" void __asan_unpoison_memory_region(void const volatile *addr, size_t size);
-extern "C" bool __asan_address_is_poisoned(void const volatile *addr);
+extern "C" int __asan_address_is_poisoned(void const volatile *addr);
 #endif
 
 namespace WTF {
@@ -137,6 +137,7 @@ public:
     T* ptr() const { ASSERT(m_ptr); return m_ptr; }
     T& get() const { ASSERT(m_ptr); return *m_ptr; }
     operator T&() const { ASSERT(m_ptr); return *m_ptr; }
+    bool operator!() const { ASSERT(m_ptr); return !*m_ptr; }
 
     template<typename U> Ref<T> replace(Ref<U>&&) WARN_UNUSED_RETURN;
 

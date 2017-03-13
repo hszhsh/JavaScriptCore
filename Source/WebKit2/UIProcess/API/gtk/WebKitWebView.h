@@ -111,7 +111,7 @@ typedef enum {
  * @WEBKIT_LOAD_REDIRECTED: A provisional data source received
  * a server redirect.
  * @WEBKIT_LOAD_COMMITTED: The content started arriving for a page load.
- * The necessary transport requirements are stabilished, and the
+ * The necessary transport requirements are established, and the
  * load is being performed.
  * @WEBKIT_LOAD_FINISHED: Load completed. All resources are done loading
  * or there was an error during the load operation.
@@ -273,6 +273,12 @@ webkit_web_view_new_with_related_view                (WebKitWebView             
 
 WEBKIT_API GtkWidget *
 webkit_web_view_new_with_user_content_manager        (WebKitUserContentManager  *user_content_manager);
+
+WEBKIT_API gboolean
+webkit_web_view_is_ephemeral                         (WebKitWebView             *web_view);
+
+WEBKIT_API WebKitWebsiteDataManager *
+webkit_web_view_get_website_data_manager             (WebKitWebView             *web_view);
 
 WEBKIT_API WebKitWebContext *
 webkit_web_view_get_context                          (WebKitWebView             *web_view);

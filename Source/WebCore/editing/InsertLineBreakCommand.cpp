@@ -27,6 +27,7 @@
 #include "InsertLineBreakCommand.h"
 
 #include "Document.h"
+#include "Editing.h"
 #include "Frame.h"
 #include "FrameSelection.h"
 #include "HTMLBRElement.h"
@@ -37,7 +38,6 @@
 #include "RenderText.h"
 #include "Text.h"
 #include "VisibleUnits.h"
-#include "htmlediting.h"
 
 namespace WebCore {
 
@@ -151,7 +151,7 @@ void InsertLineBreakCommand::doApply()
             deleteInsignificantTextDownstream(endingPosition);
             ASSERT(!textNode.renderer() || textNode.renderer()->style().collapseWhiteSpace());
             // Deleting insignificant whitespace will remove textNode if it contains nothing but insignificant whitespace.
-            if (textNode.inDocument())
+            if (textNode.isConnected())
                 insertTextIntoNode(&textNode, 0, nonBreakingSpaceString());
             else {
                 RefPtr<Text> nbspNode = document().createTextNode(nonBreakingSpaceString());

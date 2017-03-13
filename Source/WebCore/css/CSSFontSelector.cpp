@@ -145,6 +145,7 @@ void CSSFontSelector::addFontFaceRule(StyleRuleFontFace& fontFaceRule, bool isIn
     RefPtr<CSSValue> fontFamily = style.getPropertyCSSValue(CSSPropertyFontFamily);
     RefPtr<CSSValue> fontStyle = style.getPropertyCSSValue(CSSPropertyFontStyle);
     RefPtr<CSSValue> fontWeight = style.getPropertyCSSValue(CSSPropertyFontWeight);
+    RefPtr<CSSValue> fontStretch = style.getPropertyCSSValue(CSSPropertyFontStretch);
     RefPtr<CSSValue> src = style.getPropertyCSSValue(CSSPropertySrc);
     RefPtr<CSSValue> unicodeRange = style.getPropertyCSSValue(CSSPropertyUnicodeRange);
     RefPtr<CSSValue> featureSettings = style.getPropertyCSSValue(CSSPropertyFontFeatureSettings);
@@ -167,6 +168,9 @@ void CSSFontSelector::addFontFaceRule(StyleRuleFontFace& fontFaceRule, bool isIn
     if (!fontWeight)
         fontWeight = CSSValuePool::singleton().createIdentifierValue(CSSValueNormal);
 
+    if (!fontStretch)
+        fontStretch = CSSValuePool::singleton().createIdentifierValue(CSSValueNormal);
+
     CSSValueList* rangeList = downcast<CSSValueList>(unicodeRange.get());
 
     CSSValueList& srcList = downcast<CSSValueList>(*src);
@@ -178,10 +182,9 @@ void CSSFontSelector::addFontFaceRule(StyleRuleFontFace& fontFaceRule, bool isIn
 
     if (!fontFace->setFamilies(*fontFamily))
         return;
-    if (!fontFace->setStyle(*fontStyle))
-        return;
-    if (!fontFace->setWeight(*fontWeight))
-        return;
+    fontFace->setStyle(*fontStyle);
+    fontFace->setWeight(*fontWeight);
+    fontFace->setStretch(*fontStretch);
     if (rangeList && !fontFace->setUnicodeRange(*rangeList))
         return;
     if (variantLigatures && !fontFace->setVariantLigatures(*variantLigatures))
@@ -262,10 +265,10 @@ void CSSFontSelector::fontCacheInvalidated()
 
 static const AtomicString& resolveGenericFamily(Document* document, const FontDescription& fontDescription, const AtomicString& familyName)
 {
-    if (!document || !document->frame())
+    if (!document)
         return familyName;
 
-    const Settings& settings = document->frame()->settings();
+    const Settings& settings = document->settings();
 
     UScriptCode script = fontDescription.script();
     if (familyName == serifFamily)
@@ -295,7 +298,7 @@ FontRanges CSSFontSelector::fontRangesForFamily(const FontDescription& fontDescr
     bool resolveGenericFamilyFirst = familyName == standardFamily;
 
     AtomicString familyForLookup = resolveGenericFamilyFirst ? resolveGenericFamily(m_document, fontDescription, familyName) : familyName;
-    auto* face = m_cssFontFaceSet->fontFace(fontDescription.traitsMask(), familyForLookup);
+    auto* face = m_cssFontFaceSet->fontFace(fontDescription.fontSelectionRequest(), familyForLookup);
     if (!face) {
         if (!resolveGenericFamilyFirst)
             familyForLookup = resolveGenericFamily(m_document, fontDescription, familyName);
@@ -356,7 +359,7 @@ void CSSFontSelector::beginLoadTimerFired()
         cachedResourceLoader.decrementRequestCount(*fontHandle);
     }
     // Ensure that if the request count reaches zero, the frame loader will know about it.
-    cachedResourceLoader.loadDone(nullptr);
+    cachedResourceLoader.loadDone();
     // New font loads may be triggered by layout after the document load is complete but before we have dispatched
     // didFinishLoading for the frame. Make sure the delegate is always dispatched by checking explicitly.
     if (m_document && m_document->frame())
@@ -369,10 +372,7 @@ size_t CSSFontSelector::fallbackFontCount()
     if (!m_document)
         return 0;
 
-    if (Settings* settings = m_document->settings())
-        return settings->fontFallbackPrefersPictographs() ? 1 : 0;
-
-    return 0;
+    return m_document->settings().fontFallbackPrefersPictographs() ? 1 : 0;
 }
 
 RefPtr<Font> CSSFontSelector::fallbackFontAt(const FontDescription& fontDescription, size_t index)
@@ -382,11 +382,10 @@ RefPtr<Font> CSSFontSelector::fallbackFontAt(const FontDescription& fontDescript
     if (!m_document)
         return nullptr;
 
-    Settings* settings = m_document->settings();
-    if (!settings || !settings->fontFallbackPrefersPictographs())
+    if (!m_document->settings().fontFallbackPrefersPictographs())
         return nullptr;
 
-    return FontCache::singleton().fontForFamily(fontDescription, settings->pictographFontFamily());
+    return FontCache::singleton().fontForFamily(fontDescription, m_document->settings().pictographFontFamily());
 }
 
 }

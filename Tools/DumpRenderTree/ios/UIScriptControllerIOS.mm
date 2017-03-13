@@ -63,6 +63,11 @@ void UIScriptController::doAfterNextStablePresentationUpdate(JSValueRef callback
     doAsyncTask(callback);
 }
 
+void UIScriptController::doAfterVisibleContentRectUpdate(JSValueRef callback)
+{
+    doAsyncTask(callback);
+}
+
 void UIScriptController::zoomToScale(double scale, JSValueRef callback)
 {
     RefPtr<UIScriptController> protectedThis(this);
@@ -287,6 +292,28 @@ void UIScriptController::removeAllDynamicDictionaries()
 JSRetainPtr<JSStringRef> UIScriptController::scrollingTreeAsText() const
 {
     return nullptr;
+}
+
+JSObjectRef UIScriptController::propertiesOfLayerWithID(uint64_t layerID) const
+{
+    return nullptr;
+}
+
+void UIScriptController::retrieveSpeakSelectionContent(JSValueRef)
+{
+}
+
+JSRetainPtr<JSStringRef> UIScriptController::accessibilitySpeakSelectionContent() const
+{
+    return nullptr;
+}
+
+void UIScriptController::removeViewFromWindow(JSValueRef)
+{
+}
+
+void UIScriptController::addViewToWindow(JSValueRef)
+{
 }
 
 }

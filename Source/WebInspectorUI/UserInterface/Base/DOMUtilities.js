@@ -65,19 +65,26 @@ WebInspector.linkifyNodeReference = function(node, maxLength)
 
     let link = document.createElement("span");
     link.append(displayName);
-    link.setAttribute("role", "link");
-    
-    link.title = displayName;
-    
+    return WebInspector.linkifyNodeReferenceElement(node, link, displayName);
+};
+
+WebInspector.linkifyNodeReferenceElement = function(node, element, displayName)
+{
+    if (!displayName)
+        displayName = node.displayName;
+
+    element.setAttribute("role", "link");
+    element.title = displayName;
+
     let nodeType = node.nodeType();
     if ((nodeType !== Node.DOCUMENT_NODE || node.parentNode) && nodeType !== Node.TEXT_NODE)
-        link.className = "node-link";
+        element.classList.add("node-link");
 
-    link.addEventListener("click", WebInspector.domTreeManager.inspectElement.bind(WebInspector.domTreeManager, node.id));
-    link.addEventListener("mouseover", WebInspector.domTreeManager.highlightDOMNode.bind(WebInspector.domTreeManager, node.id, "all"));
-    link.addEventListener("mouseout", WebInspector.domTreeManager.hideDOMNodeHighlight.bind(WebInspector.domTreeManager));
+    element.addEventListener("click", WebInspector.domTreeManager.inspectElement.bind(WebInspector.domTreeManager, node.id));
+    element.addEventListener("mouseover", WebInspector.domTreeManager.highlightDOMNode.bind(WebInspector.domTreeManager, node.id, "all"));
+    element.addEventListener("mouseout", WebInspector.domTreeManager.hideDOMNodeHighlight.bind(WebInspector.domTreeManager));
 
-    return link;
+    return element;
 };
 
 function createSVGElement(tagName)
@@ -239,7 +246,7 @@ WebInspector.xpathComponent = function(node)
         break;
     case Node.PROCESSING_INSTRUCTION_NODE:
         value = "processing-instruction()";
-        break
+        break;
     default:
         value = "";
         break;
@@ -278,9 +285,9 @@ WebInspector.xpathIndex = function(node)
 
         // XPath CDATA and text() are the same.
         if (aType === Node.CDATA_SECTION_NODE)
-            aType === Node.TEXT_NODE;
+            return aType === Node.TEXT_NODE;
         if (bType === Node.CDATA_SECTION_NODE)
-            bType === Node.TEXT_NODE;
+            return bType === Node.TEXT_NODE;
 
         return aType === bType;
     }

@@ -39,13 +39,14 @@
 #include "AccessibilityListBoxOption.h"
 #include "AccessibilityTable.h"
 #include "Document.h"
+#include "Editing.h"
 #include "Frame.h"
 #include "FrameView.h"
 #include "HTMLNames.h"
 #include "HTMLTableElement.h"
 #include "HostWindow.h"
 #include "RenderAncestorIterator.h"
-#include "RenderFieldset.h"
+#include "RenderBlock.h"
 #include "RenderObject.h"
 #include "SVGElement.h"
 #include "Settings.h"
@@ -65,7 +66,6 @@
 #include "WebKitAccessibleInterfaceText.h"
 #include "WebKitAccessibleInterfaceValue.h"
 #include "WebKitAccessibleUtil.h"
-#include "htmlediting.h"
 #include <glib/gprintf.h>
 #include <wtf/text/CString.h>
 
@@ -186,9 +186,11 @@ static void setAtkRelationSetFromCoreObject(AccessibilityObject* coreObject, Atk
         if (AccessibilityObject* label = coreObject->titleUIElement())
             atk_relation_set_add_relation_by_type(relationSet, ATK_RELATION_LABELLED_BY, label->wrapper());
     } else if (coreObject->roleValue() == LegendRole) {
-        if (RenderFieldset* renderFieldset = ancestorsOfType<RenderFieldset>(*coreObject->renderer()).first()) {
-            AccessibilityObject* fieldset = coreObject->axObjectCache()->getOrCreate(renderFieldset);
-            atk_relation_set_add_relation_by_type(relationSet, ATK_RELATION_LABEL_FOR, fieldset->wrapper());
+        if (RenderBlock* renderFieldset = ancestorsOfType<RenderBlock>(*coreObject->renderer()).first()) {
+            if (renderFieldset->isFieldset()) {
+                AccessibilityObject* fieldset = coreObject->axObjectCache()->getOrCreate(renderFieldset);
+                atk_relation_set_add_relation_by_type(relationSet, ATK_RELATION_LABEL_FOR, fieldset->wrapper());
+            }
         }
     } else if (AccessibilityObject* control = coreObject->correspondingControlForLabelElement()) {
         atk_relation_set_add_relation_by_type(relationSet, ATK_RELATION_LABEL_FOR, control->wrapper());
@@ -357,8 +359,6 @@ static AtkAttributeSet* webkitAccessibleGetAttributes(AtkObject* object)
     AtkAttributeSet* attributeSet = nullptr;
 #if PLATFORM(GTK)
     attributeSet = addToAtkAttributeSet(attributeSet, "toolkit", "WebKitGtk");
-#elif PLATFORM(EFL)
-    attributeSet = addToAtkAttributeSet(attributeSet, "toolkit", "WebKitEfl");
 #endif
 
     AccessibilityObject* coreObject = core(object);
@@ -532,8 +532,6 @@ static AtkRole atkRole(AccessibilityObject* coreObject)
 #if PLATFORM(GTK)
         // ATK_ROLE_COLOR_CHOOSER is defined as a dialog (i.e. it's what appears when you push the button).
         return ATK_ROLE_PUSH_BUTTON;
-#elif PLATFORM(EFL)
-        return ATK_ROLE_COLOR_CHOOSER;
 #endif
     case ListRole:
         return ATK_ROLE_LIST;

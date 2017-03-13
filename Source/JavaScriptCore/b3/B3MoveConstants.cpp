@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,10 +28,11 @@
 
 #if ENABLE(B3_JIT)
 
+#include "AirArg.h"
 #include "B3BasicBlockInlines.h"
 #include "B3Dominators.h"
 #include "B3InsertionSetInlines.h"
-#include "B3MemoryValue.h"
+#include "B3MemoryValueInlines.h"
 #include "B3PhaseScope.h"
 #include "B3ProcedureInlines.h"
 #include "B3ValueInlines.h"
@@ -202,12 +203,8 @@ private:
                                 if (!candidatePointer->hasIntPtr())
                                     return false;
                                 
-                                intptr_t offset = desiredOffset(candidatePointer);
-                                if (!B3::isRepresentableAs<int32_t>(static_cast<int64_t>(offset)))
-                                    return false;
-                                return Air::Arg::isValidAddrForm(
-                                    static_cast<int32_t>(offset),
-                                    Air::Arg::widthForBytes(memoryValue->accessByteSize()));
+                                int64_t offset = desiredOffset(candidatePointer);
+                                return memoryValue->isLegalOffset(offset);
                             });
                         
                         if (bestPointer) {

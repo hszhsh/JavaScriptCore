@@ -145,8 +145,8 @@ int OpenSLESPlayer::StopPlayout() {
   // Verify that the buffer queue is in fact cleared as it should.
   SLAndroidSimpleBufferQueueState buffer_queue_state;
   (*simple_buffer_queue_)->GetState(simple_buffer_queue_, &buffer_queue_state);
-  RTC_DCHECK_EQ(0u, buffer_queue_state.count);
-  RTC_DCHECK_EQ(0u, buffer_queue_state.index);
+  RTC_DCHECK_EQ(0, buffer_queue_state.count);
+  RTC_DCHECK_EQ(0, buffer_queue_state.index);
 #endif
   // The number of lower latency audio players is limited, hence we create the
   // audio player in Start() and destroy it in Stop().
@@ -205,19 +205,16 @@ void OpenSLESPlayer::AllocateDataBuffers() {
   // recommended to construct audio buffers so that they contain an exact
   // multiple of this number. If so, callbacks will occur at regular intervals,
   // which reduces jitter.
-  ALOGD("native buffer size: %" PRIuS, audio_parameters_.GetBytesPerBuffer());
+  const size_t buffer_size_in_bytes = audio_parameters_.GetBytesPerBuffer();
+  ALOGD("native buffer size: %" PRIuS, buffer_size_in_bytes);
   ALOGD("native buffer size in ms: %.2f",
         audio_parameters_.GetBufferSizeInMilliseconds());
-  fine_audio_buffer_.reset(new FineAudioBuffer(
-      audio_device_buffer_, audio_parameters_.GetBytesPerBuffer(),
-      audio_parameters_.sample_rate()));
-  // Each buffer must be of this size to avoid unnecessary memcpy while caching
-  // data between successive callbacks.
-  const size_t required_buffer_size =
-      fine_audio_buffer_->RequiredPlayoutBufferSizeBytes();
-  ALOGD("required buffer size: %" PRIuS, required_buffer_size);
+  fine_audio_buffer_.reset(
+      new FineAudioBuffer(audio_device_buffer_, buffer_size_in_bytes,
+                          audio_parameters_.sample_rate()));
+  // Allocated memory for audio buffers.
   for (int i = 0; i < kNumOfOpenSLESBuffers; ++i) {
-    audio_buffers_[i].reset(new SLint8[required_buffer_size]);
+    audio_buffers_[i].reset(new SLint8[buffer_size_in_bytes]);
   }
 }
 

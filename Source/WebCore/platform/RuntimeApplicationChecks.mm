@@ -148,16 +148,16 @@ bool MacApplication::isHRBlock()
     return isHRBlock;
 }
 
+bool MacApplication::isIAdProducer()
+{
+    static bool isIAdProducer = applicationBundleIsEqualTo("com.apple.iAdProducer");
+    return isIAdProducer;
+}
+
 bool MacApplication::isSolidStateNetworksDownloader()
 {
     static bool isSolidStateNetworksDownloader = applicationBundleIsEqualTo("com.solidstatenetworks.awkhost");
     return isSolidStateNetworksDownloader;
-}
-
-bool MacApplication::isAppStore()
-{
-    static bool isAppStore = applicationBundleIsEqualTo("com.apple.appstore");
-    return isAppStore;
 }
 
 #endif // PLATFORM(MAC)
@@ -184,8 +184,8 @@ bool IOSApplication::isWebBookmarksD()
 
 bool IOSApplication::isDumpRenderTree()
 {
-    // We use a prefix match instead of strict equality since LayoutTestRelay may launch multiple instances of
-    // DumpRenderTree where the bundle identifier of each instance has a unique suffix.
+    // We use a prefix match instead of strict equality since multiple instances of DumpRenderTree
+    // may be launched, where the bundle identifier of each instance has a unique suffix.
     static bool isDumpRenderTree = applicationBundleIsEqualTo("org.webkit.DumpRenderTree"); // e.g. org.webkit.DumpRenderTree0
     return isDumpRenderTree;
 }

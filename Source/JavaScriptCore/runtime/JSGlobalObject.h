@@ -44,7 +44,6 @@
 #include <JavaScriptCore/JSBase.h>
 #include <array>
 #include <wtf/HashSet.h>
-#include <wtf/PassRefPtr.h>
 
 struct OpaqueJSClass;
 struct OpaqueJSClassContextData;
@@ -262,6 +261,7 @@ public:
     LazyProperty<JSGlobalObject, JSFunction> m_arrayProtoValuesFunction;
     LazyProperty<JSGlobalObject, JSFunction> m_initializePromiseFunction;
     LazyProperty<JSGlobalObject, JSFunction> m_iteratorProtocolFunction;
+    WriteBarrier<JSFunction> m_objectProtoValueOfFunction;
     WriteBarrier<JSFunction> m_newPromiseCapabilityFunction;
     WriteBarrier<JSFunction> m_functionProtoHasInstanceSymbolFunction;
     LazyProperty<JSGlobalObject, GetterSetter> m_throwTypeErrorGetterSetter;
@@ -345,6 +345,7 @@ public:
     WriteBarrier<Structure> m_webAssemblyStructure;
     WriteBarrier<Structure> m_webAssemblyModuleRecordStructure;
     WriteBarrier<Structure> m_webAssemblyFunctionStructure;
+    WriteBarrier<Structure> m_webAssemblyWrapperFunctionStructure;
     FOR_EACH_WEBASSEMBLY_CONSTRUCTOR_TYPE(DEFINE_STORAGE_FOR_SIMPLE_TYPE)
 #endif // ENABLE(WEBASSEMBLY)
 
@@ -379,7 +380,7 @@ public:
     VM& m_vm;
 
 #if ENABLE(WEB_REPLAY)
-    RefPtr<InputCursor> m_inputCursor;
+    Ref<InputCursor> m_inputCursor;
 #endif
 
 #if ENABLE(REMOTE_INSPECTOR)
@@ -509,6 +510,7 @@ public:
     JSFunction* arrayProtoValuesFunction() const { return m_arrayProtoValuesFunction.get(this); }
     JSFunction* initializePromiseFunction() const { return m_initializePromiseFunction.get(this); }
     JSFunction* iteratorProtocolFunction() const { return m_iteratorProtocolFunction.get(this); }
+    JSFunction* objectProtoValueOfFunction() const { return m_objectProtoValueOfFunction.get(); }
     JSFunction* newPromiseCapabilityFunction() const { return m_newPromiseCapabilityFunction.get(); }
     JSFunction* functionProtoHasInstanceSymbolFunction() const { return m_functionProtoHasInstanceSymbolFunction.get(); }
     JSObject* regExpProtoExecFunction() const { return m_regExpProtoExec.get(); }
@@ -611,14 +613,15 @@ public:
 #if ENABLE(WEBASSEMBLY)
     Structure* webAssemblyModuleRecordStructure() const { return m_webAssemblyModuleRecordStructure.get(); }
     Structure* webAssemblyFunctionStructure() const { return m_webAssemblyFunctionStructure.get(); }
+    Structure* webAssemblyWrapperFunctionStructure() const { return m_webAssemblyWrapperFunctionStructure.get(); }
 #endif // ENABLE(WEBASSEMBLY)
 
     JS_EXPORT_PRIVATE void setRemoteDebuggingEnabled(bool);
     JS_EXPORT_PRIVATE bool remoteDebuggingEnabled() const;
 
 #if ENABLE(WEB_REPLAY)
-    JS_EXPORT_PRIVATE void setInputCursor(PassRefPtr<InputCursor>);
-    InputCursor& inputCursor() const { return *m_inputCursor; }
+    JS_EXPORT_PRIVATE void setInputCursor(Ref<InputCursor>&&);
+    InputCursor& inputCursor() const { return m_inputCursor.get(); }
 #endif
 
 #if ENABLE(REMOTE_INSPECTOR)

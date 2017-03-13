@@ -383,6 +383,16 @@ WKFontSmoothingLevel WKPreferencesGetFontSmoothingLevel(WKPreferencesRef prefere
     return toAPI(static_cast<FontSmoothingLevel>(toImpl(preferencesRef)->fontSmoothingLevel()));
 }
 
+void WKPreferencesSetSubpixelAntialiasedLayerTextEnabled(WKPreferencesRef preferencesRef, bool flag)
+{
+    toImpl(preferencesRef)->setSubpixelAntialiasedLayerTextEnabled(flag);
+}
+
+bool WKPreferencesGetSubpixelAntialiasedLayerTextEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->subpixelAntialiasedLayerTextEnabled();
+}
+
 void WKPreferencesSetAcceleratedDrawingEnabled(WKPreferencesRef preferencesRef, bool flag)
 {
     toImpl(preferencesRef)->setAcceleratedDrawingEnabled(flag);
@@ -830,6 +840,16 @@ void WKPreferencesSetModernMediaControlsEnabled(WKPreferencesRef preferencesRef,
 bool WKPreferencesGetModernMediaControlsEnabled(WKPreferencesRef preferencesRef)
 {
     return toImpl(preferencesRef)->modernMediaControlsEnabled();
+}
+
+void WKPreferencesSetCredentialManagementEnabled(WKPreferencesRef preferencesRef, bool flag)
+{
+    toImpl(preferencesRef)->setCredentialManagementEnabled(flag);
+}
+
+bool WKPreferencesGetCredentialManagementEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->credentialManagementEnabled();
 }
 
 void WKPreferencesSetShowsToolTipOverTruncatedText(WKPreferencesRef preferencesRef, bool flag)
@@ -1531,6 +1551,26 @@ bool WKPreferencesGetMockCaptureDevicesEnabled(WKPreferencesRef preferencesRef)
     return toImpl(preferencesRef)->mockCaptureDevicesEnabled();
 }
 
+void WKPreferencesSetICECandidateFilteringEnabled(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setICECandidateFilteringEnabled(enabled);
+}
+
+bool WKPreferencesGetICECandidateFilteringEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->iceCandidateFilteringEnabled();
+}
+
+void WKPreferencesSetEnumeratingAllNetworkInterfacesEnabled(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setEnumeratingAllNetworkInterfacesEnabled(enabled);
+}
+
+bool WKPreferencesGetEnumeratingAllNetworkInterfacesEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->enumeratingAllNetworkInterfacesEnabled();
+}
+
 void WKPreferencesSetMediaCaptureRequiresSecureConnection(WKPreferencesRef preferencesRef, bool enabled)
 {
     toImpl(preferencesRef)->setMediaCaptureRequiresSecureConnection(enabled);
@@ -1569,6 +1609,26 @@ void WKPreferencesSetIntersectionObserverEnabled(WKPreferencesRef preferencesRef
 bool WKPreferencesGetIntersectionObserverEnabled(WKPreferencesRef preferencesRef)
 {
     return toImpl(preferencesRef)->intersectionObserverEnabled();
+}
+
+void WKPreferencesSetUserTimingEnabled(WKPreferencesRef preferencesRef, bool flag)
+{
+    toImpl(preferencesRef)->setUserTimingEnabled(flag);
+}
+
+bool WKPreferencesGetUserTimingEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->userTimingEnabled();
+}
+
+void WKPreferencesSetResourceTimingEnabled(WKPreferencesRef preferencesRef, bool flag)
+{
+    toImpl(preferencesRef)->setResourceTimingEnabled(flag);
+}
+
+bool WKPreferencesGetResourceTimingEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->resourceTimingEnabled();
 }
 
 void WKPreferencesSetSelectionPaintingWithoutSelectionGapsEnabled(WKPreferencesRef preferencesRef, bool flag)
@@ -1619,6 +1679,36 @@ void WKPreferencesSetSubtleCryptoEnabled(WKPreferencesRef preferencesRef, bool f
 bool WKPreferencesGetSubtleCryptoEnabled(WKPreferencesRef preferencesRef)
 {
     return toImpl(preferencesRef)->subtleCryptoEnabled();
+}
+
+void WKPreferencesSetLinkPreloadEnabled(WKPreferencesRef preferencesRef, bool flag)
+{
+    toImpl(preferencesRef)->setLinkPreloadEnabled(flag);
+}
+
+bool WKPreferencesGetLinkPreloadEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->linkPreloadEnabled();
+}
+
+void WKPreferencesSetLargeImageAsyncDecodingEnabled(WKPreferencesRef preferencesRef, bool flag)
+{
+    toImpl(preferencesRef)->setLargeImageAsyncDecodingEnabled(flag);
+}
+
+bool WKPreferencesGetLargeImageAsyncDecodingEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->largeImageAsyncDecodingEnabled();
+}
+
+void WKPreferencesSetAnimatedImageAsyncDecodingEnabled(WKPreferencesRef preferencesRef, bool flag)
+{
+    toImpl(preferencesRef)->setAnimatedImageAsyncDecodingEnabled(flag);
+}
+
+bool WKPreferencesGetAnimatedImageAsyncDecodingEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->animatedImageAsyncDecodingEnabled();
 }
 
 void WKPreferencesSetShouldSuppressKeyboardInputDuringProvisionalNavigation(WKPreferencesRef preferencesRef, bool flag)

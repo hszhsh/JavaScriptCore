@@ -51,6 +51,7 @@
 #include "RenderView.h"
 #include "Settings.h"
 #include "SimpleLineLayoutFunctions.h"
+#include "SimpleLineLayoutPagination.h"
 #include "VerticalPositionCache.h"
 #include "VisiblePosition.h"
 
@@ -431,7 +432,7 @@ void RenderBlockFlow::computeColumnCountAndWidth()
 bool RenderBlockFlow::willCreateColumns(std::optional<unsigned> desiredColumnCount) const
 {
     // The following types are not supposed to create multicol context.
-    if (isFieldset() || isFileUploadControl() || isTextControl() || isListBox())
+    if (isFileUploadControl() || isTextControl() || isListBox())
         return false;
 
     if (!firstChild())
@@ -636,7 +637,7 @@ void RenderBlockFlow::layoutBlockChildren(bool relayoutChildren, LayoutUnit& max
     // Fieldsets need to find their legend and position it inside the border of the object.
     // The legend then gets skipped during normal layout. The same is true for ruby text.
     // It doesn't get included in the normal layout process but is instead skipped.
-    RenderObject* childToExclude = layoutSpecialExcludedChild(relayoutChildren);
+    layoutExcludedChildren(relayoutChildren);
 
     LayoutUnit previousFloatLogicalBottom = 0;
     maxFloatLogicalBottom = 0;
@@ -647,7 +648,7 @@ void RenderBlockFlow::layoutBlockChildren(bool relayoutChildren, LayoutUnit& max
         RenderBox& child = *next;
         next = child.nextSiblingBox();
 
-        if (childToExclude == &child)
+        if (child.isExcludedFromNormalLayout())
             continue; // Skip this child, since it will be positioned by the specialized subclass (fieldsets and ruby runs).
 
         updateBlockChildDirtyBitsBeforeLayout(relayoutChildren, child);
@@ -3548,13 +3549,20 @@ VisiblePosition RenderBlockFlow::positionForPointWithInlineChildren(const Layout
     return createVisiblePosition(0, DOWNSTREAM);
 }
 
+Position RenderBlockFlow::positionForPoint(const LayoutPoint& point)
+{
+    // FIXME: It supports single text child only (which is the majority of simple line layout supported content at this point).
+    if (!simpleLineLayout() || firstChild() != lastChild() || !is<RenderText>(firstChild()))
+        return positionForPoint(point, nullptr).deepEquivalent();
+    return downcast<RenderText>(*firstChild()).positionForPoint(point);
+}
+
 VisiblePosition RenderBlockFlow::positionForPoint(const LayoutPoint& point, const RenderRegion* region)
 {
     if (auto fragment = renderNamedFlowFragment())
         return fragment->positionForPoint(point, region);
     return RenderBlock::positionForPoint(point, region);
 }
-
 
 void RenderBlockFlow::addFocusRingRectsForInlineChildren(Vector<LayoutRect>& rects, const LayoutPoint& additionalOffset, const RenderLayerModelObject*)
 {
@@ -3664,6 +3672,10 @@ void RenderBlockFlow::layoutSimpleLines(bool relayoutChildren, LayoutUnit& repai
         deleteLineBoxesBeforeSimpleLineLayout();
         m_simpleLineLayout = SimpleLineLayout::create(*this);
     }
+    if (view().layoutState() && view().layoutState()->isPaginated()) {
+        m_simpleLineLayout->setIsPaginated();
+        SimpleLineLayout::adjustLinePositionsForPagination(*m_simpleLineLayout, *this);
+    }
     for (auto& renderer : childrenOfType<RenderObject>(*this))
         renderer.clearNeedsLayout();
     ASSERT(!m_lineBoxes.firstLineBox());
@@ -3693,6 +3705,7 @@ void RenderBlockFlow::ensureLineBoxes()
     setLineLayoutPath(ForceLineBoxesPath);
     if (!m_simpleLineLayout)
         return;
+    bool isPaginated = m_simpleLineLayout->isPaginated();
     m_simpleLineLayout = nullptr;
 
 #if !ASSERT_DISABLED
@@ -3703,7 +3716,12 @@ void RenderBlockFlow::ensureLineBoxes()
     bool relayoutChildren = false;
     LayoutUnit repaintLogicalTop;
     LayoutUnit repaintLogicalBottom;
-    layoutLineBoxes(relayoutChildren, repaintLogicalTop, repaintLogicalBottom);
+    if (isPaginated) {
+        view().pushLayoutStateForPagination(*this);
+        layoutLineBoxes(relayoutChildren, repaintLogicalTop, repaintLogicalBottom);
+        view().popLayoutState(*this);
+    } else
+        layoutLineBoxes(relayoutChildren, repaintLogicalTop, repaintLogicalBottom);
 
     updateLogicalHeight();
     ASSERT(didNeedLayout || logicalHeight() == oldHeight);
@@ -3856,11 +3874,15 @@ void RenderBlockFlow::adjustComputedFontSizes(float size, float visibleWidth)
 }
 #endif // ENABLE(TEXT_AUTOSIZING)
 
-RenderObject* RenderBlockFlow::layoutSpecialExcludedChild(bool relayoutChildren)
+void RenderBlockFlow::layoutExcludedChildren(bool relayoutChildren)
 {
-    RenderMultiColumnFlowThread* flowThread = multiColumnFlowThread();
+    RenderBlock::layoutExcludedChildren(relayoutChildren);
+
+    auto* flowThread = multiColumnFlowThread();
     if (!flowThread)
-        return nullptr;
+        return;
+
+    flowThread->setIsExcludedFromNormalLayout(true);
 
     setLogicalTopForChild(*flowThread, borderAndPaddingBefore());
 
@@ -3886,19 +3908,16 @@ RenderObject* RenderBlockFlow::layoutSpecialExcludedChild(bool relayoutChildren)
         flowThread->setNeedsHeightsRecalculation(false);
     }
     determineLogicalLeftPositionForChild(*flowThread);
-
-    return flowThread;
 }
 
 void RenderBlockFlow::addChild(RenderObject* newChild, RenderObject* beforeChild)
 {
-    if (multiColumnFlowThread())
+    if (multiColumnFlowThread() && (!isFieldset() || !newChild->isLegend()))
         return multiColumnFlowThread()->addChild(newChild, beforeChild);
-    if (beforeChild) {
-        if (RenderFlowThread* containingFlowThread = flowThreadContainingBlock())
-            beforeChild = containingFlowThread->resolveMovedChild(beforeChild);
-    }
-    RenderBlock::addChild(newChild, beforeChild);
+    auto* beforeChildOrPlaceholder = beforeChild;
+    if (auto* containingFlowThread = flowThreadContainingBlock())
+        beforeChildOrPlaceholder = containingFlowThread->resolveMovedChild(beforeChild);
+    RenderBlock::addChild(newChild, beforeChildOrPlaceholder);
 }
 
 void RenderBlockFlow::removeChild(RenderObject& oldChild)
@@ -3938,7 +3957,7 @@ void RenderBlockFlow::checkForPaginationLogicalHeightChange(bool& relayoutChildr
         // enabled and flow thread height is still unknown (i.e. during the first layout pass). When
         // it's unknown, we need to prevent the pagination code from assuming page breaks everywhere
         // and thereby eating every top margin. It should be trivial to clean up and get rid of this
-        // hack once the old multicol implementation is gone.
+        // hack once the old multicol implementation is gone (see also RenderView::pushLayoutStateForPagination).
         pageLogicalHeight = flowThread.isPageLogicalHeightKnown() ? LayoutUnit(1) : LayoutUnit(0);
 
         pageLogicalHeightChanged = flowThread.pageLogicalSizeChanged();
@@ -4257,8 +4276,10 @@ void RenderBlockFlow::computeInlinePreferredLogicalWidths(LayoutUnit& minLogical
             if (!is<RenderInline>(*child) && !is<RenderText>(*child)) {
                 // Case (2). Inline replaced elements and floats.
                 // Terminate the current line as far as minwidth is concerned.
-                childMin += child->minPreferredLogicalWidth().ceilToFloat();
-                childMax += child->maxPreferredLogicalWidth().ceilToFloat();
+                LayoutUnit childMinPreferredLogicalWidth, childMaxPreferredLogicalWidth;
+                computeChildPreferredLogicalWidths(*child, childMinPreferredLogicalWidth, childMaxPreferredLogicalWidth);
+                childMin += childMinPreferredLogicalWidth.ceilToFloat();
+                childMax += childMaxPreferredLogicalWidth.ceilToFloat();
 
                 bool clearPreviousFloat;
                 if (child->isFloating()) {

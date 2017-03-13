@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2010-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -105,6 +105,7 @@ public:
     void setCustomElementsEnabled(bool);
     void setModernMediaControlsEnabled(bool);
     void setWebGL2Enabled(bool);
+    void setWebGPUEnabled(bool);
     void setFetchAPIEnabled(bool);
     void setAllowUniversalAccessFromFileURLs(bool);
     void setAllowFileAccessFromFileURLs(bool);
@@ -270,6 +271,7 @@ public:
 
     // Cookies testing
     void setAlwaysAcceptCookies(bool);
+    void setCookieStoragePartitioningEnabled(bool);
 
     // Custom full screen behavior.
     void setHasCustomFullScreenBehavior(bool value) { m_customFullScreenBehavior = value; }
@@ -345,6 +347,28 @@ public:
     void setMockGamepadDetails(unsigned index, JSStringRef gamepadID, unsigned axisCount, unsigned buttonCount);
     void setMockGamepadAxisValue(unsigned index, unsigned axisIndex, double value);
     void setMockGamepadButtonValue(unsigned index, unsigned buttonIndex, double value);
+    
+    // Resource Load Statistics
+    void installStatisticsDidModifyDataRecordsCallback(JSValueRef callback);
+    void statisticsDidModifyDataRecordsCallback();
+    void statisticsFireDataModificationHandler();
+    void statisticsFireShouldPartitionCookiesHandler(JSStringRef hostName, bool value);
+    void setStatisticsPrevalentResource(JSStringRef hostName, bool value);
+    bool isStatisticsPrevalentResource(JSStringRef hostName);
+    void setStatisticsHasHadUserInteraction(JSStringRef hostName, bool value);
+    bool isStatisticsHasHadUserInteraction(JSStringRef hostName);
+    void setStatisticsSubframeUnderTopFrameOrigin(JSStringRef hostName, JSStringRef topFrameHostName);
+    void setStatisticsSubresourceUnderTopFrameOrigin(JSStringRef hostName, JSStringRef topFrameHostName);
+    void setStatisticsSubresourceUniqueRedirectTo(JSStringRef hostName, JSStringRef hostNameRedirectedTo);
+    void setStatisticsTimeToLiveUserInteraction(double seconds);
+    void setStatisticsNotifyPagesWhenDataRecordsWereScanned(bool);
+    void setStatisticsShouldClassifyResourcesBeforeDataRecordsRemoval(bool);
+    void setStatisticsMinimumTimeBetweeenDataRecordsRemoval(double);
+    void statisticsClearInMemoryAndPersistentStore();
+    void statisticsResetToConsistentState();
+
+    // Open panel
+    void setOpenPanelFiles(JSValueRef);
 
 private:
     TestRunner();

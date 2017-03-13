@@ -55,16 +55,16 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
 
         this._timelineRecordingWarningElement = document.createElement("div");
         this._timelineRecordingWarningElement.classList.add("warning-banner");
-        this._timelineRecordingWarningElement.append(WebInspector.UIString("Debugger is disabled during a Timeline recording."), " ");
+        this._timelineRecordingWarningElement.append(WebInspector.UIString("Debugger disabled during Timeline recording"), " ");
         let stopRecordingLink = this._timelineRecordingWarningElement.appendChild(document.createElement("a"));
-        stopRecordingLink.textContent = WebInspector.UIString("Stop recording.");
+        stopRecordingLink.textContent = WebInspector.UIString("Stop recording");
         stopRecordingLink.addEventListener("click", () => { WebInspector.timelineManager.stopCapturing(); });
 
         this._breakpointsDisabledWarningElement = document.createElement("div");
         this._breakpointsDisabledWarningElement.classList.add("warning-banner");
-        this._breakpointsDisabledWarningElement.append(WebInspector.UIString("Breakpoints are disabled."), document.createElement("br"));
+        this._breakpointsDisabledWarningElement.append(WebInspector.UIString("Breakpoints disabled"), document.createElement("br"));
         let enableBreakpointsLink = this._breakpointsDisabledWarningElement.appendChild(document.createElement("a"));
-        enableBreakpointsLink.textContent = WebInspector.UIString("Enable breakpoints.");
+        enableBreakpointsLink.textContent = WebInspector.UIString("Enable breakpoints");
         enableBreakpointsLink.addEventListener("click", () => { WebInspector.debuggerToggleBreakpoints(); });
 
         this._navigationBar = new WebInspector.NavigationBar;
@@ -153,7 +153,11 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
 
         this._breakpointsContentTreeOutline.addEventListener(WebInspector.TreeOutline.Event.SelectionDidChange, this._treeSelectionDidChange, this);
         this._breakpointsContentTreeOutline.ondelete = this._breakpointTreeOutlineDeleteTreeElement.bind(this);
-        this._breakpointsContentTreeOutline.oncontextmenu = this._breakpointTreeOutlineContextMenuTreeElement.bind(this);
+        this._breakpointsContentTreeOutline.populateContextMenu = function(contextMenu, event, treeElement) {
+            this._breakpointTreeOutlineContextMenuTreeElement(contextMenu, event, treeElement);
+
+            WebInspector.TreeOutline.prototype.populateContextMenu(contextMenu, event, treeElement);
+        }.bind(this);
 
         this._breakpointsContentTreeOutline.appendChild(this._allExceptionsBreakpointTreeElement);
         this._breakpointsContentTreeOutline.appendChild(this._allUncaughtExceptionsBreakpointTreeElement);
@@ -162,7 +166,40 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
         if (DebuggerAgent.setPauseOnAssertions)
             this._breakpointsContentTreeOutline.appendChild(this._assertionsBreakpointTreeElement);
 
-        this._scriptsContentTreeOutline = this.createContentTreeOutline(true);
+        if (WebInspector.domDebuggerManager.supported) {
+            this._domBreakpointsContentTreeOutline = this.createContentTreeOutline(true);
+            this._domBreakpointsContentTreeOutline.addEventListener(WebInspector.TreeOutline.Event.ElementAdded, this._domBreakpointAddedOrRemoved, this);
+            this._domBreakpointsContentTreeOutline.addEventListener(WebInspector.TreeOutline.Event.ElementRemoved, this._domBreakpointAddedOrRemoved, this);
+            this._domBreakpointTreeController = new WebInspector.DOMBreakpointTreeController(this._domBreakpointsContentTreeOutline);
+
+            this._domBreakpointsRow = new WebInspector.DetailsSectionRow(WebInspector.UIString("No Breakpoints"));
+            this._domBreakpointsRow.element.appendChild(this._domBreakpointsContentTreeOutline.element);
+            this._domBreakpointsRow.showEmptyMessage();
+
+            let domBreakpointsGroup = new WebInspector.DetailsSectionGroup([this._domBreakpointsRow]);
+            let domBreakpointsSection = new WebInspector.DetailsSection("dom-breakpoints", WebInspector.UIString("DOM Breakpoints"), [domBreakpointsGroup]);
+            this.contentView.element.appendChild(domBreakpointsSection.element);
+
+            this._xhrBreakpointsContentTreeOutline = this.createContentTreeOutline(true);
+            this._xhrBreakpointTreeController = new WebInspector.XHRBreakpointTreeController(this._xhrBreakpointsContentTreeOutline);
+
+            this._xhrBreakpointsRow = new WebInspector.DetailsSectionRow;
+            this._xhrBreakpointsRow.element.appendChild(this._xhrBreakpointsContentTreeOutline.element);
+
+            let navigationBar = new WebInspector.NavigationBar;
+            let navigationBarWrapper = document.createElement("div");
+            navigationBarWrapper.appendChild(navigationBar.element);
+
+            let addXHRBreakpointButton = new WebInspector.ButtonNavigationItem("add-xhr-breakpoint", WebInspector.UIString("Add XHR Breakpoint"), "Images/Plus13.svg", 13, 13);
+            addXHRBreakpointButton.addEventListener(WebInspector.ButtonNavigationItem.Event.Clicked, this._addXHRBreakpointButtonClicked, this);
+            navigationBar.addNavigationItem(addXHRBreakpointButton);
+
+            let xhrBreakpointsGroup = new WebInspector.DetailsSectionGroup([this._xhrBreakpointsRow]);
+            let xhrBreakpointsSection = new WebInspector.DetailsSection("xhr-breakpoints", WebInspector.UIString("XHR Breakpoints"), [xhrBreakpointsGroup], navigationBarWrapper);
+            this.contentView.element.appendChild(xhrBreakpointsSection.element);
+        }
+
+        this._scriptsContentTreeOutline = this.createContentTreeOutline();
         this._scriptsContentTreeOutline.addEventListener(WebInspector.TreeOutline.Event.SelectionDidChange, this._treeSelectionDidChange, this);
 
         let scriptsRow = new WebInspector.DetailsSectionRow;
@@ -172,9 +209,8 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
         this._scriptsSection = new WebInspector.DetailsSection("scripts", WebInspector.UIString("Sources"), [scriptsGroup]);
         this.contentView.element.appendChild(this._scriptsSection.element);
 
-        const dontHideByDefault = true;
         const suppressFiltering = true;
-        this._callStackTreeOutline = this.createContentTreeOutline(dontHideByDefault, suppressFiltering);
+        this._callStackTreeOutline = this.createContentTreeOutline(suppressFiltering);
         this._callStackTreeOutline.addEventListener(WebInspector.TreeOutline.Event.SelectionDidChange, this._treeSelectionDidChange, this);
 
         this._mainTargetTreeElement = new WebInspector.ThreadTreeElement(WebInspector.mainTarget);
@@ -229,6 +265,9 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
     closed()
     {
         super.closed();
+
+        this._domBreakpointTreeController.disconnect();
+        this._domBreakpointTreeController = null;
 
         WebInspector.Frame.removeEventListener(null, null, this);
         WebInspector.debuggerManager.removeEventListener(null, null, this);
@@ -308,6 +347,11 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
             return;
         }
 
+        if (representedObject === WebInspector.domDebuggerManager.allRequestsBreakpoint) {
+            cookie[WebInspector.DebuggerSidebarPanel.SelectedAllRequestsCookieKey] = true;
+            return;
+        }
+
         super.saveStateToCookie(cookie);
     }
 
@@ -322,6 +366,8 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
             this._allUncaughtExceptionsBreakpointTreeElement.revealAndSelect();
         else if (cookie[WebInspector.DebuggerSidebarPanel.SelectedAssertionsCookieKey])
             this._assertionsBreakpointTreeElement.revealAndSelect();
+        else if (cookie[WebInspector.DebuggerSidebarPanel.SelectedAllRequestsCookieKey])
+            this._xhrBreakpointTreeController.revealAndSelect(WebInspector.domDebuggerManager.allRequestsBreakpoint);
         else
             super.restoreStateFromCookie(cookie, relaxedMatchDelay);
     }
@@ -462,7 +508,7 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
         this._addBreakpointsForSourceCode(resource);
         this._addIssuesForSourceCode(resource);
 
-        if (!this.contentBrowser.currentContentView)
+        if (this.parentSidebar && !this.contentBrowser.currentContentView)
             this.showDefaultContentViewForTreeElement(treeElement);
     }
 
@@ -537,7 +583,7 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
         this._addBreakpointsForSourceCode(script);
         this._addIssuesForSourceCode(script);
 
-        if (!this.contentBrowser.currentContentView)
+        if (this.parentSidebar && !this.contentBrowser.currentContentView)
             this.showDefaultContentViewForTreeElement(treeElement);
 
         return treeElement;
@@ -747,9 +793,10 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
         return true;
     }
 
-    _breakpointTreeOutlineContextMenuTreeElement(event, treeElement)
+    _breakpointTreeOutlineContextMenuTreeElement(contextMenu, event, treeElement)
     {
-        console.assert(treeElement instanceof WebInspector.ResourceTreeElement || treeElement instanceof WebInspector.ScriptTreeElement);
+        // This check is necessary since the context menu is created by the TreeOutline, meaning
+        // that any child could be the target of the context menu event.
         if (!(treeElement instanceof WebInspector.ResourceTreeElement) && !(treeElement instanceof WebInspector.ScriptTreeElement))
             return;
 
@@ -764,7 +811,6 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
             this._toggleAllBreakpoints(breakpoints, shouldDisable);
         };
 
-        let contextMenu = WebInspector.ContextMenu.createFromEvent(event);
         if (shouldDisable)
             contextMenu.appendItem(WebInspector.UIString("Disable Breakpoints"), toggleAllResourceBreakpoints);
         else
@@ -779,7 +825,7 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
             return;
 
         if (treeElement instanceof WebInspector.ResourceTreeElement || treeElement instanceof WebInspector.ScriptTreeElement) {
-            WebInspector.showSourceCode(treeElement.representedObject);
+            WebInspector.showSourceCode(treeElement.representedObject, {ignoreNetworkTab: true});
             return;
         }
 
@@ -789,12 +835,12 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
                 WebInspector.debuggerManager.activeCallFrame = callFrame;
 
             if (callFrame.sourceCodeLocation)
-                WebInspector.showSourceCodeLocation(callFrame.sourceCodeLocation);
+                WebInspector.showSourceCodeLocation(callFrame.sourceCodeLocation, {ignoreNetworkTab: true});
             return;
         }
 
         if (treeElement instanceof WebInspector.IssueTreeElement) {
-            WebInspector.showSourceCodeLocation(treeElement.issueMessage.sourceCodeLocation);
+            WebInspector.showSourceCodeLocation(treeElement.issueMessage.sourceCodeLocation, {ignoreNetworkTab: true});
             return;
         }
 
@@ -803,7 +849,7 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
 
         let breakpoint = treeElement.breakpoint;
         if (treeElement.treeOutline === this._pauseReasonTreeOutline) {
-            WebInspector.showSourceCodeLocation(breakpoint.sourceCodeLocation);
+            WebInspector.showSourceCodeLocation(breakpoint.sourceCodeLocation, {ignoreNetworkTab: true});
             return;
         }
 
@@ -814,7 +860,7 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
         if (!(treeElement.parent.representedObject instanceof WebInspector.SourceCode))
             return;
 
-        WebInspector.showSourceCodeLocation(breakpoint.sourceCodeLocation);
+        WebInspector.showSourceCodeLocation(breakpoint.sourceCodeLocation, {ignoreNetworkTab: true});
     }
 
     _compareTopLevelTreeElements(a, b)
@@ -879,10 +925,11 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
         case WebInspector.DebuggerManager.PauseReason.Breakpoint:
             console.assert(pauseData, "Expected breakpoint identifier, but found none.");
             if (pauseData && pauseData.breakpointId) {
-                let breakpoint = WebInspector.debuggerManager.breakpointForIdentifier(pauseData.breakpointId);
-                this._pauseReasonTreeOutline = this.createContentTreeOutline(true, true);
+                const suppressFiltering = true;
+                this._pauseReasonTreeOutline = this.createContentTreeOutline(suppressFiltering);
                 this._pauseReasonTreeOutline.addEventListener(WebInspector.TreeOutline.Event.SelectionDidChange, this._treeSelectionDidChange, this);
 
+                let breakpoint = WebInspector.debuggerManager.breakpointForIdentifier(pauseData.breakpointId);
                 let breakpointTreeElement = new WebInspector.BreakpointTreeElement(breakpoint, WebInspector.DebuggerSidebarPanel.PausedBreakpointIconStyleClassName, WebInspector.UIString("Triggered Breakpoint"));
                 let breakpointDetailsSection = new WebInspector.DetailsSectionRow;
                 this._pauseReasonTreeOutline.appendChild(breakpointTreeElement);
@@ -908,6 +955,35 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
             this._pauseReasonGroup.rows = [this._pauseReasonTextRow];
             return true;
 
+        case WebInspector.DebuggerManager.PauseReason.DOM:
+            console.assert(WebInspector.domDebuggerManager.supported);
+            console.assert(pauseData, "Expected DOM breakpoint data, but found none.");
+            if (pauseData && pauseData.nodeId) {
+                let domNode = WebInspector.domTreeManager.nodeForId(pauseData.nodeId);
+                let domBreakpoints = WebInspector.domDebuggerManager.domBreakpointsForNode(domNode);
+                let domBreakpoint;
+                for (let breakpoint of domBreakpoints) {
+                    if (breakpoint.type === pauseData.type) {
+                        domBreakpoint = breakpoint;
+                        break;
+                    }
+                }
+
+                if (!domBreakpoint)
+                    return;
+
+                this._pauseReasonTreeOutline = this.createContentTreeOutline(true, true);
+
+                let domBreakpointTreeElement = new WebInspector.DOMBreakpointTreeElement(domBreakpoint, WebInspector.DebuggerSidebarPanel.PausedBreakpointIconStyleClassName, WebInspector.UIString("Triggered DOM Breakpoint"));
+                let domBreakpointDetailsSection = new WebInspector.DetailsSectionRow;
+                this._pauseReasonTreeOutline.appendChild(domBreakpointTreeElement);
+                domBreakpointDetailsSection.element.appendChild(this._pauseReasonTreeOutline.element);
+
+                this._pauseReasonGroup.rows = [domBreakpointDetailsSection];
+                return true;
+            }
+            break;
+
         case WebInspector.DebuggerManager.PauseReason.Exception:
             console.assert(pauseData, "Expected data with an exception, but found none.");
             if (pauseData) {
@@ -923,6 +999,36 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
             this._pauseReasonTextRow.text = WebInspector.UIString("Immediate Pause Requested");
             this._pauseReasonGroup.rows = [this._pauseReasonTextRow];
             return true;
+
+        case WebInspector.DebuggerManager.PauseReason.XHR:
+            console.assert(WebInspector.domDebuggerManager.supported);
+            console.assert(pauseData, "Expected XHR breakpoint data, but found none.");
+            if (pauseData && pauseData.breakpointURL) {
+                let xhrBreakpoints = WebInspector.domDebuggerManager.xhrBreakpoints;
+                let xhrBreakpoint;
+                for (let breakpoint of xhrBreakpoints) {
+                    if (breakpoint.url === pauseData.breakpointURL) {
+                        xhrBreakpoint = breakpoint;
+                        break;
+                    }
+                }
+
+                if (!xhrBreakpoint)
+                    return;
+
+                this._pauseReasonTreeOutline = this.createContentTreeOutline(true, true);
+
+                let xhrBreakpointTreeElement = new WebInspector.XHRBreakpointTreeElement(xhrBreakpoint, WebInspector.DebuggerSidebarPanel.PausedBreakpointIconStyleClassName, WebInspector.UIString("Triggered XHR Breakpoint"));
+                let xhrBreakpointRow = new WebInspector.DetailsSectionRow;
+                this._pauseReasonTreeOutline.appendChild(xhrBreakpointTreeElement);
+                xhrBreakpointRow.element.appendChild(this._pauseReasonTreeOutline.element);
+
+                this._pauseReasonTextRow.text = pauseData.url;
+                this._pauseReasonGroup.rows = [xhrBreakpointRow, this._pauseReasonTextRow];
+
+                return true;
+            }
+            break;
 
         case WebInspector.DebuggerManager.PauseReason.Other:
             console.error("Paused for unknown reason. We should always have a reason.");
@@ -1002,6 +1108,41 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
 
         issueTreeElements.forEach((treeElement) => treeElement.parent.removeChild(treeElement));
     }
+
+    _domBreakpointAddedOrRemoved(event)
+    {
+        if (!this._domBreakpointsContentTreeOutline.children.length) {
+            this._domBreakpointsRow.showEmptyMessage();
+            return;
+        }
+
+        if (this._domBreakpointsContentTreeOutline.element.parent)
+            return;
+
+        this._domBreakpointsRow.hideEmptyMessage();
+        this._domBreakpointsRow.element.append(this._domBreakpointsContentTreeOutline.element);
+    }
+
+    _addXHRBreakpointButtonClicked(event)
+    {
+        let popover = new WebInspector.InputPopover(WebInspector.UIString("Break when URL contains:"), this);
+        popover.show(event.target.element, [WebInspector.RectEdge.MAX_Y, WebInspector.RectEdge.MIN_Y, WebInspector.RectEdge.MAX_X]);
+    }
+
+    // Popover delegate
+
+    willDismissPopover(popover)
+    {
+        if (popover.result !== WebInspector.InputPopover.Result.Committed)
+            return;
+
+        let url = popover.value;
+        if (!url)
+            return;
+
+        let documentURL = WebInspector.frameResourceManager.mainFrame.url;
+        WebInspector.domDebuggerManager.addXHRBreakpoint(new WebInspector.XHRBreakpoint(documentURL, url));
+    }
 };
 
 WebInspector.DebuggerSidebarPanel.DebuggerPausedStyleClassName = "paused";
@@ -1012,3 +1153,4 @@ WebInspector.DebuggerSidebarPanel.PausedBreakpointIconStyleClassName = "breakpoi
 WebInspector.DebuggerSidebarPanel.SelectedAllExceptionsCookieKey = "debugger-sidebar-panel-all-exceptions-breakpoint";
 WebInspector.DebuggerSidebarPanel.SelectedAllUncaughtExceptionsCookieKey = "debugger-sidebar-panel-all-uncaught-exceptions-breakpoint";
 WebInspector.DebuggerSidebarPanel.SelectedAssertionsCookieKey = "debugger-sidebar-panel-assertions-breakpoint";
+WebInspector.DebuggerSidebarPanel.SelectedAllRequestsCookieKey = "debugger-sidebar-panel-all-requests-breakpoint";

@@ -1,6 +1,6 @@
 /*
  *  Copyright (C) 1999-2001 Harri Porten (porten@kde.org)
- *  Copyright (C) 2004-2008, 2013, 2016 Apple Inc. All rights reserved.
+ *  Copyright (C) 2004-2017 Apple Inc. All rights reserved.
  *  Copyright (C) 2009 Torch Mobile, Inc.
  *  Copyright (C) 2015 Jordan Harband (ljharb@gmail.com)
  *
@@ -37,6 +37,7 @@
 #include "JSStringIterator.h"
 #include "Lookup.h"
 #include "ObjectPrototype.h"
+#include "ParseInt.h"
 #include "PropertyNameArray.h"
 #include "RegExpCache.h"
 #include "RegExpConstructor.h"
@@ -126,7 +127,7 @@ StringPrototype::StringPrototype(VM& vm, Structure* structure)
 void StringPrototype::finishCreation(VM& vm, JSGlobalObject* globalObject, JSString* nameAndMessage)
 {
     Base::finishCreation(vm, nameAndMessage);
-    ASSERT(inherits(info()));
+    ASSERT(inherits(vm, info()));
 
     JSC_NATIVE_INTRINSIC_FUNCTION_WITHOUT_TRANSITION(vm.propertyNames->toString, stringProtoFuncToString, DontEnum, 0, StringPrototypeValueOfIntrinsic);
     JSC_NATIVE_INTRINSIC_FUNCTION_WITHOUT_TRANSITION(vm.propertyNames->valueOf, stringProtoFuncToString, DontEnum, 0, StringPrototypeValueOfIntrinsic);
@@ -539,21 +540,23 @@ static ALWAYS_INLINE EncodedJSValue replaceUsingRegExpSearch(
                     OUT_OF_MEMORY(exec, scope);
 
                 unsigned i = 0;
+                cachedCall.clearArguments();
                 for (; i < regExp->numSubpatterns() + 1; ++i) {
                     int matchStart = ovector[i * 2];
                     int matchLen = ovector[i * 2 + 1] - matchStart;
 
                     if (matchStart < 0)
-                        cachedCall.setArgument(i, jsUndefined());
+                        cachedCall.appendArgument(jsUndefined());
                     else
-                        cachedCall.setArgument(i, jsSubstring(&vm, source, matchStart, matchLen));
+                        cachedCall.appendArgument(jsSubstring(&vm, source, matchStart, matchLen));
                 }
 
-                cachedCall.setArgument(i++, jsNumber(result.start));
-                cachedCall.setArgument(i++, string);
+                cachedCall.appendArgument(jsNumber(result.start));
+                cachedCall.appendArgument(string);
 
                 cachedCall.setThis(jsUndefined());
                 JSValue jsResult = cachedCall.call();
+                RETURN_IF_EXCEPTION(scope, encodedJSValue());
                 replacements.append(jsResult.toWTFString(exec));
                 RETURN_IF_EXCEPTION(scope, encodedJSValue());
 
@@ -578,21 +581,23 @@ static ALWAYS_INLINE EncodedJSValue replaceUsingRegExpSearch(
                     OUT_OF_MEMORY(exec, scope);
 
                 unsigned i = 0;
+                cachedCall.clearArguments();
                 for (; i < regExp->numSubpatterns() + 1; ++i) {
                     int matchStart = ovector[i * 2];
                     int matchLen = ovector[i * 2 + 1] - matchStart;
 
                     if (matchStart < 0)
-                        cachedCall.setArgument(i, jsUndefined());
+                        cachedCall.appendArgument(jsUndefined());
                     else
-                        cachedCall.setArgument(i, jsSubstring(&vm, source, matchStart, matchLen));
+                        cachedCall.appendArgument(jsSubstring(&vm, source, matchStart, matchLen));
                 }
 
-                cachedCall.setArgument(i++, jsNumber(result.start));
-                cachedCall.setArgument(i++, string);
+                cachedCall.appendArgument(jsNumber(result.start));
+                cachedCall.appendArgument(string);
 
                 cachedCall.setThis(jsUndefined());
                 JSValue jsResult = cachedCall.call();
+                RETURN_IF_EXCEPTION(scope, encodedJSValue());
                 replacements.append(jsResult.toWTFString(exec));
                 RETURN_IF_EXCEPTION(scope, encodedJSValue());
 
@@ -732,6 +737,7 @@ static ALWAYS_INLINE EncodedJSValue replaceUsingStringSearch(VM& vm, ExecState* 
     auto scope = DECLARE_THROW_SCOPE(vm);
 
     const String& string = jsString->value(exec);
+    RETURN_IF_EXCEPTION(scope, encodedJSValue());
     String searchString = searchValue.toWTFString(exec);
     RETURN_IF_EXCEPTION(scope, encodedJSValue());
 
@@ -836,7 +842,7 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncRepeatCharacter(ExecState* exec)
 ALWAYS_INLINE EncodedJSValue replace(
     VM& vm, ExecState* exec, JSString* string, JSValue searchValue, JSValue replaceValue)
 {
-    if (searchValue.inherits(RegExpObject::info()))
+    if (searchValue.inherits(vm, RegExpObject::info()))
         return replaceUsingRegExpSearch(vm, exec, string, searchValue, replaceValue);
     return replaceUsingStringSearch(vm, exec, string, searchValue, replaceValue);
 }
@@ -863,7 +869,7 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncReplaceUsingRegExp(ExecState* exec)
     RETURN_IF_EXCEPTION(scope, encodedJSValue());
 
     JSValue searchValue = exec->argument(0);
-    if (!searchValue.inherits(RegExpObject::info()))
+    if (!searchValue.inherits(vm, RegExpObject::info()))
         return JSValue::encode(jsUndefined());
 
     scope.release();
@@ -905,7 +911,7 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncToString(ExecState* exec)
     if (thisValue.isString())
         return JSValue::encode(thisValue);
 
-    if (thisValue.inherits(StringObject::info()))
+    if (thisValue.inherits(vm, StringObject::info()))
         return JSValue::encode(asStringObject(thisValue)->internalValue());
 
     return throwVMTypeError(exec, scope);

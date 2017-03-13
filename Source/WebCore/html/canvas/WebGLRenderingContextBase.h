@@ -25,7 +25,10 @@
 
 #pragma once
 
+#if ENABLE(WEBGL)
+
 #include "ActiveDOMObject.h"
+#include "ActivityStateChangeObserver.h"
 #include "CanvasRenderingContext.h"
 #include "GraphicsContext3D.h"
 #include "ImageBuffer.h"
@@ -107,7 +110,7 @@ inline bool clip2D(GC3Dint x, GC3Dint y, GC3Dsizei width, GC3Dsizei height,
     return (*clippedX != x || *clippedY != y || *clippedWidth != width || *clippedHeight != height);
 }
 
-class WebGLRenderingContextBase : public CanvasRenderingContext, public ActiveDOMObject {
+class WebGLRenderingContextBase : public CanvasRenderingContext, private ActivityStateChangeObserver, public ActiveDOMObject {
 public:
     static std::unique_ptr<WebGLRenderingContextBase> create(HTMLCanvasElement&, WebGLContextAttributes&, const String&);
     virtual ~WebGLRenderingContextBase();
@@ -337,6 +340,8 @@ public:
     void recycleContext();
     void forceRestoreContext();
     void loseContextImpl(LostContextMode);
+    void dispatchContextChangedEvent();
+    WEBCORE_EXPORT void simulateContextChanged();
 
     GraphicsContext3D* graphicsContext3D() const { return m_context.get(); }
     WebGLContextGroup* contextGroup() const { return m_contextGroup.get(); }
@@ -391,6 +396,10 @@ protected:
 
     void destroyGraphicsContext3D();
     void markContextChanged();
+    void markContextChangedAndNotifyCanvasObserver();
+
+    void addActivityStateChangeObserverIfNecessary();
+    void removeActivityStateChangeObserver();
 
     // Query whether it is built on top of compliant GLES2 implementation.
     bool isGLES2Compliant() { return m_isGLES2Compliant; }
@@ -769,10 +778,10 @@ protected:
     WebGLBuffer* validateBufferDataParameters(const char* functionName, GC3Denum target, GC3Denum usage);
 
     // Helper function for tex{Sub}Image2D to make sure image is ready.
-    bool validateHTMLImageElement(const char* functionName, HTMLImageElement*);
-    bool validateHTMLCanvasElement(const char* functionName, HTMLCanvasElement*);
+    bool validateHTMLImageElement(const char* functionName, HTMLImageElement*, ExceptionCode&);
+    bool validateHTMLCanvasElement(const char* functionName, HTMLCanvasElement*, ExceptionCode&);
 #if ENABLE(VIDEO)
-    bool validateHTMLVideoElement(const char* functionName, HTMLVideoElement*);
+    bool validateHTMLVideoElement(const char* functionName, HTMLVideoElement*, ExceptionCode&);
 #endif
 
     // Helper functions for vertexAttribNf{v}.
@@ -827,10 +836,16 @@ protected:
 private:
     bool validateArrayBufferType(const char* functionName, GC3Denum type, std::optional<JSC::TypedArrayType>);
     void registerWithWebGLStateTracker();
+    void checkForContextLossHandling();
+
+    void activityStateDidChange(ActivityState::Flags oldActivityState, ActivityState::Flags newActivityState) override;
 
     WebGLStateTracker::Token m_trackerToken;
+    Timer m_checkForContextLossHandlingTimer;
 };
 
 } // namespace WebCore
 
 SPECIALIZE_TYPE_TRAITS_CANVASRENDERINGCONTEXT(WebCore::WebGLRenderingContextBase, is3d())
+
+#endif

@@ -162,6 +162,10 @@ PlatformWebView::PlatformWebView(WKWebViewConfiguration* configuration, const Te
 void PlatformWebView::setWindowIsKey(bool isKey)
 {
     m_windowIsKey = isKey;
+    if (m_windowIsKey)
+        [m_window makeKeyWindow];
+    else
+        [m_window resignKeyWindow];
 }
 
 void PlatformWebView::resizeTo(unsigned width, unsigned height, WebViewSizingMode sizingMode)
@@ -252,6 +256,16 @@ void PlatformWebView::removeChromeInputField()
     }
 }
 
+void PlatformWebView::addToWindow()
+{
+    [[m_window contentView] addSubview:m_view];
+}
+
+void PlatformWebView::removeFromWindow()
+{
+    [m_view removeFromSuperview];
+}
+
 void PlatformWebView::makeWebViewFirstResponder()
 {
     [m_window makeFirstResponder:platformView()];
@@ -279,7 +293,8 @@ bool PlatformWebView::viewSupportsOptions(const TestOptions& options) const
         || m_options.needsSiteSpecificQuirks != options.needsSiteSpecificQuirks
         || m_options.enableIntersectionObserver != options.enableIntersectionObserver
         || m_options.enableModernMediaControls != options.enableModernMediaControls
-        || m_options.enablePointerLock != options.enablePointerLock)
+        || m_options.enablePointerLock != options.enablePointerLock
+        || m_options.enableCredentialManagement != options.enableCredentialManagement)
         return false;
 
     return true;

@@ -64,6 +64,7 @@ private:
     std::unique_ptr<DrawingAreaProxy> createDrawingAreaProxy() override;
     void setViewNeedsDisplay(const WebCore::Region&) override;
     void requestScroll(const WebCore::FloatPoint& scrollPosition, const WebCore::IntPoint& scrollOrigin, bool isProgrammaticScroll) override;
+    WebCore::FloatPoint viewScrollPosition() override;
 
     WebCore::IntSize viewSize() override;
     bool isViewWindowActive() override;
@@ -95,7 +96,7 @@ private:
     bool canUndoRedo(WebPageProxy::UndoOrRedo) override;
     void executeUndoRedo(WebPageProxy::UndoOrRedo) override;
     bool executeSavedCommandBySelector(const String& selector) override;
-    void setDragImage(const WebCore::IntPoint& clientPosition, PassRefPtr<ShareableBitmap> dragImage, bool isLinkDrag) override;
+    void setDragImage(const WebCore::IntPoint& clientPosition, PassRefPtr<ShareableBitmap> dragImage, WebCore::DragSourceAction) override;
     void setPromisedDataForImage(const String& pasteboardName, PassRefPtr<WebCore::SharedBuffer> imageBuffer, const String& filename, const String& extension, const String& title,
         const String& url, const String& visibleUrl, PassRefPtr<WebCore::SharedBuffer> archiveBuffer) override;
 #if ENABLE(ATTACHMENT_ELEMENT)
@@ -131,7 +132,7 @@ private:
     RefPtr<WebColorPicker> createColorPicker(WebPageProxy*, const WebCore::Color& initialColor, const WebCore::IntRect&) override;
 #endif
 
-    Ref<WebCore::ValidationBubble> createValidationBubble(const String& message) final;
+    Ref<WebCore::ValidationBubble> createValidationBubble(const String& message, const WebCore::ValidationBubble::Settings&) final;
 
     void setTextIndicator(Ref<WebCore::TextIndicator>, WebCore::TextIndicatorWindowLifetime) override;
     void clearTextIndicator(WebCore::TextIndicatorWindowDismissalAnimation) override;

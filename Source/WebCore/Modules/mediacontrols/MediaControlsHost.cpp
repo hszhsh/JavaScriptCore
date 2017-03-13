@@ -215,6 +215,11 @@ bool MediaControlsHost::userGestureRequired() const
     return !m_mediaElement->mediaSession().playbackPermitted(*m_mediaElement);
 }
 
+bool MediaControlsHost::shouldForceControlsDisplay() const
+{
+    return m_mediaElement->shouldForceControlsDisplay();
+}
+
 String MediaControlsHost::externalDeviceDisplayName() const
 {
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
@@ -278,7 +283,7 @@ String MediaControlsHost::shadowRootCSSText() const
     Page* page = m_mediaElement->document().page();
     if (!page)
         return emptyString();
-    return RenderTheme::themeForPage(page)->mediaControlsStyleSheet();
+    return RenderTheme::themeForPage(page)->modernMediaControlsStyleSheet();
 }
 
 String MediaControlsHost::base64StringForIconAndPlatform(const String& iconName, const String& platform) const

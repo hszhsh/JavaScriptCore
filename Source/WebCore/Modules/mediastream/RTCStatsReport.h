@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2012 Google Inc. All rights reserved.
+ * Copyright (C) 2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -24,38 +25,102 @@
 
 #pragma once
 
-#include "ScriptWrappable.h"
-#include <wtf/HashMap.h>
-#include <wtf/RefCounted.h>
-#include <wtf/Vector.h>
-#include <wtf/text/WTFString.h>
+#include "JSDOMMapLike.h"
 
 namespace WebCore {
 
-class RTCStatsReport : public RefCounted<RTCStatsReport>, public ScriptWrappable {
+class RTCStatsReport : public RefCounted<RTCStatsReport> {
 public:
-    static Ref<RTCStatsReport> create(const String& id, const String& type, double timestamp);
+    static Ref<RTCStatsReport> create() { return adoptRef(*new RTCStatsReport); }
 
-    double timestamp() const { return m_timestamp; }
-    String id() { return m_id; }
-    String type() { return m_type; }
-    String stat(const String& name) { return m_stats.get(name); }
-    Vector<String> names() const;
+    void synchronizeBackingMap(Ref<DOMMapLike>&& mapLike) { m_mapLike = WTFMove(mapLike); }
+    DOMMapLike* backingMap() { return m_mapLike.get(); }
 
-    // DEPRECATED
-    RTCStatsReport& local();
-    // DEPRECATED
-    RTCStatsReport& remote();
+    template<typename Value> void addStats(typename Value::ParameterType&& value) { m_mapLike->set<IDLDOMString, Value>(value.id, std::forward<typename Value::ParameterType>(value)); }
 
-    void addStatistic(const String& name, const String& value);
+
+    enum class Type {
+        Codec,
+        InboundRtp,
+        OutboundRtp,
+        PeerConnection,
+        DataChannel,
+        Track,
+        Transport,
+        CandidatePair,
+        LocalCandidate,
+        RemoteCandidate,
+        Certificate
+    };
+    struct Stats {
+        unsigned long long timestamp;
+        Type type;
+        String id;
+    };
+
+    struct RTCRTPStreamStats : Stats {
+        uint32_t ssrc;
+        String associateStatsId;
+        bool isRemote { false };
+        String mediaType;
+
+        String mediaTrackId;
+        String transportId;
+        String codecId;
+        unsigned long firCount { 0 };
+        unsigned long pliCount { 0 };
+        unsigned long nackCount { 0 };
+        unsigned long sliCount { 0 };
+        unsigned long long qpSum { 0 };
+    };
+
+    struct InboundRTPStreamStats : RTCRTPStreamStats {
+        InboundRTPStreamStats() { type = RTCStatsReport::Type::InboundRtp; }
+
+        uint32_t ssrc;
+        String associateStatsId;
+        bool isRemote { false };
+        String mediaType;
+        String mediaTrackId;
+        String transportId;
+        String codecId;
+        unsigned long firCount { 0 };
+        unsigned long pliCount { 0 };
+        unsigned long nackCount { 0 };
+        unsigned long sliCount { 0 };
+        unsigned long long qpSum { 0 };
+        unsigned long packetsReceived { 0 };
+        unsigned long long bytesReceived { 0 };
+        unsigned long packetsLost { 0 };
+        double jitter { 0 };
+        double fractionLost { 0 };
+        unsigned long packetsDiscarded { 0 };
+        unsigned long packetsRepaired { 0 };
+        unsigned long burstPacketsLost { 0 };
+        unsigned long burstPacketsDiscarded { 0 };
+        unsigned long burstLossCount { 0 };
+        unsigned long burstDiscardCount { 0 };
+        double burstLossRate { 0 };
+        double burstDiscardRate { 0 };
+        double gapLossRate { 0 };
+        double gapDiscardRate { 0 };
+        unsigned long framesDecoded { 0 };
+    };
+
+    struct OutboundRTPStreamStats : RTCRTPStreamStats {
+        OutboundRTPStreamStats() { type = RTCStatsReport::Type::OutboundRtp; }
+
+        unsigned long packetsSent { 0 };
+        unsigned long long bytesSent { 0 };
+        double targetBitrate { 0 };
+        unsigned long framesEncoded { 0 };
+    };
 
 private:
-    RTCStatsReport(const String& id, const String& type, double timestamp);
+    RTCStatsReport() = default;
 
-    String m_id;
-    String m_type;
-    double m_timestamp;
-    HashMap<String, String> m_stats;
+private:
+    RefPtr<DOMMapLike> m_mapLike;
 };
 
 } // namespace WebCore

@@ -46,6 +46,7 @@ namespace WebCore {
 
 class MediaStreamTrack;
 class PeerConnectionBackend;
+class RTCController;
 class RTCIceCandidate;
 class RTCPeerConnectionErrorCallback;
 class RTCSessionDescription;
@@ -106,7 +107,7 @@ public:
     const RTCConfiguration& getConfiguration() const { return m_configuration; }
     ExceptionOr<void> setConfiguration(RTCConfiguration&&);
 
-    void privateGetStats(MediaStreamTrack*, PeerConnection::StatsPromise&&);
+    void getStats(MediaStreamTrack*, Ref<DeferredPromise>&&);
 
     ExceptionOr<Ref<RTCDataChannel>> createDataChannel(ScriptExecutionContext&, String&&, RTCDataChannelInit&&);
 
@@ -136,10 +137,17 @@ public:
     PeerConnectionStates::IceGatheringState internalIceGatheringState() const { return m_iceGatheringState; }
     PeerConnectionStates::IceConnectionState internalIceConnectionState() const { return m_iceConnectionState; }
 
+    void disableICECandidateFiltering() { m_backend->disableICECandidateFiltering(); }
+    void enableICECandidateFiltering() { m_backend->enableICECandidateFiltering(); }
+
 private:
     RTCPeerConnection(ScriptExecutionContext&);
 
     void completeAddTransceiver(RTCRtpTransceiver&, const RtpTransceiverInit&);
+
+    RTCController& rtcController();
+    void registerToController();
+    void unregisterFromController();
 
     // EventTarget implementation.
     void refEventTarget() final { ref(); }
@@ -151,7 +159,7 @@ private:
     bool canSuspendForDocumentSuspension() const final;
 
     // RTCRtpSenderClient
-    void replaceTrack(RTCRtpSender&, RefPtr<MediaStreamTrack>&&, DOMPromise<void>&&) final;
+    void replaceTrack(RTCRtpSender&, Ref<MediaStreamTrack>&&, DOMPromise<void>&&) final;
 
     PeerConnectionStates::SignalingState m_signalingState { PeerConnectionStates::SignalingState::Stable };
     PeerConnectionStates::IceGatheringState m_iceGatheringState { PeerConnectionStates::IceGatheringState::New };

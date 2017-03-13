@@ -32,12 +32,12 @@
 #include "DOMSelection.h"
 
 #include "Document.h"
+#include "Editing.h"
 #include "ExceptionCode.h"
 #include "Frame.h"
 #include "FrameSelection.h"
 #include "Range.h"
 #include "TextIterator.h"
-#include "htmlediting.h"
 
 namespace WebCore {
 
@@ -371,7 +371,7 @@ void DOMSelection::deleteFromDocument()
         return;
 
     auto selectedRange = selection.selection().toNormalizedRange();
-    if (!selectedRange)
+    if (!selectedRange || selectedRange->shadowRoot())
         return;
 
     Ref<Frame> protector(*m_frame);
@@ -392,7 +392,7 @@ bool DOMSelection::containsNode(Node& node, bool allowPartial) const
     auto selectedRange = selection.selection().toNormalizedRange();
 
     ContainerNode* parentNode = node.parentNode();
-    if (!parentNode || !parentNode->inDocument())
+    if (!parentNode || !parentNode->isConnected())
         return false;
     unsigned nodeIndex = node.computeNodeIndex();
 

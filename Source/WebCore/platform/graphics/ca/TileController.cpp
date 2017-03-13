@@ -43,8 +43,8 @@
 #endif
 
 #if PLATFORM(IOS)
-#include "MemoryPressureHandler.h"
 #include "TileControllerMemoryHandlerIOS.h"
+#include <wtf/MemoryPressureHandler.h>
 #endif
 
 namespace WebCore {
@@ -157,6 +157,7 @@ void TileController::setZoomedOutContentsScale(float scale)
 
     if (m_zoomedOutContentsScale == scale)
         return;
+
     m_zoomedOutContentsScale = scale;
 
     if (m_zoomedOutTileGrid && m_zoomedOutTileGrid->scale() != m_zoomedOutContentsScale)
@@ -167,8 +168,26 @@ void TileController::setAcceleratesDrawing(bool acceleratesDrawing)
 {
     if (m_acceleratesDrawing == acceleratesDrawing)
         return;
-    m_acceleratesDrawing = acceleratesDrawing;
 
+    m_acceleratesDrawing = acceleratesDrawing;
+    tileGrid().updateTileLayerProperties();
+}
+
+void TileController::setWantsDeepColorBackingStore(bool wantsDeepColorBackingStore)
+{
+    if (m_wantsDeepColorBackingStore == wantsDeepColorBackingStore)
+        return;
+
+    m_wantsDeepColorBackingStore = wantsDeepColorBackingStore;
+    tileGrid().updateTileLayerProperties();
+}
+
+void TileController::setSupportsSubpixelAntialiasedText(bool supportsSubpixelAntialiasedText)
+{
+    if (m_supportsSubpixelAntialiasedText == supportsSubpixelAntialiasedText)
+        return;
+
+    m_supportsSubpixelAntialiasedText = supportsSubpixelAntialiasedText;
     tileGrid().updateTileLayerProperties();
 }
 
@@ -176,8 +195,8 @@ void TileController::setTilesOpaque(bool opaque)
 {
     if (opaque == m_tilesAreOpaque)
         return;
-    m_tilesAreOpaque = opaque;
 
+    m_tilesAreOpaque = opaque;
     tileGrid().updateTileLayerProperties();
 }
 
@@ -307,6 +326,11 @@ void TileController::setTileDebugBorderColor(Color borderColor)
     m_tileDebugBorderColor = borderColor;
 
     tileGrid().updateTileLayerProperties();
+}
+
+void TileController::setTileSizeUpdateDelayDisabledForTesting(bool value)
+{
+    m_isTileSizeUpdateDelayDisabledForTesting = value;
 }
 
 IntRect TileController::boundsForSize(const FloatSize& size) const
@@ -487,7 +511,10 @@ void TileController::didEndLiveResize()
 
 void TileController::notePendingTileSizeChange()
 {
-    m_tileSizeChangeTimer.restart();
+    if (m_isTileSizeUpdateDelayDisabledForTesting)
+        tileSizeChangeTimerFired();
+    else
+        m_tileSizeChangeTimer.restart();
 }
 
 void TileController::tileSizeChangeTimerFired()
@@ -715,6 +742,7 @@ RefPtr<PlatformCALayer> TileController::createTileLayer(const IntRect& tileRect,
 
     layer->setContentsScale(m_deviceScaleFactor * temporaryScaleFactor);
     layer->setAcceleratesDrawing(m_acceleratesDrawing);
+    layer->setWantsDeepColorBackingStore(m_wantsDeepColorBackingStore);
 
     layer->setNeedsDisplay();
 

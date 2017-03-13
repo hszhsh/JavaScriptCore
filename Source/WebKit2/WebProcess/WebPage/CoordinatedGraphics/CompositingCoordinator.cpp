@@ -36,6 +36,7 @@
 #include <WebCore/InspectorController.h>
 #include <WebCore/MainFrame.h>
 #include <WebCore/Page.h>
+#include <wtf/MemoryPressureHandler.h>
 #include <wtf/SetForScope.h>
 
 using namespace WebCore;
@@ -406,15 +407,21 @@ void CompositingCoordinator::scheduleReleaseInactiveAtlases()
 
 void CompositingCoordinator::releaseInactiveAtlasesTimerFired()
 {
+    releaseAtlases(MemoryPressureHandler::singleton().isUnderMemoryPressure() ? ReleaseUnused : ReleaseInactive);
+}
+
+void CompositingCoordinator::releaseAtlases(ReleaseAtlasPolicy policy)
+{
     // We always want to keep one atlas for root contents layer.
     std::unique_ptr<UpdateAtlas> atlasToKeepAnyway;
     bool foundActiveAtlasForRootContentsLayer = false;
     for (int i = m_updateAtlases.size() - 1;  i >= 0; --i) {
         UpdateAtlas* atlas = m_updateAtlases[i].get();
-        if (!atlas->isInUse())
+        bool inUse = atlas->isInUse();
+        if (!inUse)
             atlas->addTimeInactive(ReleaseInactiveAtlasesTimerInterval);
         bool usableForRootContentsLayer = !atlas->supportsAlpha();
-        if (atlas->isInactive()) {
+        if (atlas->isInactive() || (!inUse && policy == ReleaseUnused)) {
             if (!foundActiveAtlasForRootContentsLayer && !atlasToKeepAnyway && usableForRootContentsLayer)
                 atlasToKeepAnyway = WTFMove(m_updateAtlases[i]);
             m_updateAtlases.remove(i);

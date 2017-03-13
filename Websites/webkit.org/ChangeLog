@@ -1,3 +1,176 @@
+2017-03-11  Jon Davis  <jond@apple.com>
+
+        Add Swift syntax highlighting to webkit.org
+        https://bugs.webkit.org/show_bug.cgi?id=163672
+
+        Reviewed by Matt Baker.
+
+        * wp-content/plugins/hyperlight/hyperlight/languages/swift.php: Added.
+
+2017-03-10  Jon Davis  <jond@apple.com>
+
+        Switch back to the Twitter API for the Tweet widget
+        https://bugs.webkit.org/show_bug.cgi?id=168749
+
+        Reviewed by Lucas Forschler.
+        
+        Updates the Twitter widget tile implementation to prefer the Twitter API to populate tweets 
+        displayed through the widget. If the API fails for any reason, it falls back to using the 
+        Tweet listener for updated tweets.
+        
+        The Twitter API provides the benefit of embedding media and being able to display the full 
+        URLs rather than Twitter-shortened URLs.
+
+        * wp-content/plugins/tweet-listener.php:
+        * wp-content/themes/webkit/style.css:
+        (.twitter-tile .tile-content):
+        (.twitter-tile.text-only):
+        (.twitter-tile .media):
+        (.twitter-tile img):
+        * wp-content/themes/webkit/widgets/twitter.php:
+
+2017-03-04  Filip Pizlo  <fpizlo@apple.com>
+
+        B3 should have comprehensive support for atomic operations
+        https://bugs.webkit.org/show_bug.cgi?id=162349
+
+        Reviewed by Keith Miller.
+        
+        Document the new opcodes!
+
+        * docs/b3/intermediate-representation.html:
+
+2017-03-09  Jon Davis  <jond@apple.com>
+
+        Prevent HTML in rich link previews
+        https://bugs.webkit.org/show_bug.cgi?id=169435
+
+        Reviewed by Tim Horton.
+
+        * wp-content/plugins/social-meta.php:
+
+2017-03-03  Manuel Rego Casasnovas  <rego@igalia.com>
+
+        Unreviewed, minor updates on CSS Grid Layout examples.
+
+        * demos/css-grid/index.html:
+        * demos/css-grid/responsive-grid.html:
+
+2017-02-27  Simon Fraser  <simon.fraser@apple.com>
+
+        Add css-status page on webkit.org
+        https://bugs.webkit.org/show_bug.cgi?id=168921
+
+        Reviewed by Sam Weinig.
+        
+        Add a page that shows the status of CSS properties and values, scraped from Source/WebCore/css/CSSProperties.json.
+        
+        This is modeled after the feature status page. Properties can be filtered by status
+        and the spec they belong to.
+
+        * wp-content/themes/webkit/css-status.php: Added.
+
+2017-02-23  Joseph Pecoraro  <pecoraro@apple.com>
+
+        [Resource Timing] Add Experimental Feature Flag
+        https://bugs.webkit.org/show_bug.cgi?id=167147
+
+        Reviewed by Ryosuke Niwa.
+
+        * experimental-features.html:
+        Test for Resource Timing.
+
+2017-02-23  Alex Christensen  <achristensen@webkit.org>
+
+        Add WebRTC to experimental-features.html
+        https://bugs.webkit.org/show_bug.cgi?id=168757
+
+        Reviewed by Tim Horton.
+
+        * experimental-features.html:
+
+2017-02-23  Jon Davis  <jond@apple.com>
+
+        Fixed saving survey data
+        https://bugs.webkit.org/show_bug.cgi?id=168730
+
+        Reviewed by Joseph Pecoraro.
+
+        * wp-content/themes/webkit/functions.php:
+
+2017-02-20  Manuel Rego Casasnovas  <rego@igalia.com>
+
+        Unreviewed, add CSS Grid Layout examples for a blog post.
+
+        * demos/css-grid/index.html: Added.
+        * demos/css-grid/responsive-grid.html: Added.
+
+2017-02-06  Jon Davis  <jond@apple.com>
+
+        Add a survey to learn how people use WebKit Nightly builds
+        https://bugs.webkit.org/show_bug.cgi?id=167748
+
+        Reviewed by Joseph Pecoraro.
+
+        * wp-content/themes/webkit/functions.php:
+        * wp-content/themes/webkit/nightly-start.php:
+        * wp-content/themes/webkit/nightly-survey.php: Added.
+        * wp-content/themes/webkit/survey.json: Added.
+
+2017-01-28  Yoav Weiss  <yoav@yoav.ws>
+
+        Add Link Preload as an off-by-default experimental feature menu item.
+        https://bugs.webkit.org/show_bug.cgi?id=167201
+
+        Reviewed by Ryosuke Niwa.
+
+        * experimental-features.html: Added Link Preload.
+
+2017-01-28  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Add User Timing Experimental Feature
+        https://bugs.webkit.org/show_bug.cgi?id=167542
+        <rdar://problem/22746307>
+
+        Reviewed by Ryosuke Niwa.
+
+        * experimental-features.html:
+
+2017-01-27  Dean Jackson  <dino@apple.com>
+
+        Add a simple demo for Touch stylus events
+        https://bugs.webkit.org/show_bug.cgi?id=167534
+
+        Reviewed by Simon Fraser.
+
+        * demos/touch/stylus.html: Added.
+
+2017-01-27  Wenson Hsieh  <wenson_hsieh@apple.com>
+
+        Unreviewed, update scroll snapping demos to use current Module 1 spec
+
+        * demos/scroll-snap/index.html:
+
+        Adopt the new CSS properties scroll-snap-type and scroll-snap-align.
+
+2017-01-26  Wenson Hsieh  <wenson_hsieh@apple.com>
+
+        Unreviewed, add a demo page for an input events blog post
+
+        * demos/input-events/index.html: Added.
+
+2017-01-20  Antoine Quint  <graouts@apple.com>
+
+        Web Animations should be off by default and enabled as an experimental feature
+        https://bugs.webkit.org/show_bug.cgi?id=167115
+        <rdar://problem/30048963>
+
+        Reviewed by Joseph Pecoraro.
+
+        Add a test for Web Animations feature detection.
+
+        * experimental-features.html:
+
 2017-01-19  Joseph Pecoraro  <pecoraro@apple.com>
 
         Include SubtleCrypto test on experimental-features test page

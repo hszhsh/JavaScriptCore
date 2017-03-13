@@ -352,7 +352,7 @@ bool RenderEmbeddedObject::getReplacementTextGeometry(const LayoutPoint& accumul
 
     FontCascadeDescription fontDescription;
     RenderTheme::defaultTheme()->systemFont(CSSValueWebkitSmallControl, fontDescription);
-    fontDescription.setWeight(FontWeightBold);
+    fontDescription.setWeight(boldWeightValue());
     fontDescription.setRenderingMode(settings().fontRenderingMode());
     fontDescription.setComputedSize(12);
     font = FontCascade(fontDescription, 0, 0);
@@ -616,7 +616,7 @@ void RenderEmbeddedObject::handleUnavailablePluginIndicatorEvent(Event* event)
             setUnavailablePluginIndicatorIsPressed(false);
         }
         if (m_mouseDownWasInUnavailablePluginIndicator && isInUnavailablePluginIndicator(mouseEvent)) {
-            page().chrome().client().unavailablePluginButtonClicked(&element, m_pluginUnavailabilityReason);
+            page().chrome().client().unavailablePluginButtonClicked(element, m_pluginUnavailabilityReason);
         }
         m_mouseDownWasInUnavailablePluginIndicator = false;
         event->setDefaultHandled();

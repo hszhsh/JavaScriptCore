@@ -149,7 +149,7 @@ bool MockRealtimeVideoSource::applySize(const IntSize& size)
     fontDescription.setOneFamily("Courier");
     fontDescription.setSpecifiedSize(m_baseFontSize);
     fontDescription.setComputedSize(m_baseFontSize);
-    fontDescription.setWeight(FontWeight500);
+    fontDescription.setWeight(FontSelectionValue(500));
 
     m_timeFont = FontCascade(fontDescription, 0, 0);
     m_timeFont.update(nullptr);
@@ -333,9 +333,11 @@ void MockRealtimeVideoSource::generateFrame()
     FloatRect frameRect(FloatPoint(), size);
     context.fillRect(FloatRect(FloatPoint(), size), Color::black);
 
-    drawText(context);
-    drawAnimation(context);
-    drawBoxes(context);
+    if (!m_muted && m_enabled) {
+        drawText(context);
+        drawAnimation(context);
+        drawBoxes(context);
+    }
 
     updateSampleBuffer();
 }

@@ -22,10 +22,10 @@
 
 #include "ActivityStateChangeObserver.h"
 #include "AlternativeTextClient.h"
-#include "AnimationController.h"
 #include "ApplicationCacheStorage.h"
 #include "BackForwardClient.h"
 #include "BackForwardController.h"
+#include "CSSAnimationController.h"
 #include "Chrome.h"
 #include "ChromeClient.h"
 #include "ClientRectList.h"
@@ -55,7 +55,9 @@
 #include "HistoryItem.h"
 #include "InspectorController.h"
 #include "InspectorInstrumentation.h"
+#include "LibWebRTCProvider.h"
 #include "Logging.h"
+#include "LowPowerModeNotifier.h"
 #include "MainFrame.h"
 #include "MediaCanStartListener.h"
 #include "Navigator.h"
@@ -80,8 +82,10 @@
 #include "RenderWidget.h"
 #include "ResourceUsageOverlay.h"
 #include "RuntimeEnabledFeatures.h"
+#include "SVGDocumentExtensions.h"
 #include "SchemeRegistry.h"
 #include "ScriptController.h"
+#include "ScriptedAnimationController.h"
 #include "ScrollingCoordinator.h"
 #include "Settings.h"
 #include "SharedBuffer.h"
@@ -124,6 +128,10 @@
 #if ENABLE(INDEXED_DATABASE)
 #include "IDBConnectionToServer.h"
 #include "InProcessIDBServer.h"
+#endif
+
+#if ENABLE(DATA_INTERACTION)
+#include "SelectionRect.h"
 #endif
 
 namespace WebCore {
@@ -201,6 +209,7 @@ Page::Page(PageConfiguration&& pageConfiguration)
     , m_validationMessageClient(WTFMove(pageConfiguration.validationMessageClient))
     , m_diagnosticLoggingClient(WTFMove(pageConfiguration.diagnosticLoggingClient))
     , m_webGLStateTracker(WTFMove(pageConfiguration.webGLStateTracker))
+    , m_libWebRTCProvider(WTFMove(pageConfiguration.libWebRTCProvider))
     , m_openedByDOM(false)
     , m_tabKeyCyclesThroughElements(true)
     , m_defersLoading(false)
@@ -225,8 +234,8 @@ Page::Page(PageConfiguration&& pageConfiguration)
 #if ENABLE(VIEW_MODE_CSS_MEDIA)
     , m_viewMode(ViewModeWindowed)
 #endif // ENABLE(VIEW_MODE_CSS_MEDIA)
-    , m_timerAlignmentInterval(DOMTimer::defaultAlignmentInterval())
-    , m_timerAlignmentIntervalIncreaseTimer(*this, &Page::timerAlignmentIntervalIncreaseTimerFired)
+    , m_domTimerAlignmentInterval(DOMTimer::defaultAlignmentInterval())
+    , m_domTimerAlignmentIntervalIncreaseTimer(*this, &Page::domTimerAlignmentIntervalIncreaseTimerFired)
     , m_isEditable(false)
     , m_isPrerender(false)
     , m_activityState(PageInitialActivityState)
@@ -256,6 +265,7 @@ Page::Page(PageConfiguration&& pageConfiguration)
     , m_isClosing(false)
     , m_isUtilityPage(isUtilityPageChromeClient(chrome().client()))
     , m_performanceMonitor(isUtilityPage() ? nullptr : std::make_unique<PerformanceMonitor>(*this))
+    , m_lowPowerModeNotifier(std::make_unique<LowPowerModeNotifier>([this](bool isLowPowerModeEnabled) { handleLowModePowerChange(isLowPowerModeEnabled); }))
 {
     updateTimerThrottlingState();
 
@@ -319,6 +329,7 @@ Page::~Page()
         m_scrollingCoordinator->pageDestroyed();
 
     backForward().close();
+    PageCache::singleton().removeAllItemsForPage(*this);
 
 #ifndef NDEBUG
     pageCounter.decrement();
@@ -363,7 +374,7 @@ ViewportArguments Page::viewportArguments() const
 ScrollingCoordinator* Page::scrollingCoordinator()
 {
     if (!m_scrollingCoordinator && m_settings->scrollingCoordinatorEnabled()) {
-        m_scrollingCoordinator = chrome().client().createScrollingCoordinator(this);
+        m_scrollingCoordinator = chrome().client().createScrollingCoordinator(*this);
         if (!m_scrollingCoordinator)
             m_scrollingCoordinator = ScrollingCoordinator::create(this);
     }
@@ -537,26 +548,11 @@ void Page::refreshPlugins(bool reload)
 
     HashSet<PluginInfoProvider*> pluginInfoProviders;
 
-    Vector<Ref<Frame>> framesNeedingReload;
-
-    for (auto& page : *allPages) {
+    for (auto& page : *allPages)
         pluginInfoProviders.add(&page->pluginInfoProvider());
-        page->m_pluginData = nullptr;
-
-        if (!reload)
-            continue;
-        
-        for (Frame* frame = &page->mainFrame(); frame; frame = frame->tree().traverseNext()) {
-            if (frame->loader().subframeLoader().containsPlugins())
-                framesNeedingReload.append(*frame);
-        }
-    }
 
     for (auto& pluginInfoProvider : pluginInfoProviders)
-        pluginInfoProvider->refreshPlugins();
-
-    for (auto& frame : framesNeedingReload)
-        frame->loader().reload();
+        pluginInfoProvider->refresh(reload);
 }
 
 PluginData& Page::pluginData()
@@ -564,6 +560,11 @@ PluginData& Page::pluginData()
     if (!m_pluginData)
         m_pluginData = PluginData::create(*this);
     return *m_pluginData;
+}
+
+void Page::clearPluginData()
+{
+    m_pluginData = nullptr;
 }
 
 bool Page::showAllPlugins() const
@@ -857,7 +858,7 @@ void Page::setPageScaleFactor(float scale, const IntPoint& origin, bool inStable
         if (document->renderView())
             document->renderView()->setNeedsLayout();
 
-        document->recalcStyle(Style::Force);
+        document->resolveStyle(Document::ResolveStyleType::Rebuild);
 
         // Transform change on RenderView doesn't trigger repaint on non-composited contents.
         mainFrame().view()->invalidateRect(IntRect(LayoutRect::infiniteRect()));
@@ -954,6 +955,20 @@ void Page::didFinishLoad()
 bool Page::isOnlyNonUtilityPage() const
 {
     return !isUtilityPage() && nonUtilityPageCount == 1;
+}
+
+bool Page::isLowPowerModeEnabled() const
+{
+    if (m_lowPowerModeEnabledOverrideForTesting)
+        return m_lowPowerModeEnabledOverrideForTesting.value();
+
+    return m_lowPowerModeNotifier->isLowPowerModeEnabled();
+}
+
+void Page::setLowPowerModeEnabledOverrideForTesting(std::optional<bool> isEnabled)
+{
+    m_lowPowerModeEnabledOverrideForTesting = isEnabled;
+    handleLowModePowerChange(m_lowPowerModeEnabledOverrideForTesting.value_or(false));
 }
 
 void Page::setTopContentInset(float contentInset)
@@ -1096,12 +1111,34 @@ void Page::resumeScriptedAnimations()
     }
 }
 
+enum class ThrottlingReasonOperation { Add, Remove };
+static void updateScriptedAnimationsThrottlingReason(Page& page, ThrottlingReasonOperation operation, ScriptedAnimationController::ThrottlingReason reason)
+{
+    for (Frame* frame = &page.mainFrame(); frame; frame = frame->tree().traverseNext()) {
+        auto* document = frame->document();
+        if (!document)
+            continue;
+        auto* scriptedAnimationController = document->scriptedAnimationController();
+        if (!scriptedAnimationController)
+            continue;
+
+        if (operation == ThrottlingReasonOperation::Add)
+            scriptedAnimationController->addThrottlingReason(reason);
+        else
+            scriptedAnimationController->removeThrottlingReason(reason);
+    }
+}
+
 void Page::setIsVisuallyIdleInternal(bool isVisuallyIdle)
 {
-    for (Frame* frame = &mainFrame(); frame; frame = frame->tree().traverseNext()) {
-        if (frame->document())
-            frame->document()->scriptedAnimationControllerSetThrottled(isVisuallyIdle);
-    }
+    updateScriptedAnimationsThrottlingReason(*this, isVisuallyIdle ? ThrottlingReasonOperation::Add : ThrottlingReasonOperation::Remove, ScriptedAnimationController::ThrottlingReason::VisuallyIdle);
+}
+
+void Page::handleLowModePowerChange(bool isLowPowerModeEnabled)
+{
+    updateScriptedAnimationsThrottlingReason(*this, isLowPowerModeEnabled ? ThrottlingReasonOperation::Add : ThrottlingReasonOperation::Remove, ScriptedAnimationController::ThrottlingReason::LowPowerMode);
+    mainFrame().animation().updateThrottlingState();
+    updateDOMTimerAlignmentInterval();
 }
 
 void Page::userStyleSheetLocationChanged()
@@ -1284,7 +1321,7 @@ void Page::setTimerThrottlingState(TimerThrottlingState state)
         return;
 
     m_timerThrottlingState = state;
-    m_timerThrottlingStateLastChangedTime = std::chrono::steady_clock::now();
+    m_timerThrottlingStateLastChangedTime = MonotonicTime::now();
 
     updateDOMTimerAlignmentInterval();
 
@@ -1297,12 +1334,12 @@ void Page::setTimerThrottlingState(TimerThrottlingState state)
     }
 }
 
-void Page::setTimerAlignmentIntervalIncreaseLimit(std::chrono::milliseconds limit)
+void Page::setDOMTimerAlignmentIntervalIncreaseLimit(Seconds limit)
 {
-    m_timerAlignmentIntervalIncreaseLimit = limit;
+    m_domTimerAlignmentIntervalIncreaseLimit = limit;
 
-    // If (m_timerAlignmentIntervalIncreaseLimit < m_timerAlignmentInterval) then we need
-    // to update m_timerAlignmentInterval, if greater then need to restart the increase timer.
+    // If (m_domTimerAlignmentIntervalIncreaseLimit < m_domTimerAlignmentInterval) then we need
+    // to update m_domTimerAlignmentInterval, if greater then need to restart the increase timer.
     if (m_timerThrottlingState == TimerThrottlingState::EnabledIncreasing)
         updateDOMTimerAlignmentInterval();
 }
@@ -1313,28 +1350,28 @@ void Page::updateDOMTimerAlignmentInterval()
 
     switch (m_timerThrottlingState) {
     case TimerThrottlingState::Disabled:
-        m_timerAlignmentInterval = DOMTimer::defaultAlignmentInterval();
+        m_domTimerAlignmentInterval = isLowPowerModeEnabled() ? DOMTimer::defaultAlignmentIntervalInLowPowerMode() : DOMTimer::defaultAlignmentInterval();
         break;
 
     case TimerThrottlingState::Enabled:
-        m_timerAlignmentInterval = DOMTimer::hiddenPageAlignmentInterval();
+        m_domTimerAlignmentInterval = DOMTimer::hiddenPageAlignmentInterval();
         break;
 
     case TimerThrottlingState::EnabledIncreasing:
         // For pages in prerender state maximum throttling kicks in immediately.
         if (m_isPrerender)
-            m_timerAlignmentInterval = m_timerAlignmentIntervalIncreaseLimit;
+            m_domTimerAlignmentInterval = m_domTimerAlignmentIntervalIncreaseLimit;
         else {
-            ASSERT(m_timerThrottlingStateLastChangedTime.time_since_epoch() != std::chrono::steady_clock::duration::zero());
-            m_timerAlignmentInterval = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - m_timerThrottlingStateLastChangedTime);
+            ASSERT(!!m_timerThrottlingStateLastChangedTime);
+            m_domTimerAlignmentInterval = MonotonicTime::now() - m_timerThrottlingStateLastChangedTime;
             // If we're below the limit, set the timer. If above, clamp to limit.
-            if (m_timerAlignmentInterval < m_timerAlignmentIntervalIncreaseLimit)
+            if (m_domTimerAlignmentInterval < m_domTimerAlignmentIntervalIncreaseLimit)
                 needsIncreaseTimer = true;
             else
-                m_timerAlignmentInterval = m_timerAlignmentIntervalIncreaseLimit;
+                m_domTimerAlignmentInterval = m_domTimerAlignmentIntervalIncreaseLimit;
         }
         // Alignment interval should not be less than DOMTimer::hiddenPageAlignmentInterval().
-        m_timerAlignmentInterval = std::max(m_timerAlignmentInterval, DOMTimer::hiddenPageAlignmentInterval());
+        m_domTimerAlignmentInterval = std::max(m_domTimerAlignmentInterval, DOMTimer::hiddenPageAlignmentInterval());
     }
 
     // If throttling is enabled, auto-increasing of throttling is enabled, and the auto-increase
@@ -1342,16 +1379,16 @@ void Page::updateDOMTimerAlignmentInterval()
     // between increases is equal to the current throttle time. Since alinment interval increases
     // exponentially, time between steps is exponential too.
     if (!needsIncreaseTimer)
-        m_timerAlignmentIntervalIncreaseTimer.stop();
-    else if (!m_timerAlignmentIntervalIncreaseTimer.isActive())
-        m_timerAlignmentIntervalIncreaseTimer.startOneShot(m_timerAlignmentInterval);
+        m_domTimerAlignmentIntervalIncreaseTimer.stop();
+    else if (!m_domTimerAlignmentIntervalIncreaseTimer.isActive())
+        m_domTimerAlignmentIntervalIncreaseTimer.startOneShot(m_domTimerAlignmentInterval);
 }
 
-void Page::timerAlignmentIntervalIncreaseTimerFired()
+void Page::domTimerAlignmentIntervalIncreaseTimerFired()
 {
     ASSERT(m_settings->hiddenPageDOMTimerThrottlingAutoIncreases());
     ASSERT(m_timerThrottlingState == TimerThrottlingState::EnabledIncreasing);
-    ASSERT(m_timerAlignmentInterval < m_timerAlignmentIntervalIncreaseLimit);
+    ASSERT(m_domTimerAlignmentInterval < m_domTimerAlignmentIntervalIncreaseLimit);
     
     // Alignment interval is increased to equal the time the page has been throttled, to a limit.
     updateDOMTimerAlignmentInterval();
@@ -1496,6 +1533,10 @@ void Page::setActivityState(ActivityState::Flags activityState)
         setIsInWindowInternal(activityState & ActivityState::IsInWindow);
     if (changed & ActivityState::IsVisuallyIdle)
         setIsVisuallyIdleInternal(activityState & ActivityState::IsVisuallyIdle);
+    if (changed & ActivityState::WindowIsActive) {
+        if (auto* view = m_mainFrame->view())
+            view->updateTiledBackingAdaptiveSizing();
+    }
 
     if (changed & (ActivityState::IsVisible | ActivityState::IsVisuallyIdle | ActivityState::IsAudible | ActivityState::IsLoading))
         updateTimerThrottlingState();
@@ -1515,12 +1556,35 @@ bool Page::isVisibleAndActive() const
     return (m_activityState & ActivityState::IsVisible) && (m_activityState & ActivityState::WindowIsActive);
 }
 
+bool Page::isWindowActive() const
+{
+    return m_activityState & ActivityState::WindowIsActive;
+}
+
 void Page::setIsVisible(bool isVisible)
 {
     if (isVisible)
         setActivityState((m_activityState & ~ActivityState::IsVisuallyIdle) | ActivityState::IsVisible | ActivityState::IsVisibleOrOccluded);
     else
         setActivityState((m_activityState & ~(ActivityState::IsVisible | ActivityState::IsVisibleOrOccluded)) | ActivityState::IsVisuallyIdle);
+}
+
+enum class SVGAnimationsState { Paused, Resumed };
+static inline void setSVGAnimationsState(Page& page, SVGAnimationsState state)
+{
+    for (Frame* frame = &page.mainFrame(); frame; frame = frame->tree().traverseNext()) {
+        auto* document = frame->document();
+        if (!document)
+            continue;
+
+        if (!document->svgExtensions())
+            continue;
+
+        if (state == SVGAnimationsState::Paused)
+            document->accessSVGExtensions().pauseAnimations();
+        else
+            document->accessSVGExtensions().unpauseAnimations();
+    }
 }
 
 void Page::setIsVisibleInternal(bool isVisible)
@@ -1542,6 +1606,8 @@ void Page::setIsVisibleInternal(bool isVisible)
         if (m_settings->hiddenPageCSSAnimationSuspensionEnabled())
             mainFrame().animation().resumeAnimations();
 
+        setSVGAnimationsState(*this, SVGAnimationsState::Resumed);
+
         resumeAnimatingImages();
     }
 
@@ -1555,6 +1621,8 @@ void Page::setIsVisibleInternal(bool isVisible)
     if (!isVisible) {
         if (m_settings->hiddenPageCSSAnimationSuspensionEnabled())
             mainFrame().animation().suspendAnimations();
+
+        setSVGAnimationsState(*this, SVGAnimationsState::Paused);
 
 #if PLATFORM(IOS)
         suspendDeviceMotionAndOrientationUpdates();
@@ -2115,7 +2183,7 @@ void Page::setResourceUsageOverlayVisible(bool visible)
         return;
     }
 
-    if (!m_resourceUsageOverlay)
+    if (!m_resourceUsageOverlay && m_settings->acceleratedCompositingEnabled())
         m_resourceUsageOverlay = std::make_unique<ResourceUsageOverlay>(*this);
 }
 #endif
@@ -2159,5 +2227,27 @@ void Page::accessibilitySettingsDidChange()
     if (neededRecalc)
         LOG(Layout, "hasMediaQueriesAffectedByAccessibilitySettingsChange, enqueueing style recalc");
 }
+
+#if ENABLE(DATA_INTERACTION)
+
+bool Page::hasSelectionAtPosition(const FloatPoint& position) const
+{
+    auto currentSelection = m_mainFrame->selection().selection();
+    if (!currentSelection.isRange())
+        return false;
+
+    if (auto selectedRange = currentSelection.toNormalizedRange()) {
+        Vector<SelectionRect> selectionRects;
+        selectedRange->collectSelectionRects(selectionRects);
+        for (auto selectionRect : selectionRects) {
+            if (FloatRect(selectionRect.rect()).contains(position))
+                return true;
+        }
+    }
+
+    return false;
+}
+
+#endif
 
 } // namespace WebCore

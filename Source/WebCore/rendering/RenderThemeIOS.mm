@@ -1273,16 +1273,27 @@ void RenderThemeIOS::updateCachedSystemFontDescription(CSSValueID valueID, FontC
 
     ASSERT(fontDescriptor);
     RetainPtr<CTFontRef> font = adoptCF(CTFontCreateWithFontDescriptor(fontDescriptor.get(), 0, nullptr));
-    font = preparePlatformFont(font.get(), fontDescription.textRenderingMode(), nullptr, nullptr, fontDescription.featureSettings(), fontDescription.variantSettings(), fontDescription.variationSettings());
     fontDescription.setIsAbsoluteSize(true);
     fontDescription.setOneFamily(textStyle);
     fontDescription.setSpecifiedSize(CTFontGetSize(font.get()));
-    fontDescription.setWeight(fontWeightFromCoreText(FontCache::weightOfCTFont(font.get())));
-    fontDescription.setItalic(FontItalicOff);
+    auto capabilities = capabilitiesForFontDescriptor(adoptCF(CTFontCopyFontDescriptor(font.get())).get());
+    fontDescription.setWeight(capabilities.weight.minimum);
+    fontDescription.setItalic(normalItalicValue());
 }
 
 #if ENABLE(VIDEO)
 String RenderThemeIOS::mediaControlsStyleSheet()
+{
+#if ENABLE(MEDIA_CONTROLS_SCRIPT)
+    if (m_legacyMediaControlsStyleSheet.isEmpty())
+        m_legacyMediaControlsStyleSheet = [NSString stringWithContentsOfFile:[[NSBundle bundleForClass:[WebCoreRenderThemeBundle class]] pathForResource:@"mediaControlsiOS" ofType:@"css"] encoding:NSUTF8StringEncoding error:nil];
+    return m_legacyMediaControlsStyleSheet;
+#else
+    return emptyString();
+#endif
+}
+
+String RenderThemeIOS::modernMediaControlsStyleSheet()
 {
 #if ENABLE(MEDIA_CONTROLS_SCRIPT)
     if (RuntimeEnabledFeatures::sharedFeatures().modernMediaControlsEnabled()) {
@@ -1290,10 +1301,7 @@ String RenderThemeIOS::mediaControlsStyleSheet()
             m_mediaControlsStyleSheet = [NSString stringWithContentsOfFile:[[NSBundle bundleForClass:[WebCoreRenderThemeBundle class]] pathForResource:@"modern-media-controls" ofType:@"css" inDirectory:@"modern-media-controls"] encoding:NSUTF8StringEncoding error:nil];
         return m_mediaControlsStyleSheet;
     }
-
-    if (m_legacyMediaControlsStyleSheet.isEmpty())
-        m_legacyMediaControlsStyleSheet = [NSString stringWithContentsOfFile:[[NSBundle bundleForClass:[WebCoreRenderThemeBundle class]] pathForResource:@"mediaControlsiOS" ofType:@"css"] encoding:NSUTF8StringEncoding error:nil];
-    return m_legacyMediaControlsStyleSheet;
+    return emptyString();
 #else
     return emptyString();
 #endif

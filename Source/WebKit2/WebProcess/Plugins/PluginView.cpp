@@ -72,6 +72,10 @@
 #include <bindings/ScriptValue.h>
 #include <wtf/text/StringBuilder.h>
 
+#if PLUGIN_ARCHITECTURE(X11)
+#include <WebCore/PlatformDisplay.h>
+#endif
+
 using namespace JSC;
 using namespace WebCore;
 
@@ -1128,7 +1132,7 @@ void PluginView::focusPluginElement()
     ASSERT(frame());
     
     if (Page* page = frame()->page())
-        page->focusController().setFocusedElement(m_pluginElement.get(), frame());
+        page->focusController().setFocusedElement(m_pluginElement.get(), *frame());
     else
         frame()->document()->setFocusedElement(m_pluginElement.get());
 }
@@ -1508,7 +1512,7 @@ void PluginView::setStatusbarText(const String& statusbarText)
     if (!page)
         return;
 
-    page->chrome().setStatusbarText(frame(), statusbarText);
+    page->chrome().setStatusbarText(*frame(), statusbarText);
 }
 
 bool PluginView::isAcceleratedCompositingEnabled()
@@ -1589,7 +1593,8 @@ void PluginView::setCookiesForURL(const String& urlString, const String& cookieS
 
 bool PluginView::getAuthenticationInfo(const ProtectionSpace& protectionSpace, String& username, String& password)
 {
-    Credential credential = CredentialStorage::defaultCredentialStorage().get(protectionSpace);
+    String partitionName = m_pluginElement->contentDocument()->topDocument().securityOrigin().domainForCachePartition();
+    Credential credential = CredentialStorage::defaultCredentialStorage().get(partitionName, protectionSpace);
     if (credential.isEmpty())
         credential = CredentialStorage::defaultCredentialStorage().getFromPersistentStorage(protectionSpace);
 
@@ -1676,7 +1681,8 @@ void PluginView::didFailLoad(WebFrame* webFrame, bool wasCancelled)
 uint64_t PluginView::createPluginContainer()
 {
     uint64_t windowID = 0;
-    m_webPage->sendSync(Messages::WebPageProxy::CreatePluginContainer(), Messages::WebPageProxy::CreatePluginContainer::Reply(windowID));
+    if (PlatformDisplay::sharedDisplay().type() == PlatformDisplay::Type::X11)
+        m_webPage->sendSync(Messages::WebPageProxy::CreatePluginContainer(), Messages::WebPageProxy::CreatePluginContainer::Reply(windowID));
     return windowID;
 }
 

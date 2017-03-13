@@ -28,6 +28,7 @@
 
 #include "LLIntCommon.h"
 #include "LLIntData.h"
+#include "SigillCrashAnalyzer.h"
 #include <algorithm>
 #include <limits>
 #include <math.h>
@@ -49,9 +50,6 @@
 #if OS(WINDOWS)
 #include "MacroAssemblerX86.h"
 #endif
-
-#define USE_OPTIONS_FILE 0
-#define OPTIONS_FILENAME "/tmp/jsc.options"
 
 namespace JSC {
 
@@ -103,9 +101,14 @@ static bool parse(const char* string, OptionRange& value)
 
 static bool parse(const char* string, const char*& value)
 {
-    if (!strlen(string))
-        string = nullptr;
-    value = string;
+    if (!strlen(string)) {
+        value = nullptr;
+        return true;
+    }
+
+    // FIXME <https://webkit.org/b/169057>: This could leak if this option is set more than once.
+    // Given that Options are typically used for testing, this isn't considered to be a problem.
+    value = WTF::fastStrDup(string);
     return true;
 }
 
@@ -142,6 +145,10 @@ bool Options::isAvailable(Options::ID id, Options::Availability availability)
 #endif
 #if !defined(NDEBUG)
     if (id == maxSingleAllocationSizeID)
+        return true;
+#endif
+#if OS(DARWIN)
+    if (id == useSigillCrashAnalyzerID)
         return true;
 #endif
     return false;
@@ -220,14 +227,14 @@ bool OptionRange::init(const char* rangeString)
         return true;
     }
     
-    m_rangeString = rangeString;
+    const char* p = rangeString;
 
-    if (*rangeString == '!') {
+    if (*p == '!') {
         invert = true;
-        rangeString++;
+        p++;
     }
 
-    int scanResult = sscanf(rangeString, " %u:%u", &m_lowLimit, &m_highLimit);
+    int scanResult = sscanf(p, " %u:%u", &m_lowLimit, &m_highLimit);
 
     if (!scanResult || scanResult == EOF) {
         m_state = InitError;
@@ -242,6 +249,9 @@ bool OptionRange::init(const char* rangeString)
         return false;
     }
 
+    // FIXME <https://webkit.org/b/169057>: This could leak if this particular option is set more than once.
+    // Given that these options are used for testing, this isn't considered to be problem.
+    m_rangeString = WTF::fastStrDup(rangeString);
     m_state = invert ? Inverted : Normal;
 
     return true;
@@ -311,8 +321,21 @@ static void overrideDefaults()
     if (WTF::numberOfProcessorCores() < 4) {
         Options::maximumMutatorUtilization() = 0.6;
         Options::concurrentGCMaxHeadroom() = 1.4;
-        Options::concurrentGCPeriodMS() = 10;
+        Options::minimumGCPauseMS() = 1;
+        Options::useStochasticMutatorScheduler() = false;
+        if (WTF::numberOfProcessorCores() <= 1)
+            Options::gcIncrementScale() = 1;
+        else
+            Options::gcIncrementScale() = 0;
     }
+
+#if PLATFORM(IOS)
+    Options::useSigillCrashAnalyzer() = true;
+#endif
+
+#if !ENABLE(SIGNAL_BASED_VM_TRAPS)
+    Options::usePollingTraps() = true;
+#endif
 }
 
 static void recomputeDependentOptions()
@@ -428,6 +451,14 @@ static void recomputeDependentOptions()
     else
         fastSetMaxSingleAllocationSize(std::numeric_limits<size_t>::max());
 #endif
+
+    if (Options::useZombieMode()) {
+        Options::sweepSynchronously() = true;
+        Options::scribbleFreeCells() = true;
+    }
+
+    if (Options::useSigillCrashAnalyzer())
+        enableSigillCrashAnalyzer();
 }
 
 void Options::initialize()
@@ -478,31 +509,6 @@ void Options::initialize()
                 ; // Deconfuse editors that do auto indentation
 #endif
     
-#if USE(OPTIONS_FILE)
-            {
-                const char* filename = OPTIONS_FILENAME;
-                FILE* optionsFile = fopen(filename, "r");
-                if (!optionsFile) {
-                    dataLogF("Failed to open file %s. Did you add the file-read-data entitlement to WebProcess.sb?\n", filename);
-                    return;
-                }
-                
-                StringBuilder builder;
-                char* line;
-                char buffer[BUFSIZ];
-                while ((line = fgets(buffer, sizeof(buffer), optionsFile)))
-                    builder.append(buffer);
-                
-                const char* optionsStr = builder.toString().utf8().data();
-                dataLogF("Setting options: %s\n", optionsStr);
-                setOptions(optionsStr);
-                
-                int result = fclose(optionsFile);
-                if (result)
-                    dataLogF("Failed to close file %s: %s\n", filename, strerror(errno));
-            }
-#endif
-
             recomputeDependentOptions();
 
             // Do range checks where needed and make corrections to the options:
@@ -563,6 +569,7 @@ bool Options::setOptions(const char* optionsStr)
         p = strstr(p, "=");
         if (!p) {
             dataLogF("'=' not found in option string: %p\n", optionStart);
+            WTF::fastFree(optionsStrCopy);
             return false;
         }
         p++;
@@ -574,6 +581,7 @@ bool Options::setOptions(const char* optionsStr)
             p = strstr(p + 1, "\"");
             if (!p) {
                 dataLogF("Missing trailing '\"' in option string: %p\n", optionStart);
+                WTF::fastFree(optionsStrCopy);
                 return false; // End of string not found.
             }
             hasStringValue = true;
@@ -610,7 +618,14 @@ bool Options::setOptions(const char* optionsStr)
         }
     }
 
+    recomputeDependentOptions();
+
     dumpOptionsIfNeeded();
+
+    ensureOptionsAreCoherent();
+
+    WTF::fastFree(optionsStrCopy);
+
     return success;
 }
 

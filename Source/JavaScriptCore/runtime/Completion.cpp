@@ -96,18 +96,10 @@ JSValue evaluate(ExecState* exec, const SourceCode& source, JSValue thisValue, N
 
     CodeProfiling profile(source);
 
-    ProgramExecutable* program = ProgramExecutable::create(exec, source);
-    ASSERT(scope.exception() || program);
-    if (!program) {
-        returnedException = scope.exception();
-        scope.clearException();
-        return jsUndefined();
-    }
-
     if (!thisValue || thisValue.isUndefinedOrNull())
         thisValue = exec->vmEntryGlobalObject();
     JSObject* thisObj = jsCast<JSObject*>(thisValue.toThis(exec, NotStrictMode));
-    JSValue result = exec->interpreter()->execute(program, exec, thisObj);
+    JSValue result = exec->interpreter()->executeProgram(source, exec, thisObj);
 
     if (scope.exception()) {
         returnedException = scope.exception();
@@ -246,6 +238,15 @@ JSValue linkAndEvaluateModule(ExecState* exec, const Identifier& moduleKey, JSVa
 
     JSGlobalObject* globalObject = exec->vmEntryGlobalObject();
     return globalObject->moduleLoader()->linkAndEvaluateModule(exec, identifierToJSValue(exec->vm(), moduleKey), scriptFetcher);
+}
+
+JSInternalPromise* importModule(ExecState* exec, const Identifier& moduleKey, JSValue scriptFetcher)
+{
+    JSLockHolder lock(exec);
+    RELEASE_ASSERT(exec->vm().atomicStringTable() == wtfThreadData().atomicStringTable());
+    RELEASE_ASSERT(!exec->vm().isCollectorBusyOnCurrentThread());
+
+    return exec->vmEntryGlobalObject()->moduleLoader()->requestImportModule(exec, moduleKey, scriptFetcher);
 }
 
 } // namespace JSC

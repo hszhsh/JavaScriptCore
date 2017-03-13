@@ -816,9 +816,7 @@ TEST_F(AudioDeviceTest, SetSpeakerVolumeActuallySetsVolume) {
 
 // Tests that playout can be initiated, started and stopped. No audio callback
 // is registered in this test.
-// Flaky on our trybots makes this test unusable.
-// https://code.google.com/p/webrtc/issues/detail?id=5046
-TEST_F(AudioDeviceTest, DISABLED_StartStopPlayout) {
+TEST_F(AudioDeviceTest, StartStopPlayout) {
   StartPlayout();
   StopPlayout();
   StartPlayout();
@@ -984,8 +982,8 @@ TEST_F(AudioDeviceTest, RunPlayoutAndRecordingInFullDuplex) {
   // These thresholds are set rather high to accomodate differences in hardware
   // in several devices, so this test can be used in swarming.
   // See http://bugs.webrtc.org/6464
-  EXPECT_LE(fifo_audio_stream->average_size(), 30u);
-  EXPECT_LE(fifo_audio_stream->largest_size(), 40u);
+  EXPECT_LE(fifo_audio_stream->average_size(), 60u);
+  EXPECT_LE(fifo_audio_stream->largest_size(), 70u);
 }
 
 // Measures loopback latency and reports the min, max and average values for

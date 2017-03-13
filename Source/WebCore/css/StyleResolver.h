@@ -150,7 +150,7 @@ public:
     const Element* element() { return m_state.element(); }
     Document& document() { return m_document; }
     const Document& document() const { return m_document; }
-    Settings* documentSettings() { return m_document.settings(); }
+    const Settings& settings() const { return m_document.settings(); }
 
     void appendAuthorStyleSheets(const Vector<RefPtr<CSSStyleSheet>>&);
 
@@ -184,7 +184,7 @@ public:
     void applyPropertyToCurrentStyle(CSSPropertyID, CSSValue*);
 
     void updateFont();
-    void initializeFontStyle(Settings*);
+    void initializeFontStyle();
 
     void setFontSize(FontCascadeDescription&, float size);
 
@@ -308,6 +308,10 @@ public:
         WritingMode m_writingMode;
     };
 
+    // FIXME: Should make a StyleAdjuster class (like Blink has) that handles all RenderStyle
+    // adjustments. For now put this function on StyleResolver, since adjustRenderStyle is here.
+    static void adjustStyleForAlignment(RenderStyle&, const RenderStyle& parentStyle);
+    
 private:
     // This function fixes up the default font size if it detects that the current generic font family has changed. -dwh
     void checkForGenericFamilyChange(RenderStyle*, const RenderStyle* parentStyle);
@@ -317,9 +321,7 @@ private:
 #endif
 
     void adjustRenderStyle(RenderStyle&, const RenderStyle& parentStyle, const RenderStyle* parentBoxStyle, const Element*);
-#if ENABLE(CSS_GRID_LAYOUT)
     std::unique_ptr<GridPosition> adjustNamedGridItemPosition(const NamedGridAreaMap&, const NamedGridLinesMap&, const GridPosition&, GridPositionSide) const;
-#endif
     
     void adjustStyleForInterCharacterRuby();
     

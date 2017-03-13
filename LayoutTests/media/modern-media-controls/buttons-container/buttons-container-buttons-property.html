@@ -1,5 +1,6 @@
 <script src="../../../resources/js-test-pre.js"></script>
 <script src="../resources/media-controls-loader.js" type="text/javascript"></script>
+<script src="../resources/media-controls-utils.js" type="text/javascript"></script>
 <body>
 <script type="text/javascript">
 
@@ -8,8 +9,9 @@ description("Testing <code>ButtonsContainer</code> buttons property.");
 window.jsTestIsAsync = true;
 
 const container = new ButtonsContainer({
-    margin: 10,
-    padding: 20
+    leftMargin: 20,
+    rightMargin: 20,
+    buttonMargin: 10
 });
 
 container.buttons = [new Button, new Button, new Button];
@@ -19,7 +21,7 @@ scheduler.frameDidFire = function()
     shouldBe("container.buttons.length", "3");
     shouldBe("container.children.length", "3");
     shouldBe("container.buttons", "container.children");
-    finishJSTest();
+    finishMediaControlsTest();
 };
 
 </script>

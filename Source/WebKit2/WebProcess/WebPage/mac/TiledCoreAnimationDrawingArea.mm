@@ -202,11 +202,8 @@ void TiledCoreAnimationDrawingArea::updatePreferences(const WebPreferencesStore&
 #endif
 
     // Fixed position elements need to be composited and create stacking contexts
-    // in order to be scrolled by the ScrollingCoordinator. We also want to keep
-    // Settings:setFixedPositionCreatesStackingContext() enabled for iOS. See
-    // <rdar://problem/9813262> for more details.
+    // in order to be scrolled by the ScrollingCoordinator.
     settings.setAcceleratedCompositingForFixedPositionEnabled(true);
-    settings.setFixedPositionCreatesStackingContext(true);
 
     if (MainFrame* mainFrame = m_webPage.mainFrame())
         DebugPageOverlays::settingsChanged(*mainFrame);
@@ -226,6 +223,9 @@ void TiledCoreAnimationDrawingArea::updateRootLayers()
     }
 
     [m_hostingLayer setSublayers:m_viewOverlayRootLayer ? @[ m_rootLayer.get(), m_viewOverlayRootLayer->platformLayer() ] : @[ m_rootLayer.get() ]];
+    
+    if (m_debugInfoLayer)
+        [m_hostingLayer addSublayer:m_debugInfoLayer.get()];
 }
 
 void TiledCoreAnimationDrawingArea::attachViewOverlayGraphicsLayer(Frame* frame, GraphicsLayer* viewOverlayRootLayer)
@@ -648,9 +648,9 @@ void TiledCoreAnimationDrawingArea::setRootCompositingLayer(CALayer *layer)
     updateRootLayers();
 
     if (hadRootLayer != !!layer)
-        m_layerHostingContext->setRootLayer(layer ? m_hostingLayer.get() : 0);
+        m_layerHostingContext->setRootLayer(layer ? m_hostingLayer.get() : nil);
 
-    updateDebugInfoLayer(m_webPage.corePage()->settings().showTiledScrollingIndicator());
+    updateDebugInfoLayer(layer && m_webPage.corePage()->settings().showTiledScrollingIndicator());
 
     [CATransaction commit];
 }
@@ -663,6 +663,11 @@ TiledBacking* TiledCoreAnimationDrawingArea::mainFrameTiledBacking() const
 
 void TiledCoreAnimationDrawingArea::updateDebugInfoLayer(bool showLayer)
 {
+    if (m_debugInfoLayer) {
+        [m_debugInfoLayer removeFromSuperlayer];
+        m_debugInfoLayer = nil;
+    }
+    
     if (showLayer) {
         if (TiledBacking* tiledBacking = mainFrameTiledBacking()) {
             if (PlatformCALayer* indicatorLayer = tiledBacking->tiledScrollingIndicatorLayer())
@@ -670,14 +675,9 @@ void TiledCoreAnimationDrawingArea::updateDebugInfoLayer(bool showLayer)
         }
 
         if (m_debugInfoLayer) {
-#ifndef NDEBUG
             [m_debugInfoLayer setName:@"Debug Info"];
-#endif
             [m_hostingLayer addSublayer:m_debugInfoLayer.get()];
         }
-    } else if (m_debugInfoLayer) {
-        [m_debugInfoLayer removeFromSuperlayer];
-        m_debugInfoLayer = nullptr;
     }
 }
 

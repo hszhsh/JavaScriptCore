@@ -11,13 +11,15 @@
 #ifndef WEBRTC_BASE_NETWORK_H_
 #define WEBRTC_BASE_NETWORK_H_
 
+#include <stdint.h>
+
 #include <deque>
 #include <map>
 #include <memory>
 #include <string>
 #include <vector>
 
-#include "webrtc/base/basictypes.h"
+#include "webrtc/base/export.h"
 #include "webrtc/base/ipaddress.h"
 #include "webrtc/base/networkmonitor.h"
 #include "webrtc/base/messagehandler.h"
@@ -135,13 +137,14 @@ class NetworkManager : public DefaultLocalAddressProvider {
 };
 
 // Base class for NetworkManager implementations.
-class NetworkManagerBase : public NetworkManager {
+class WEBRTC_DYLIB_EXPORT NetworkManagerBase : public NetworkManager {
  public:
   NetworkManagerBase();
   ~NetworkManagerBase() override;
 
   void GetNetworks(NetworkList* networks) const override;
   void GetAnyAddressNetworks(NetworkList* networks) override;
+  // Defaults to true.
   bool ipv6_enabled() const { return ipv6_enabled_; }
   void set_ipv6_enabled(bool enabled) { ipv6_enabled_ = enabled; }
 
@@ -204,7 +207,7 @@ class BasicNetworkManager : public NetworkManagerBase,
                             public MessageHandler,
                             public sigslot::has_slots<> {
  public:
-  BasicNetworkManager();
+  WEBRTC_DYLIB_EXPORT BasicNetworkManager();
   ~BasicNetworkManager() override;
 
   void StartUpdating() override;
@@ -276,7 +279,7 @@ class BasicNetworkManager : public NetworkManagerBase,
 };
 
 // Represents a Unix-type network interface, with a name and single address.
-class Network {
+class WEBRTC_DYLIB_EXPORT Network {
  public:
   Network(const std::string& name,
           const std::string& description,

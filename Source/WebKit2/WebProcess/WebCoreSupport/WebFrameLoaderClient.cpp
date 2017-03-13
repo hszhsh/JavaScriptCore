@@ -640,13 +640,13 @@ Frame* WebFrameLoaderClient::dispatchCreatePage(const NavigationAction& navigati
 {
     WebPage* webPage = m_frame->page();
     if (!webPage)
-        return 0;
+        return nullptr;
 
     // Just call through to the chrome client.
     FrameLoadRequest request(m_frame->coreFrame()->document()->securityOrigin(), navigationAction.resourceRequest(), LockHistory::No, LockBackForwardList::No, MaybeSendReferrer, AllowNavigationToInvalidURL::Yes, NewFrameOpenerPolicy::Allow, navigationAction.shouldOpenExternalURLsPolicy());
-    Page* newPage = webPage->corePage()->chrome().createWindow(m_frame->coreFrame(), request, WindowFeatures(), navigationAction);
+    Page* newPage = webPage->corePage()->chrome().createWindow(*m_frame->coreFrame(), request, WindowFeatures(), navigationAction);
     if (!newPage)
-        return 0;
+        return nullptr;
     
     return &newPage->mainFrame();
 }
@@ -816,6 +816,23 @@ void WebFrameLoaderClient::dispatchDecidePolicyForNavigationAction(const Navigat
     // Only setUserContentExtensionsEnabled if it hasn't already been disabled by reloading without content blockers.
     if (documentLoader->userContentExtensionsEnabled())
         documentLoader->setUserContentExtensionsEnabled(websitePolicies.contentBlockersEnabled);
+
+    documentLoader->setAllowsAutoplayQuirks(websitePolicies.allowsAutoplayQuirks);
+
+    switch (websitePolicies.autoplayPolicy) {
+    case WebsiteAutoplayPolicy::Default:
+        documentLoader->setAutoplayPolicy(AutoplayPolicy::Default);
+        break;
+    case WebsiteAutoplayPolicy::Allow:
+        documentLoader->setAutoplayPolicy(AutoplayPolicy::Allow);
+        break;
+    case WebsiteAutoplayPolicy::AllowWithoutSound:
+        documentLoader->setAutoplayPolicy(AutoplayPolicy::AllowWithoutSound);
+        break;
+    case WebsiteAutoplayPolicy::Deny:
+        documentLoader->setAutoplayPolicy(AutoplayPolicy::Deny);
+        break;
+    }
 
     // We call this synchronously because WebCore cannot gracefully handle a frame load without a synchronous navigation policy reply.
     if (receivedPolicyAction)
@@ -1195,7 +1212,7 @@ void WebFrameLoaderClient::frameLoadCompleted()
 
 void WebFrameLoaderClient::saveViewStateToItem(HistoryItem& historyItem)
 {
-#if PLATFORM(IOS) || PLATFORM(EFL)
+#if PLATFORM(IOS)
     if (m_frame->isMainFrame())
         m_frame->page()->savePageState(historyItem);
 #else
@@ -1205,14 +1222,16 @@ void WebFrameLoaderClient::saveViewStateToItem(HistoryItem& historyItem)
 
 void WebFrameLoaderClient::restoreViewState()
 {
-#if PLATFORM(IOS) || PLATFORM(EFL)
+#if PLATFORM(IOS)
     Frame& frame = *m_frame->coreFrame();
     HistoryItem* currentItem = frame.loader().history().currentItem();
     if (FrameView* view = frame.view()) {
         if (m_frame->isMainFrame())
             m_frame->page()->restorePageState(*currentItem);
-        else if (!view->wasScrolledByUser())
+        else if (!view->wasScrolledByUser()) {
+            WTFLogAlways("WebFrameLoaderClient::restoreViewState restoring scroll position %d,%d", currentItem->scrollPosition().x(), currentItem->scrollPosition().y());
             view->setScrollPosition(currentItem->scrollPosition());
+        }
     }
 #else
     // Inform the UI process of the scale factor.
@@ -1280,6 +1299,15 @@ String WebFrameLoaderClient::userAgent(const URL& url)
         return String();
 
     return webPage->userAgent(m_frame, url);
+}
+
+String WebFrameLoaderClient::overrideContentSecurityPolicy() const
+{
+    WebPage* webPage = m_frame->page();
+    if (!webPage)
+        return String();
+
+    return webPage->overrideContentSecurityPolicy();
 }
 
 void WebFrameLoaderClient::savePlatformDataToCachedFrame(CachedFrame* cachedFrame)
@@ -1465,10 +1493,9 @@ void WebFrameLoaderClient::recreatePlugin(Widget* widget)
 #endif
 }
 
-void WebFrameLoaderClient::redirectDataToPlugin(Widget* pluginWidget)
+void WebFrameLoaderClient::redirectDataToPlugin(Widget& pluginWidget)
 {
-    if (pluginWidget)
-        m_pluginView = static_cast<PluginView*>(pluginWidget);
+    m_pluginView = static_cast<PluginView*>(&pluginWidget);
 }
 
 #if ENABLE(WEBGL)
@@ -1590,7 +1617,7 @@ void WebFrameLoaderClient::dispatchDidClearWindowObjectInWorld(DOMWrapperWorld& 
     if (automationSessionProxy && world.isNormal())
         automationSessionProxy->didClearWindowObjectForFrame(*m_frame);
 
-#if HAVE(ACCESSIBILITY) && (PLATFORM(GTK) || PLATFORM(EFL))
+#if HAVE(ACCESSIBILITY) && PLATFORM(GTK)
     // Ensure the accessibility hierarchy is updated.
     webPage->updateAccessibilityTree();
 #endif

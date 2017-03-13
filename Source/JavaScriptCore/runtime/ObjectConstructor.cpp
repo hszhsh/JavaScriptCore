@@ -95,7 +95,7 @@ ObjectConstructor::ObjectConstructor(VM& vm, Structure* structure)
 
 void ObjectConstructor::finishCreation(VM& vm, JSGlobalObject* globalObject, ObjectPrototype* objectPrototype)
 {
-    Base::finishCreation(vm, objectPrototype->classInfo()->className);
+    Base::finishCreation(vm, objectPrototype->classInfo(vm)->className);
     // ECMA 15.2.3.1
     putDirectWithoutTransition(vm, vm.propertyNames->prototype, objectPrototype, DontEnum | DontDelete | ReadOnly);
     // no. of arguments for constructor
@@ -105,6 +105,7 @@ void ObjectConstructor::finishCreation(VM& vm, JSGlobalObject* globalObject, Obj
     JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION(vm.propertyNames->builtinNames().definePropertyPrivateName(), objectConstructorDefineProperty, DontEnum, 3);
     JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION(vm.propertyNames->builtinNames().getPrototypeOfPrivateName(), objectConstructorGetPrototypeOf, DontEnum, 1);
     JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION(vm.propertyNames->builtinNames().getOwnPropertyNamesPrivateName(), objectConstructorGetOwnPropertyNames, DontEnum, 1);
+    JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION(vm.propertyNames->builtinNames().getOwnPropertyDescriptorPrivateName(), objectConstructorGetOwnPropertyDescriptor, DontEnum, 1);
 }
 
 // ES 19.1.1.1 Object([value])
@@ -631,7 +632,7 @@ EncodedJSValue JSC_HOST_CALL objectConstructorIsSealed(ExecState* exec)
     // 2. For each named own property name P of O,
     PropertyNameArray properties(exec, PropertyNameMode::StringsAndSymbols);
     object->methodTable(vm)->getOwnPropertyNames(object, exec, properties, EnumerationMode(DontEnumPropertiesMode::Include));
-    RETURN_IF_EXCEPTION(scope, encodedJSValue());
+    RETURN_IF_EXCEPTION(scope, { });
     PropertyNameArray::const_iterator end = properties.end();
     for (PropertyNameArray::const_iterator iter = properties.begin(); iter != end; ++iter) {
         Identifier propertyName = *iter;
@@ -639,7 +640,9 @@ EncodedJSValue JSC_HOST_CALL objectConstructorIsSealed(ExecState* exec)
             continue;
         // a. Let desc be the result of calling the [[GetOwnProperty]] internal method of O with P.
         PropertyDescriptor desc;
-        if (!object->getOwnPropertyDescriptor(exec, propertyName, desc))
+        bool didGetDescriptor = object->getOwnPropertyDescriptor(exec, propertyName, desc);
+        RETURN_IF_EXCEPTION(scope, { });
+        if (!didGetDescriptor)
             continue;
         // b. If desc.[[Configurable]] is true, then return false.
         if (desc.configurable())
@@ -649,7 +652,7 @@ EncodedJSValue JSC_HOST_CALL objectConstructorIsSealed(ExecState* exec)
     // 3. If the [[Extensible]] internal property of O is false, then return true.
     // 4. Otherwise, return false.
     bool isExtensible = object->isExtensible(exec);
-    RETURN_IF_EXCEPTION(scope, encodedJSValue());
+    RETURN_IF_EXCEPTION(scope, { });
     return JSValue::encode(jsBoolean(!isExtensible));
 }
 
@@ -670,7 +673,7 @@ EncodedJSValue JSC_HOST_CALL objectConstructorIsFrozen(ExecState* exec)
     // 2. For each named own property name P of O,
     PropertyNameArray properties(exec, PropertyNameMode::StringsAndSymbols);
     object->methodTable(vm)->getOwnPropertyNames(object, exec, properties, EnumerationMode(DontEnumPropertiesMode::Include));
-    RETURN_IF_EXCEPTION(scope, encodedJSValue());
+    RETURN_IF_EXCEPTION(scope, { });
     PropertyNameArray::const_iterator end = properties.end();
     for (PropertyNameArray::const_iterator iter = properties.begin(); iter != end; ++iter) {
         Identifier propertyName = *iter;
@@ -678,7 +681,9 @@ EncodedJSValue JSC_HOST_CALL objectConstructorIsFrozen(ExecState* exec)
             continue;
         // a. Let desc be the result of calling the [[GetOwnProperty]] internal method of O with P.
         PropertyDescriptor desc;
-        if (!object->getOwnPropertyDescriptor(exec, propertyName, desc))
+        bool didGetDescriptor = object->getOwnPropertyDescriptor(exec, propertyName, desc);
+        RETURN_IF_EXCEPTION(scope, { });
+        if (!didGetDescriptor)
             continue;
         // b. If IsDataDescriptor(desc) is true then
         // i. If desc.[[Writable]] is true, return false. c. If desc.[[Configurable]] is true, then return false.
@@ -689,7 +694,7 @@ EncodedJSValue JSC_HOST_CALL objectConstructorIsFrozen(ExecState* exec)
     // 3. If the [[Extensible]] internal property of O is false, then return true.
     // 4. Otherwise, return false.
     bool isExtensible = object->isExtensible(exec);
-    RETURN_IF_EXCEPTION(scope, encodedJSValue());
+    RETURN_IF_EXCEPTION(scope, { });
     return JSValue::encode(jsBoolean(!isExtensible));
 }
 

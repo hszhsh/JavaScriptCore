@@ -370,10 +370,12 @@ static BOOL areEssentiallyEqual(double a, double b)
     preferences._tiledScrollingIndicatorVisible = settings.tiledScrollingIndicatorVisible;
     preferences._compositingBordersVisible = settings.layerBordersVisible;
     preferences._compositingRepaintCountersVisible = settings.layerBordersVisible;
+    preferences._simpleLineLayoutEnabled = settings.simpleLineLayoutEnabled;
     preferences._simpleLineLayoutDebugBordersEnabled = settings.simpleLineLayoutDebugBordersEnabled;
     preferences._acceleratedDrawingEnabled = settings.acceleratedDrawingEnabled;
     preferences._resourceUsageOverlayVisible = settings.resourceUsageOverlayVisible;
     preferences._displayListDrawingEnabled = settings.displayListDrawingEnabled;
+    preferences._subpixelAntialiasedLayerTextEnabled = settings.subpixelAntialiasedLayerTextEnabled;
     preferences._visualViewportEnabled = settings.visualViewportEnabled;
     preferences._largeImageAsyncDecodingEnabled = settings.largeImageAsyncDecodingEnabled;
     preferences._animatedImageAsyncDecodingEnabled = settings.animatedImageAsyncDecodingEnabled;

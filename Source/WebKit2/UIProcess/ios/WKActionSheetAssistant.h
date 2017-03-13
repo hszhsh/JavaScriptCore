@@ -58,11 +58,13 @@ struct InteractionInformationAtPosition;
 - (void)actionSheetAssistantDidStopInteraction:(WKActionSheetAssistant *)assistant;
 - (NSDictionary *)dataDetectionContextForActionSheetAssistant:(WKActionSheetAssistant *)assistant;
 - (NSString *)selectedTextForActionSheetAssistant:(WKActionSheetAssistant *)assistant;
+- (void)actionSheetAssistant:(WKActionSheetAssistant *)assistant getAlternateURLForImage:(UIImage *)image completion:(void (^)(NSURL *alternateURL, NSDictionary *userInfo))completion;
 
 @end
 
 @interface WKActionSheetAssistant : NSObject <WKActionSheetDelegate, DDDetectionControllerInteractionDelegate>
 @property (nonatomic, weak) id <WKActionSheetAssistantDelegate> delegate;
+@property (nonatomic) BOOL needsLinkIndicator;
 - (id)initWithView:(UIView *)view;
 - (void)showLinkSheet;
 - (void)showImageSheet;

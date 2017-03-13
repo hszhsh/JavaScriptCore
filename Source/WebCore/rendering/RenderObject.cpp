@@ -28,8 +28,8 @@
 #include "RenderObject.h"
 
 #include "AXObjectCache.h"
-#include "AnimationController.h"
-#include "EventHandler.h"
+#include "CSSAnimationController.h"
+#include "Editing.h"
 #include "FloatQuad.h"
 #include "FlowThreadController.h"
 #include "FrameSelection.h"
@@ -70,7 +70,6 @@
 #include "SVGRenderSupport.h"
 #include "StyleResolver.h"
 #include "TransformState.h"
-#include "htmlediting.h"
 #include <algorithm>
 #include <stdio.h>
 #include <wtf/RefCountedLeakCounter.h>
@@ -157,6 +156,12 @@ bool RenderObject::isDescendantOf(const RenderObject* ancestor) const
 bool RenderObject::isLegend() const
 {
     return node() && node()->hasTagName(legendTag);
+}
+
+    
+bool RenderObject::isFieldset() const
+{
+    return node() && node()->hasTagName(fieldsetTag);
 }
 
 bool RenderObject::isHTMLMarquee() const
@@ -1548,6 +1553,12 @@ void RenderObject::destroy()
         return;
     }
     delete this;
+}
+
+Position RenderObject::positionForPoint(const LayoutPoint& point)
+{
+    // FIXME: This should just create a Position object instead (webkit.org/b/168566). 
+    return positionForPoint(point, nullptr).deepEquivalent();
 }
 
 VisiblePosition RenderObject::positionForPoint(const LayoutPoint&, const RenderRegion*)

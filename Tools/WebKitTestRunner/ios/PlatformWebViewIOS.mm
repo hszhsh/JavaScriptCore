@@ -166,6 +166,16 @@ void PlatformWebView::setWindowIsKey(bool isKey)
         [m_window makeKeyWindow];
 }
 
+void PlatformWebView::addToWindow()
+{
+    [m_window.rootViewController.view addSubview:m_view];
+}
+
+void PlatformWebView::removeFromWindow()
+{
+    [m_view removeFromSuperview];
+}
+
 void PlatformWebView::resizeTo(unsigned width, unsigned height, WebViewSizingMode viewSizingMode)
 {
     WKRect frame = windowFrame();
@@ -288,7 +298,8 @@ bool PlatformWebView::viewSupportsOptions(const TestOptions& options) const
         || m_options.useCharacterSelectionGranularity != options.useCharacterSelectionGranularity
         || m_options.enableIntersectionObserver != options.enableIntersectionObserver
         || m_options.enableModernMediaControls != options.enableModernMediaControls
-        || m_options.enablePointerLock != options.enablePointerLock)
+        || m_options.enablePointerLock != options.enablePointerLock
+        || m_options.enableCredentialManagement != options.enableCredentialManagement)
         return false;
 
     return true;

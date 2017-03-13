@@ -32,31 +32,25 @@
 
 #if ENABLE(MEDIA_STREAM)
 
-#include "AudioCaptureSourceProviderObjC.h"
 #include "FontCascade.h"
 #include "MockRealtimeAudioSource.h"
 #include <CoreAudio/CoreAudioTypes.h>
+#include <wtf/Vector.h>
 
 OBJC_CLASS AVAudioPCMBuffer;
-typedef struct AudioBufferList AudioBufferList;
 typedef struct OpaqueCMClock* CMClockRef;
 typedef const struct opaqueCMFormatDescription* CMFormatDescriptionRef;
 
 namespace WebCore {
 
+class WebAudioBufferList;
 class WebAudioSourceProviderAVFObjC;
 
-class MockRealtimeAudioSourceMac final : public MockRealtimeAudioSource, public AudioCaptureSourceProviderObjC {
-public:
-
-    // AudioCaptureSourceProviderObjC
-    void addObserver(AudioSourceObserverObjC&) final;
-    void removeObserver(AudioSourceObserverObjC&) final;
-    void start() final;
-
+class MockRealtimeAudioSourceMac final : public MockRealtimeAudioSource {
 private:
     friend class MockRealtimeAudioSource;
     MockRealtimeAudioSourceMac(const String&);
+    ~MockRealtimeAudioSourceMac();
 
     bool applySampleRate(int) final;
     bool applySampleSize(int) final { return false; }
@@ -68,16 +62,18 @@ private:
     AudioSourceProvider* audioSourceProvider() final;
 
     size_t m_audioBufferListBufferSize { 0 };
-    std::unique_ptr<AudioBufferList> m_audioBufferList;
+    std::unique_ptr<WebAudioBufferList> m_audioBufferList;
 
     uint32_t m_maximiumFrameCount;
-    uint32_t m_sampleRate { 44100 };
-    double m_bytesPerFrame { sizeof(Float32) };
+    uint32_t m_sampleRate { 0 };
+    uint64_t m_samplesEmitted { 0 };
+    uint64_t m_samplesRendered { 0 };
 
     RetainPtr<CMFormatDescriptionRef> m_formatDescription;
     AudioStreamBasicDescription m_streamFormat;
     RefPtr<WebAudioSourceProviderAVFObjC> m_audioSourceProvider;
-    Vector<AudioSourceObserverObjC*> m_observers;
+
+    Vector<float> m_bipBopBuffer;
 };
 
 } // namespace WebCore

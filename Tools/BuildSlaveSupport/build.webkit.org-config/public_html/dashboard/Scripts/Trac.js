@@ -30,9 +30,14 @@ Trac = function(baseURL, options)
     console.assert(baseURL);
 
     this.baseURL = baseURL;
-    this._needsAuthentication = (typeof options === "object") && options[Trac.NeedsAuthentication] === true;
+    if (typeof options === "object") {
+        this._needsAuthentication = options[Trac.NeedsAuthentication] === true;
+        // We expect the projectIdentifier option iff the target Trac instance is hosting multiple repositories && Trac version > 1.0
+        this._projectName = options[Trac.ProjectIdentifier];
+    }
 
     this.recordedCommits = []; // Will be sorted in ascending order.
+    this.recordedCommitIndicesByRevisionNumber = {};
 };
 
 BaseObject.addConstructorFunctions(Trac);
@@ -40,6 +45,7 @@ BaseObject.addConstructorFunctions(Trac);
 Trac.NO_MORE_REVISIONS = null;
 
 Trac.NeedsAuthentication = "needsAuthentication";
+Trac.ProjectIdentifier = "projectIdentifier";
 Trac.UpdateInterval = 45000; // 45 seconds
 
 Trac.Event = {
@@ -103,7 +109,10 @@ Trac.prototype = {
 
     revisionURL: function(revision)
     {
-        return this.baseURL + "changeset/" + encodeURIComponent(revision);
+        var url = this.baseURL + "changeset/" + encodeURIComponent(revision);
+        if (this._projectName)
+            url += '/' + encodeURIComponent(this._projectName);
+        return url;
     },
 
     _xmlTimelineURL: function(fromDate, toDate)
@@ -112,10 +121,14 @@ Trac.prototype = {
 
         var fromDay = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate());
         var toDay = new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate());
+        var changesetParameter = this._projectName ? "repo-" + this._projectName : "changeset";
 
-        return this.baseURL + "timeline?changeset=on&format=rss&max=0" +
-            "&from=" +  toDay.toISOString().slice(0, 10) +
-            "&daysback=" + ((toDay - fromDay) / 1000 / 60 / 60 / 24);
+        return this.baseURL + "timeline?" +
+            changesetParameter + "=on" +
+            "&format=rss" +
+            "&max=0" +
+            "&from=" + encodeURIComponent(toDay.toISOString().slice(0, 10)) +
+            "&daysback=" + encodeURIComponent((toDay - fromDay) / 1000 / 60 / 60 / 24);
     },
 
     _parseRevisionFromURL: function(url)
@@ -150,7 +163,7 @@ Trac.prototype = {
         var location = "";
         if (parsedDescription.firstChild && parsedDescription.firstChild.className === "changes") {
             // We can extract branch information when trac.ini contains "changeset_show_files=location".
-            location = doc.evaluate("//strong", parsedDescription.firstChild, null, XPathResult.STRING_TYPE).stringValue
+            location = doc.evaluate("//strong", parsedDescription.firstChild, null, XPathResult.STRING_TYPE).stringValue;
             parsedDescription.removeChild(parsedDescription.firstChild);
         }
 
@@ -211,11 +224,6 @@ Trac.prototype = {
         if (!dataDocument)
             return;
 
-        var recordedRevisionNumbers = this.recordedCommits.reduce(function(previousResult, commit) {
-            previousResult[commit.revisionNumber] = commit;
-            return previousResult;
-        }, {});
-
         var knownCommitsWereUpdated = false;
         var newCommits = [];
 
@@ -223,19 +231,25 @@ Trac.prototype = {
         var commitInfoElement;
         while (commitInfoElement = commitInfoElements.iterateNext()) {
             var commit = this._convertCommitInfoElementToObject(dataDocument, commitInfoElement);
-            if (commit.revisionNumber in recordedRevisionNumbers) {
+            var knownCommitIndex = this.recordedCommitIndicesByRevisionNumber[commit.revisionNumber];
+            if (knownCommitIndex >= 0) {
                 // Author could have changed, as commit queue replaces it after the fact.
-                console.assert(recordedRevisionNumbers[commit.revisionNumber].revisionNumber === commit.revisionNumber);
-                if (recordedRevisionNumbers[commit.revisionNumber].author != commit.author) {
-                    recordedRevisionNumbers[commit.revisionNumber].author = commit.author;
+                console.assert(this.recordedCommits[knownCommitIndex].revisionNumber === commit.revisionNumber);
+                if (this.recordedCommits[knownCommitIndex].author != commit.author) {
+                    this.recordedCommits[knownCommitIndex].author = commit.author;
                     knownCommitWasUpdated = true;
                 }
             } else
                 newCommits.push(commit);
         }
 
-        if (newCommits.length)
+        if (newCommits.length) {
             this.recordedCommits = newCommits.concat(this.recordedCommits).sort(function(a, b) { return a.date - b.date; });
+            this.recordedCommitIndicesByRevisionNumber = {};
+            this.recordedCommits.forEach(function(curentValue, index) {
+                this.recordedCommitIndicesByRevisionNumber[curentValue.revisionNumber] = index;
+            }, this);
+        }
 
         if (newCommits.length || knownCommitsWereUpdated)
             this.dispatchEventToListeners(Trac.Event.CommitsUpdated, null);
@@ -306,13 +320,12 @@ Trac.prototype = {
         return Trac.NO_MORE_REVISIONS;
     },
 
-    indexOfRevision: function(revision)
+    indexOfRevision: function(revisionNumber)
     {
-        var commits = this.recordedCommits;
-        for (var i = 0; i < commits.length; ++i) {
-            if (commits[i].revisionNumber === revision)
-                return i;
-        }
-        return -1;
+        var result = this.recordedCommitIndicesByRevisionNumber[revisionNumber];
+        // FIXME: Update callers to handle undefined result.
+        if (result === undefined)
+            return -1;
+        return result;
     },
 };

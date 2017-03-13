@@ -21,7 +21,7 @@
 #include "WebKitCustomProtocolManagerClient.h"
 
 #include "APICustomProtocolManagerClient.h"
-#include "CustomProtocolManagerProxy.h"
+#include "LegacyCustomProtocolManagerProxy.h"
 #include "WebKitWebContextPrivate.h"
 #include "WebProcessPool.h"
 
@@ -36,18 +36,17 @@ public:
     }
 
 private:
-    bool startLoading(CustomProtocolManagerProxy& manager, uint64_t customProtocolID, const ResourceRequest& request) override
+    void startLoading(LegacyCustomProtocolManagerProxy& manager, uint64_t customProtocolID, const ResourceRequest& request) override
     {
         webkitWebContextStartLoadingCustomProtocol(m_webContext, customProtocolID, request, manager);
-        return true;
     }
 
-    void stopLoading(CustomProtocolManagerProxy&, uint64_t customProtocolID) override
+    void stopLoading(LegacyCustomProtocolManagerProxy&, uint64_t customProtocolID) override
     {
         webkitWebContextStopLoadingCustomProtocol(m_webContext, customProtocolID);
     }
 
-    void invalidate(CustomProtocolManagerProxy& manager) override
+    void invalidate(LegacyCustomProtocolManagerProxy& manager) override
     {
         webkitWebContextInvalidateCustomProtocolRequests(m_webContext, manager);
     }
@@ -57,6 +56,5 @@ private:
 
 void attachCustomProtocolManagerClientToContext(WebKitWebContext* webContext)
 {
-    auto* processPool = webkitWebContextGetProcessPool(webContext);
-    processPool->setCustomProtocolManagerClient(std::make_unique<CustomProtocolManagerClient>(webContext));
+    webkitWebContextGetProcessPool(webContext).setLegacyCustomProtocolManagerClient(std::make_unique<CustomProtocolManagerClient>(webContext));
 }

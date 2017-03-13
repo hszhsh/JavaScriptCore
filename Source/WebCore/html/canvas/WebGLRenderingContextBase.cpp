@@ -31,6 +31,8 @@
 #include "ANGLEInstancedArrays.h"
 #include "CachedImage.h"
 #include "DOMWindow.h"
+#include "DiagnosticLoggingClient.h"
+#include "DiagnosticLoggingKeys.h"
 #include "Document.h"
 #include "EXTBlendMinMax.h"
 #include "EXTFragDepth.h"
@@ -100,6 +102,7 @@ namespace WebCore {
 
 const double secondsBetweenRestoreAttempts = 1.0;
 const int maxGLErrorsAllowedToConsole = 256;
+static const std::chrono::seconds checkContextLossHandlingDelay { 3 };
 
 namespace {
     
@@ -348,6 +351,11 @@ private:
     WebGLRenderingContextBase* m_context;
 };
 
+static bool isHighPerformanceContext(const RefPtr<GraphicsContext3D>& context)
+{
+    return context->powerPreferenceUsedForCreation() == WebGLPowerPreference::HighPerformance;
+}
+
 std::unique_ptr<WebGLRenderingContextBase> WebGLRenderingContextBase::create(HTMLCanvasElement& canvas, WebGLContextAttributes& attributes, const String& type)
 {
 #if ENABLE(WEBGL2)
@@ -388,20 +396,18 @@ std::unique_ptr<WebGLRenderingContextBase> WebGLRenderingContextBase::create(HTM
         }
     }
 
-    if (attributes.antialias) {
-        if (!frame->settings().openGLMultisamplingEnabled())
-            attributes.antialias = false;
-    }
-
     attributes.noExtensions = true;
     attributes.shareResources = false;
 
     if (frame->settings().forceSoftwareWebGLRendering())
         attributes.forceSoftwareRenderer = true;
 
-    attributes.initialPreferLowPowerToHighPerformance = attributes.preferLowPowerToHighPerformance;
-    if (frame->settings().preferLowPowerWebGLRendering())
-        attributes.preferLowPowerToHighPerformance = true;
+    attributes.initialPowerPreference = attributes.powerPreference;
+    if (frame->settings().forceWebGLUsesLowPower()) {
+        if (attributes.powerPreference == GraphicsContext3DPowerPreference::HighPerformance)
+            LOG(WebGL, "Overriding powerPreference from high-performance to low-power.");
+        attributes.powerPreference = GraphicsContext3DPowerPreference::LowPower;
+    }
 
     if (page)
         attributes.devicePixelRatio = page->deviceScaleFactor();
@@ -461,8 +467,10 @@ WebGLRenderingContextBase::WebGLRenderingContextBase(HTMLCanvasElement& passedCa
     , m_attributes(attributes)
     , m_numGLErrorsToConsoleAllowed(maxGLErrorsAllowedToConsole)
     , m_isPendingPolicyResolution(true)
+    , m_checkForContextLossHandlingTimer(*this, &WebGLRenderingContextBase::checkForContextLossHandling)
 {
     registerWithWebGLStateTracker();
+    m_checkForContextLossHandlingTimer.startOneShot(checkContextLossHandlingDelay);
 }
 
 WebGLRenderingContextBase::WebGLRenderingContextBase(HTMLCanvasElement& passedCanvas, Ref<GraphicsContext3D>&& context, WebGLContextAttributes attributes)
@@ -474,6 +482,7 @@ WebGLRenderingContextBase::WebGLRenderingContextBase(HTMLCanvasElement& passedCa
     , m_generatedImageCache(4)
     , m_attributes(attributes)
     , m_numGLErrorsToConsoleAllowed(maxGLErrorsAllowedToConsole)
+    , m_checkForContextLossHandlingTimer(*this, &WebGLRenderingContextBase::checkForContextLossHandling)
 {
     m_contextGroup = WebGLContextGroup::create();
     m_contextGroup->addContext(*this);
@@ -485,6 +494,24 @@ WebGLRenderingContextBase::WebGLRenderingContextBase(HTMLCanvasElement& passedCa
     setupFlags();
     initializeNewContext();
     registerWithWebGLStateTracker();
+    m_checkForContextLossHandlingTimer.startOneShot(checkContextLossHandlingDelay);
+
+    addActivityStateChangeObserverIfNecessary();
+}
+
+// We check for context loss handling after a few seconds to give the JS a chance to register the event listeners
+// and to discard temporary GL contexts (e.g. feature detection).
+void WebGLRenderingContextBase::checkForContextLossHandling()
+{
+    if (!canvas().renderer())
+        return;
+
+    auto* page = canvas().document().page();
+    if (!page)
+        return;
+
+    bool handlesContextLoss = canvas().hasEventListeners(eventNames().webglcontextlostEvent) && canvas().hasEventListeners(eventNames().webglcontextrestoredEvent);
+    page->diagnosticLoggingClient().logDiagnosticMessage(DiagnosticLoggingKeys::pageHandlesWebGLContextLossKey(), handlesContextLoss ? DiagnosticLoggingKeys::yesKey() : DiagnosticLoggingKeys::noKey(), ShouldSample::No);
 }
 
 void WebGLRenderingContextBase::registerWithWebGLStateTracker()
@@ -497,7 +524,7 @@ void WebGLRenderingContextBase::registerWithWebGLStateTracker()
     if (!tracker)
         return;
 
-    m_trackerToken = tracker->token(m_attributes.initialPreferLowPowerToHighPerformance);
+    m_trackerToken = tracker->token(m_attributes.initialPowerPreference);
 }
 
 void WebGLRenderingContextBase::initializeNewContext()
@@ -598,6 +625,31 @@ void WebGLRenderingContextBase::addCompressedTextureFormat(GC3Denum format)
         m_compressedTextureFormats.append(format);
 }
 
+void WebGLRenderingContextBase::addActivityStateChangeObserverIfNecessary()
+{
+    // We are only interested in visibility changes for contexts
+    // that are using the high-performance GPU.
+    if (!isHighPerformanceContext(m_context))
+        return;
+
+    auto* page = canvas().document().page();
+    if (!page)
+        return;
+
+    page->addActivityStateChangeObserver(*this);
+
+    // We won't get a state change right away, so
+    // make sure the context knows if it visible or not.
+    if (m_context)
+        m_context->setContextVisibility(page->isVisible());
+}
+
+void WebGLRenderingContextBase::removeActivityStateChangeObserver()
+{
+    if (auto* page = canvas().document().page())
+        page->removeActivityStateChangeObserver(*this);
+}
+
 WebGLRenderingContextBase::~WebGLRenderingContextBase()
 {
     // Remove all references to WebGLObjects so if they are the last reference
@@ -630,6 +682,8 @@ void WebGLRenderingContextBase::destroyGraphicsContext3D()
     if (m_isPendingPolicyResolution)
         return;
 
+    removeActivityStateChangeObserver();
+
     if (m_context) {
         m_context->setContextLostCallback(nullptr);
         m_context->setErrorMessageCallback(nullptr);
@@ -656,6 +710,17 @@ void WebGLRenderingContextBase::markContextChanged()
             canvas().didDraw(FloatRect(FloatPoint(0, 0), clampedCanvasSize()));
         }
     }
+}
+
+void WebGLRenderingContextBase::markContextChangedAndNotifyCanvasObserver()
+{
+    markContextChanged();
+    if (!isAccelerated())
+        return;
+    
+    RenderBox* renderBox = canvas().renderBox();
+    if (renderBox && renderBox->hasAcceleratedCompositing())
+        canvas().notifyObserversCanvasChanged(FloatRect(FloatPoint(0, 0), clampedCanvasSize()));
 }
 
 bool WebGLRenderingContextBase::clearIfComposited(GC3Dbitfield mask)
@@ -1935,7 +2000,7 @@ void WebGLRenderingContextBase::drawArrays(GC3Denum mode, GC3Dint first, GC3Dsiz
         restoreStatesAfterVertexAttrib0Simulation();
     if (usesFallbackTexture)
         checkTextureCompleteness("drawArrays", false);
-    markContextChanged();
+    markContextChangedAndNotifyCanvasObserver();
 }
 
 void WebGLRenderingContextBase::drawElements(GC3Denum mode, GC3Dsizei count, GC3Denum type, long long offset)
@@ -1963,7 +2028,7 @@ void WebGLRenderingContextBase::drawElements(GC3Denum mode, GC3Dsizei count, GC3
         restoreStatesAfterVertexAttrib0Simulation();
     if (usesFallbackTexture)
         checkTextureCompleteness("drawElements", false);
-    markContextChanged();
+    markContextChangedAndNotifyCanvasObserver();
 }
 
 void WebGLRenderingContextBase::enable(GC3Denum cap)
@@ -3493,10 +3558,9 @@ ExceptionOr<void> WebGLRenderingContextBase::texSubImage2D(GC3Denum target, GC3D
 
         return { };
     } , [&](const RefPtr<HTMLImageElement>& image) -> ExceptionOr<void> {
-        if (wouldTaintOrigin(image.get()))
-            return Exception { SECURITY_ERR };
-        if (isContextLostOrPending() || !validateHTMLImageElement("texSubImage2D", image.get()))
-            return { };
+        ExceptionCode ec = 0;
+        if (isContextLostOrPending() || !validateHTMLImageElement("texSubImage2D", image.get(), ec))
+            return ec ? Exception { ec } : ExceptionOr<void> { };
 
         RefPtr<Image> imageForRender = image->cachedImage()->imageForRenderer(image->renderer());
         if (!imageForRender)
@@ -3521,10 +3585,9 @@ ExceptionOr<void> WebGLRenderingContextBase::texSubImage2D(GC3Denum target, GC3D
         texSubImage2DImpl(target, level, xoffset, yoffset, format, type, imageForRender.get(), GraphicsContext3D::HtmlDomImage, m_unpackFlipY, m_unpackPremultiplyAlpha);
         return { };
     }, [&](const RefPtr<HTMLCanvasElement>& canvas) -> ExceptionOr<void> {
-        if (wouldTaintOrigin(canvas.get()))
-            return Exception { SECURITY_ERR };
-        if (isContextLostOrPending() || !validateHTMLCanvasElement("texSubImage2D", canvas.get()))
-            return { };
+        ExceptionCode ec = 0;
+        if (isContextLostOrPending() || !validateHTMLCanvasElement("texSubImage2D", canvas.get(), ec))
+            return ec ? Exception { ec } : ExceptionOr<void> { };
 
         WebGLTexture* texture = validateTextureBinding("texSubImage2D", target, true);
         if (!texture)
@@ -3546,10 +3609,9 @@ ExceptionOr<void> WebGLRenderingContextBase::texSubImage2D(GC3Denum target, GC3D
             texSubImage2DImpl(target, level, xoffset, yoffset, format, type, canvas->copiedImage(), GraphicsContext3D::HtmlDomCanvas, m_unpackFlipY, m_unpackPremultiplyAlpha);
         return { };
     }, [&](const RefPtr<HTMLVideoElement>& video) -> ExceptionOr<void> {
-        if (wouldTaintOrigin(video.get()))
-            return Exception { SECURITY_ERR };
-        if (isContextLostOrPending() || !validateHTMLVideoElement("texSubImage2D", video.get()))
-            return { };
+        ExceptionCode ec = 0;
+        if (isContextLostOrPending() || !validateHTMLVideoElement("texSubImage2D", video.get(), ec))
+            return ec ? Exception { ec } : ExceptionOr<void> { };
 
         WebGLTexture* texture = validateTextureBinding("texSubImage2D", target, true);
         if (!texture)
@@ -4010,10 +4072,9 @@ ExceptionOr<void> WebGLRenderingContextBase::texImage2D(GC3Denum target, GC3Dint
             m_context->pixelStorei(GraphicsContext3D::UNPACK_ALIGNMENT, m_unpackAlignment);
         return { };
     }, [&](const RefPtr<HTMLImageElement>& image) -> ExceptionOr<void> {
-        if (wouldTaintOrigin(image.get()))
-            return Exception { SECURITY_ERR };
-        if (isContextLostOrPending() || !validateHTMLImageElement("texImage2D", image.get()))
-            return { };
+        ExceptionCode ec = 0;
+        if (isContextLostOrPending() || !validateHTMLImageElement("texImage2D", image.get(), ec))
+            return ec ? Exception { ec } : ExceptionOr<void> { };
 
         RefPtr<Image> imageForRender = image->cachedImage()->imageForRenderer(image->renderer());
         if (!imageForRender)
@@ -4028,10 +4089,9 @@ ExceptionOr<void> WebGLRenderingContextBase::texImage2D(GC3Denum target, GC3Dint
         texImage2DImpl(target, level, internalformat, format, type, imageForRender.get(), GraphicsContext3D::HtmlDomImage, m_unpackFlipY, m_unpackPremultiplyAlpha);
         return { };
     }, [&](const RefPtr<HTMLCanvasElement>& canvas) -> ExceptionOr<void> {
-        if (wouldTaintOrigin(canvas.get()))
-            return Exception { SECURITY_ERR };
-        if (isContextLostOrPending() || !validateHTMLCanvasElement("texImage2D", canvas.get()) || !validateTexFunc("texImage2D", TexImage, SourceHTMLCanvasElement, target, level, internalformat, canvas->width(), canvas->height(), 0, format, type, 0, 0))
-            return { };
+        ExceptionCode ec = 0;
+        if (isContextLostOrPending() || !validateHTMLCanvasElement("texImage2D", canvas.get(), ec) || !validateTexFunc("texImage2D", TexImage, SourceHTMLCanvasElement, target, level, internalformat, canvas->width(), canvas->height(), 0, format, type, 0, 0))
+            return ec ? Exception { ec } : ExceptionOr<void> { };
 
         WebGLTexture* texture = validateTextureBinding("texImage2D", target, true);
         // If possible, copy from the canvas element directly to the texture
@@ -4059,11 +4119,10 @@ ExceptionOr<void> WebGLRenderingContextBase::texImage2D(GC3Denum target, GC3Dint
             texImage2DImpl(target, level, internalformat, format, type, canvas->copiedImage(), GraphicsContext3D::HtmlDomCanvas, m_unpackFlipY, m_unpackPremultiplyAlpha);
         return { };
     }, [&](const RefPtr<HTMLVideoElement>& video) -> ExceptionOr<void> {
-        if (wouldTaintOrigin(video.get()))
-            return Exception { SECURITY_ERR };
-        if (isContextLostOrPending() || !validateHTMLVideoElement("texImage2D", video.get())
+        ExceptionCode ec = 0;
+        if (isContextLostOrPending() || !validateHTMLVideoElement("texImage2D", video.get(), ec)
             || !validateTexFunc("texImage2D", TexImage, SourceHTMLVideoElement, target, level, internalformat, video->videoWidth(), video->videoHeight(), 0, format, type, 0, 0))
-            return { };
+            return ec ? Exception { ec } : ExceptionOr<void> { };
 
         // Go through the fast path doing a GPU-GPU textures copy without a readback to system memory if possible.
         // Otherwise, it will fall back to the normal SW path.
@@ -5269,7 +5328,7 @@ WebGLBuffer* WebGLRenderingContextBase::validateBufferDataParameters(const char*
     return nullptr;
 }
 
-bool WebGLRenderingContextBase::validateHTMLImageElement(const char* functionName, HTMLImageElement* image)
+bool WebGLRenderingContextBase::validateHTMLImageElement(const char* functionName, HTMLImageElement* image, ExceptionCode& ec)
 {
     if (!image || !image->cachedImage()) {
         synthesizeGLError(GraphicsContext3D::INVALID_VALUE, functionName, "no image");
@@ -5280,13 +5339,21 @@ bool WebGLRenderingContextBase::validateHTMLImageElement(const char* functionNam
         synthesizeGLError(GraphicsContext3D::INVALID_VALUE, functionName, "invalid image");
         return false;
     }
+    if (wouldTaintOrigin(image)) {
+        ec = SECURITY_ERR;
+        return false;
+    }
     return true;
 }
 
-bool WebGLRenderingContextBase::validateHTMLCanvasElement(const char* functionName, HTMLCanvasElement* canvas)
+bool WebGLRenderingContextBase::validateHTMLCanvasElement(const char* functionName, HTMLCanvasElement* canvas, ExceptionCode& ec)
 {
     if (!canvas || !canvas->buffer()) {
         synthesizeGLError(GraphicsContext3D::INVALID_VALUE, functionName, "no canvas");
+        return false;
+    }
+    if (wouldTaintOrigin(canvas)) {
+        ec = SECURITY_ERR;
         return false;
     }
     return true;
@@ -5294,10 +5361,14 @@ bool WebGLRenderingContextBase::validateHTMLCanvasElement(const char* functionNa
 
 #if ENABLE(VIDEO)
 
-bool WebGLRenderingContextBase::validateHTMLVideoElement(const char* functionName, HTMLVideoElement* video)
+bool WebGLRenderingContextBase::validateHTMLVideoElement(const char* functionName, HTMLVideoElement* video, ExceptionCode& ec)
 {
     if (!video || !video->videoWidth() || !video->videoHeight()) {
         synthesizeGLError(GraphicsContext3D::INVALID_VALUE, functionName, "no video");
+        return false;
+    }
+    if (wouldTaintOrigin(video)) {
+        ec = SECURITY_ERR;
         return false;
     }
     return true;
@@ -5569,11 +5640,23 @@ void WebGLRenderingContextBase::maybeRestoreContext()
     }
 
     m_context = context;
+    addActivityStateChangeObserverIfNecessary();
     m_contextLost = false;
     setupFlags();
     initializeNewContext();
     initializeVertexArrayObjects();
     canvas().dispatchEvent(WebGLContextEvent::create(eventNames().webglcontextrestoredEvent, false, true, emptyString()));
+}
+
+void WebGLRenderingContextBase::dispatchContextChangedEvent()
+{
+    canvas().dispatchEvent(WebGLContextEvent::create(eventNames().webglcontextchangedEvent, false, true, emptyString()));
+}
+
+void WebGLRenderingContextBase::simulateContextChanged()
+{
+    if (m_context)
+        m_context->simulateContextChanged();
 }
 
 String WebGLRenderingContextBase::ensureNotNull(const String& text) const
@@ -5762,7 +5845,7 @@ void WebGLRenderingContextBase::drawArraysInstanced(GC3Denum mode, GC3Dint first
         restoreStatesAfterVertexAttrib0Simulation();
     if (!isGLES2NPOTStrict())
         checkTextureCompleteness("drawArraysInstanced", false);
-    markContextChanged();
+    markContextChangedAndNotifyCanvasObserver();
 }
 
 void WebGLRenderingContextBase::drawElementsInstanced(GC3Denum mode, GC3Dsizei count, GC3Denum type, long long offset, GC3Dsizei primcount)
@@ -5793,7 +5876,7 @@ void WebGLRenderingContextBase::drawElementsInstanced(GC3Denum mode, GC3Dsizei c
         restoreStatesAfterVertexAttrib0Simulation();
     if (!isGLES2NPOTStrict())
         checkTextureCompleteness("drawElementsInstanced", false);
-    markContextChanged();
+    markContextChangedAndNotifyCanvasObserver();
 }
 
 void WebGLRenderingContextBase::vertexAttribDivisor(GC3Duint index, GC3Duint divisor)
@@ -5819,6 +5902,16 @@ bool WebGLRenderingContextBase::enableSupportedExtension(const char* extensionNa
         return false;
     extensions.ensureEnabled(extensionName);
     return true;
+}
+
+void WebGLRenderingContextBase::activityStateDidChange(ActivityState::Flags oldActivityState, ActivityState::Flags newActivityState)
+{
+    if (!m_context)
+        return;
+
+    ActivityState::Flags changed = oldActivityState ^ newActivityState;
+    if (changed & ActivityState::IsVisible)
+        m_context->setContextVisibility(newActivityState & ActivityState::IsVisible);
 }
 
 } // namespace WebCore

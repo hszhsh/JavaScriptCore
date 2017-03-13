@@ -25,7 +25,7 @@
 #include "InlineCallFrame.h"
 #include "JSScope.h"
 #include "JSCInlines.h"
-#include "JSGlobalObjectFunctions.h"
+#include "ParseInt.h"
 #include <wtf/text/StringBuilder.h>
 
 namespace JSC {
@@ -147,7 +147,7 @@ private:
 void ErrorInstance::finishCreation(ExecState* exec, VM& vm, const String& message, bool useCurrentFrame)
 {
     Base::finishCreation(vm);
-    ASSERT(inherits(info()));
+    ASSERT(inherits(vm, info()));
     if (!message.isNull())
         putDirect(vm, vm.propertyNames->message, jsString(&vm, message), DontEnum);
 

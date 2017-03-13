@@ -33,6 +33,7 @@
 #include "Chrome.h"
 #include "CreateLinkCommand.h"
 #include "DocumentFragment.h"
+#include "Editing.h"
 #include "EditorClient.h"
 #include "Event.h"
 #include "EventHandler.h"
@@ -58,7 +59,6 @@
 #include "UnlinkCommand.h"
 #include "UserGestureIndicator.h"
 #include "UserTypingGestureIndicator.h"
-#include "htmlediting.h"
 #include "markup.h"
 #include <wtf/text/AtomicString.h>
 
@@ -930,7 +930,7 @@ static bool executePrint(Frame& frame, Event*, EditorCommandSource, const String
     Page* page = frame.page();
     if (!page)
         return false;
-    page->chrome().print(&frame);
+    page->chrome().print(frame);
     return true;
 }
 

@@ -27,6 +27,7 @@
 
 #include "webrtc/base/basictypes.h"
 #include "webrtc/base/byteorder.h"
+#include "webrtc/base/export.h"
 #if defined(WEBRTC_WIN)
 #include "webrtc/base/win32.h"
 #endif
@@ -86,8 +87,8 @@ class IPAddress {
   friend std::ostream& operator<<(std::ostream& os, const IPAddress& addr);
 
   int family() const { return family_; }
-  in_addr ipv4_address() const;
-  in6_addr ipv6_address() const;
+  WEBRTC_DYLIB_EXPORT in_addr ipv4_address() const;
+  WEBRTC_DYLIB_EXPORT in6_addr ipv6_address() const;
 
   // Returns the number of bytes needed to store the raw address.
   size_t Size() const;

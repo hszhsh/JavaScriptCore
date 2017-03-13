@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,8 +28,10 @@
 #if ENABLE(B3_JIT)
 
 #include "AirTmp.h"
+#include "B3Bank.h"
 #include "B3Common.h"
 #include "B3Type.h"
+#include "B3Width.h"
 #include <wtf/Optional.h>
 
 #if COMPILER(GCC) && ASSERT_DISABLED
@@ -70,6 +72,7 @@ public:
 
         // These are the addresses. Instructions may load from (Use), store to (Def), or evaluate
         // (UseAddr) addresses.
+        SimpleAddr,
         Addr,
         Stack,
         CallArg,
@@ -80,6 +83,7 @@ public:
         RelCond,
         ResCond,
         DoubleCond,
+        StatusCond,
         Special,
         WidthArg
     };
@@ -149,6 +153,8 @@ public:
         // as Use has undefined behavior: the use may happen before the def, or it may happen after
         // it.
         EarlyDef,
+            
+        EarlyZDef,
 
         // Some instructions need a scratch register. We model this by saying that the temporary is
         // defined early and used late. This role implies that.
@@ -161,34 +167,6 @@ public:
         // imply that we're Use'ing any registers that the Arg contains.
         UseAddr
     };
-
-    enum Type : int8_t {
-        GP,
-        FP
-    };
-
-    static const unsigned numTypes = 2;
-
-    template<typename Functor>
-    static void forEachType(const Functor& functor)
-    {
-        functor(GP);
-        functor(FP);
-    }
-
-    enum Width : int8_t {
-        Width8,
-        Width16,
-        Width32,
-        Width64
-    };
-
-    static Width pointerWidth()
-    {
-        if (sizeof(void*) == 8)
-            return Width64;
-        return Width32;
-    }
 
     enum Signedness : int8_t {
         Signed,
@@ -212,6 +190,7 @@ public:
         case ZDef:
         case UseAddr:
         case EarlyDef:
+        case EarlyZDef:
             return false;
         }
         ASSERT_NOT_REACHED();
@@ -232,6 +211,7 @@ public:
         case UseAddr:
         case Scratch:
         case EarlyDef:
+        case EarlyZDef:
             return false;
         }
         ASSERT_NOT_REACHED();
@@ -254,6 +234,7 @@ public:
         case UseAddr:
         case Scratch:
         case EarlyDef:
+        case EarlyZDef:
             return role;
         case Use:
             return ColdUse;
@@ -279,6 +260,7 @@ public:
         case LateColdUse:
         case Scratch:
         case EarlyDef:
+        case EarlyZDef:
             return false;
         }
         ASSERT_NOT_REACHED();
@@ -300,6 +282,7 @@ public:
         case ZDef:
         case UseAddr:
         case EarlyDef:
+        case EarlyZDef:
             return false;
         }
         ASSERT_NOT_REACHED();
@@ -320,6 +303,7 @@ public:
         case ZDef:
         case UseZDef:
         case EarlyDef:
+        case EarlyZDef:
         case Scratch:
             return true;
         }
@@ -341,6 +325,7 @@ public:
         case LateColdUse:
             return false;
         case EarlyDef:
+        case EarlyZDef:
         case Scratch:
             return true;
         }
@@ -356,6 +341,7 @@ public:
         case UseAddr:
         case LateUse:
         case EarlyDef:
+        case EarlyZDef:
         case Scratch:
         case LateColdUse:
             return false;
@@ -384,73 +370,10 @@ public:
             return false;
         case ZDef:
         case UseZDef:
+        case EarlyZDef:
             return true;
         }
         ASSERT_NOT_REACHED();
-    }
-
-    static Type typeForB3Type(B3::Type type)
-    {
-        switch (type) {
-        case Void:
-            ASSERT_NOT_REACHED();
-            return GP;
-        case Int32:
-        case Int64:
-            return GP;
-        case Float:
-        case Double:
-            return FP;
-        }
-        ASSERT_NOT_REACHED();
-        return GP;
-    }
-
-    static Width widthForB3Type(B3::Type type)
-    {
-        switch (type) {
-        case Void:
-            ASSERT_NOT_REACHED();
-            return Width8;
-        case Int32:
-        case Float:
-            return Width32;
-        case Int64:
-        case Double:
-            return Width64;
-        }
-        ASSERT_NOT_REACHED();
-    }
-
-    static Width conservativeWidth(Type type)
-    {
-        return type == GP ? pointerWidth() : Width64;
-    }
-
-    static Width minimumWidth(Type type)
-    {
-        return type == GP ? Width8 : Width32;
-    }
-
-    static unsigned bytes(Width width)
-    {
-        return 1 << width;
-    }
-
-    static Width widthForBytes(unsigned bytes)
-    {
-        switch (bytes) {
-        case 0:
-        case 1:
-            return Width8;
-        case 2:
-            return Width16;
-        case 3:
-        case 4:
-            return Width32;
-        default:
-            return Width64;
-        }
     }
 
     Arg()
@@ -504,6 +427,15 @@ public:
     static Arg immPtr(const void* address)
     {
         return bigImm(bitwise_cast<intptr_t>(address));
+    }
+
+    static Arg simpleAddr(Air::Tmp ptr)
+    {
+        ASSERT(ptr.isGP());
+        Arg result;
+        result.m_kind = SimpleAddr;
+        result.m_base = ptr;
+        return result;
     }
 
     static Arg addr(Air::Tmp base, int32_t offset = 0)
@@ -623,6 +555,14 @@ public:
         return result;
     }
 
+    static Arg statusCond(MacroAssembler::StatusCondition condition)
+    {
+        Arg result;
+        result.m_kind = StatusCond;
+        result.m_offset = condition;
+        return result;
+    }
+
     static Arg special(Air::Special* special)
     {
         Arg result;
@@ -698,6 +638,11 @@ public:
         }
     }
 
+    bool isSimpleAddr() const
+    {
+        return kind() == SimpleAddr;
+    }
+
     bool isAddr() const
     {
         return kind() == Addr;
@@ -721,6 +666,7 @@ public:
     bool isMemory() const
     {
         switch (kind()) {
+        case SimpleAddr:
         case Addr:
         case Stack:
         case CallArg:
@@ -731,6 +677,13 @@ public:
         }
     }
 
+    // Returns true if this is an idiomatic stack reference. It may return false for some kinds of
+    // stack references. The following idioms are recognized:
+    // - the Stack kind
+    // - the CallArg kind
+    // - the Addr kind with the base being either SP or FP
+    // Callers of this function are allowed to expect that if it returns true, then it must be one of
+    // these easy-to-recognize kinds. So, making this function recognize more kinds could break things.
     bool isStackMemory() const;
 
     bool isRelCond() const
@@ -748,12 +701,18 @@ public:
         return kind() == DoubleCond;
     }
 
+    bool isStatusCond() const
+    {
+        return kind() == StatusCond;
+    }
+
     bool isCondition() const
     {
         switch (kind()) {
         case RelCond:
         case ResCond:
         case DoubleCond:
+        case StatusCond:
             return true;
         default:
             return false;
@@ -864,10 +823,16 @@ public:
         ASSERT(kind() == BigImm);
         return bitwise_cast<void*>(static_cast<intptr_t>(m_offset));
     }
+    
+    Air::Tmp ptr() const
+    {
+        ASSERT(kind() == SimpleAddr);
+        return m_base;
+    }
 
     Air::Tmp base() const
     {
-        ASSERT(kind() == Addr || kind() == Index);
+        ASSERT(kind() == SimpleAddr || kind() == Addr || kind() == Index);
         return m_base;
     }
 
@@ -934,6 +899,7 @@ public:
         case BigImm:
         case BitImm:
         case BitImm64:
+        case SimpleAddr:
         case Addr:
         case Index:
         case Stack:
@@ -941,6 +907,7 @@ public:
         case RelCond:
         case ResCond:
         case DoubleCond:
+        case StatusCond:
         case Special:
         case WidthArg:
             return true;
@@ -962,10 +929,12 @@ public:
         case RelCond:
         case ResCond:
         case DoubleCond:
+        case StatusCond:
         case Special:
         case WidthArg:
         case Invalid:
             return false;
+        case SimpleAddr:
         case Addr:
         case Index:
         case Stack:
@@ -978,7 +947,7 @@ public:
         ASSERT_NOT_REACHED();
     }
 
-    bool hasType() const
+    bool hasBank() const
     {
         switch (kind()) {
         case Imm:
@@ -993,14 +962,14 @@ public:
     }
     
     // The type is ambiguous for some arg kinds. Call with care.
-    Type type() const
+    Bank bank() const
     {
         return isGP() ? GP : FP;
     }
 
-    bool isType(Type type) const
+    bool isBank(Bank bank) const
     {
-        switch (type) {
+        switch (bank) {
         case GP:
             return isGP();
         case FP:
@@ -1011,7 +980,7 @@ public:
 
     bool canRepresent(Value* value) const;
 
-    bool isCompatibleType(const Arg& other) const;
+    bool isCompatibleBank(const Arg& other) const;
 
     bool isGPR() const
     {
@@ -1139,6 +1108,8 @@ public:
             return isValidBitImmForm(value());
         case BitImm64:
             return isValidBitImm64Form(value());
+        case SimpleAddr:
+            return true;
         case Addr:
         case Stack:
         case CallArg:
@@ -1148,6 +1119,7 @@ public:
         case RelCond:
         case ResCond:
         case DoubleCond:
+        case StatusCond:
         case Special:
         case WidthArg:
             return true;
@@ -1160,6 +1132,7 @@ public:
     {
         switch (m_kind) {
         case Tmp:
+        case SimpleAddr:
         case Addr:
             functor(m_base);
             break;
@@ -1184,7 +1157,7 @@ public:
     void forEachFast(const Functor&);
 
     template<typename Thing, typename Functor>
-    void forEach(Role, Type, Width, const Functor&);
+    void forEach(Role, Bank, Width, const Functor&);
 
     // This is smart enough to know that an address arg in a Def or UseDef rule will use its
     // tmps and never def them. For example, this:
@@ -1193,13 +1166,14 @@ public:
     //
     // This defs (%rcx) but uses %rcx.
     template<typename Functor>
-    void forEachTmp(Role argRole, Type argType, Width argWidth, const Functor& functor)
+    void forEachTmp(Role argRole, Bank argBank, Width argWidth, const Functor& functor)
     {
         switch (m_kind) {
         case Tmp:
             ASSERT(isAnyUse(argRole) || isAnyDef(argRole));
-            functor(m_base, argRole, argType, argWidth);
+            functor(m_base, argRole, argBank, argWidth);
             break;
+        case SimpleAddr:
         case Addr:
             functor(m_base, Use, GP, argRole == UseAddr ? argWidth : pointerWidth());
             break;
@@ -1234,9 +1208,11 @@ public:
             ASSERT(isImm());
         return MacroAssembler::TrustedImmPtr(pointerValue());
     }
-
+    
     MacroAssembler::Address asAddress() const
     {
+        if (isSimpleAddr())
+            return MacroAssembler::Address(m_base.gpr());
         ASSERT(isAddr());
         return MacroAssembler::Address(m_base.gpr(), static_cast<int32_t>(m_offset));
     }
@@ -1267,6 +1243,12 @@ public:
         return static_cast<MacroAssembler::DoubleCondition>(m_offset);
     }
     
+    MacroAssembler::StatusCondition asStatusCondition() const
+    {
+        ASSERT(isStatusCond());
+        return static_cast<MacroAssembler::StatusCondition>(m_offset);
+    }
+    
     // Tells you if the Arg is invertible. Only condition arguments are invertible, and even for those, there
     // are a few exceptions - notably Overflow and Signed.
     bool isInvertible() const
@@ -1274,6 +1256,7 @@ public:
         switch (kind()) {
         case RelCond:
         case DoubleCond:
+        case StatusCond:
             return true;
         case ResCond:
             return MacroAssembler::isInvertible(asResultCondition());
@@ -1294,6 +1277,8 @@ public:
             return resCond(MacroAssembler::invert(asResultCondition()));
         case DoubleCond:
             return doubleCond(MacroAssembler::invert(asDoubleCondition()));
+        case StatusCond:
+            return statusCond(MacroAssembler::invert(asStatusCondition()));
         default:
             RELEASE_ASSERT_NOT_REACHED();
             return Arg();
@@ -1359,8 +1344,6 @@ namespace WTF {
 
 JS_EXPORT_PRIVATE void printInternal(PrintStream&, JSC::B3::Air::Arg::Kind);
 JS_EXPORT_PRIVATE void printInternal(PrintStream&, JSC::B3::Air::Arg::Role);
-JS_EXPORT_PRIVATE void printInternal(PrintStream&, JSC::B3::Air::Arg::Type);
-JS_EXPORT_PRIVATE void printInternal(PrintStream&, JSC::B3::Air::Arg::Width);
 JS_EXPORT_PRIVATE void printInternal(PrintStream&, JSC::B3::Air::Arg::Signedness);
 
 template<typename T> struct DefaultHash;

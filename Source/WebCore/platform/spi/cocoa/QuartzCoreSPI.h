@@ -28,23 +28,19 @@
 
 #if USE(APPLE_INTERNAL_SDK)
 
+#include <QuartzCore/CABackingStore.h>
 #include <QuartzCore/CAColorMatrix.h>
 #include <QuartzCore/CARenderServer.h>
 
 #ifdef __OBJC__
 
+#import <QuartzCore/CAContext.h>
 #import <QuartzCore/CALayerHost.h>
 #import <QuartzCore/CALayerPrivate.h>
 #import <QuartzCore/QuartzCorePrivate.h>
 
 #if PLATFORM(IOS)
 #import <QuartzCore/CADisplay.h>
-#endif
-
-#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
-@interface CAContext ()
-- (void)setCommitPriority:(uint32_t)commitPriority;
-@end
 #endif
 
 #endif // __OBJC__
@@ -62,6 +58,7 @@
 - (uint32_t)createImageSlot:(CGSize)size hasAlpha:(BOOL)flag;
 - (void)deleteSlot:(uint32_t)name;
 - (void)invalidate;
+- (void)invalidateFences;
 - (mach_port_t)createFencePort;
 - (void)setFencePort:(mach_port_t)port;
 - (void)setFencePort:(mach_port_t)port commitHandler:(void(^)(void))block;
@@ -81,7 +78,6 @@
 - (CGSize)size;
 - (void *)regionBeingDrawn;
 - (void)setContentsChanged;
-@property BOOL acceleratesDrawing;
 @property BOOL allowsGroupBlending;
 @property BOOL canDrawConcurrently;
 @property BOOL contentsOpaque;
@@ -91,11 +87,6 @@
 #if PLATFORM(IOS) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 90300 && __IPHONE_OS_VERSION_MAX_ALLOWED < 100000
 @property (copy) NSString *contentsFormat;
 #endif
-@end
-
-@interface CATiledLayer ()
-- (void)displayInRect:(CGRect)rect levelOfDetail:(int)levelOfDetail options:(NSDictionary *)dictionary;
-- (void)setNeedsDisplayInRect:(CGRect)rect levelOfDetail:(int)levelOfDetail options:(NSDictionary *)dictionary;
 @end
 
 #if PLATFORM(IOS)
@@ -133,7 +124,7 @@ typedef struct CAColorMatrix CAColorMatrix;
 @property (copy) NSString *name;
 @end
 
-#if TARGET_OS_IPHONE || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100)
+#if PLATFORM(IOS) || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100)
 typedef enum {
     kCATransactionPhasePreLayout,
     kCATransactionPhasePreCommit,
@@ -196,16 +187,9 @@ CAMachPortRef CAMachPortCreate(mach_port_t);
 mach_port_t CAMachPortGetPort(CAMachPortRef);
 CFTypeID CAMachPortGetTypeID(void);
 
+void CABackingStoreCollectBlocking(void);
+
 WTF_EXTERN_C_END
-
-// FIXME: Move this into the APPLE_INTERNAL_SDK block once it's in an SDK.
-@interface CAContext (AdditionalDetails)
-#if PLATFORM(IOS) || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100)
-- (void)invalidateFences;
-#endif
-@end
-
-extern NSString * const kCATiledLayerRemoveImmediately;
 
 extern NSString * const kCAFilterColorInvert;
 extern NSString * const kCAFilterColorMatrix;
@@ -237,6 +221,10 @@ extern NSString * const kCAContextIgnoresHitTest;
 extern NSString * const kCAContentsFormatRGBA10XR;
 #endif
 
+#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
+extern NSString * const kCAContentsFormatRGBA8ColorRGBA8LinearGlyphMask;
+#endif
+
 #if (PLATFORM(APPLETV) && __TV_OS_VERSION_MAX_ALLOWED < 100000) \
     || (PLATFORM(WATCHOS) && __WATCH_OS_VERSION_MAX_ALLOWED < 30000) \
     || (PLATFORM(IOS) && TARGET_OS_IOS && __IPHONE_OS_VERSION_MAX_ALLOWED < 100000) \
@@ -246,4 +234,5 @@ extern NSString * const kCAContentsFormatRGBA10XR;
 
 @protocol CAAnimationDelegate <NSObject>
 @end
-#endif
+
+#endif // USE(APPLE_INTERNAL_SDK)

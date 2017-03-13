@@ -102,6 +102,7 @@
 #include "TypeProfilerLog.h"
 #include "UnlinkedCodeBlock.h"
 #include "VMEntryScope.h"
+#include "VMInspector.h"
 #include "Watchdog.h"
 #include "WeakGCMapInlines.h"
 #include "WeakMapData.h"
@@ -179,7 +180,7 @@ VM::VM(VMType vmType, HeapType heapType)
     , topJSWebAssemblyInstance(nullptr)
     , m_atomicStringTable(vmType == Default ? wtfThreadData().atomicStringTable() : new AtomicStringTable)
     , propertyNames(nullptr)
-    , emptyList(new MarkedArgumentBuffer)
+    , emptyList(new ArgList)
     , machineCodeBytesPerBytecodeWordForBaselineJIT(std::make_unique<SimpleStats>())
     , customGetterSetterFunctionMap(*this)
     , stringCache(*this)
@@ -239,6 +240,7 @@ VM::VM(VMType vmType, HeapType heapType)
 #if ENABLE(WEBASSEMBLY)
     webAssemblyCalleeStructure.set(*this, JSWebAssemblyCallee::createStructure(*this, 0, jsNull()));
     webAssemblyToJSCalleeStructure.set(*this, WebAssemblyToJSCallee::createStructure(*this, 0, jsNull()));
+    webAssemblyCodeBlockStructure.set(*this, JSWebAssemblyCodeBlock::createStructure(*this, 0, jsNull()));
     webAssemblyToJSCallee.set(*this, WebAssemblyToJSCallee::create(*this, webAssemblyToJSCalleeStructure.get()));
 #endif
     moduleProgramExecutableStructure.set(*this, ModuleProgramExecutable::createStructure(*this, 0, jsNull()));
@@ -349,10 +351,17 @@ VM::VM(VMType vmType, HeapType heapType)
         Watchdog& watchdog = ensureWatchdog();
         watchdog.setTimeLimit(timeoutMillis);
     }
+
+    VMInspector::instance().add(this);
 }
 
 VM::~VM()
 {
+    if (UNLIKELY(m_watchdog))
+        m_watchdog->willDestroyVM(this);
+    m_traps.willDestroyVM();
+    VMInspector::instance().remove(this);
+
     // Never GC, ever again.
     heap.incrementDeferralDepth();
 
@@ -384,7 +393,7 @@ VM::~VM()
     // Clear this first to ensure that nobody tries to remove themselves from it.
     m_perBytecodeProfiler = nullptr;
 
-    ASSERT(m_apiLock->currentThreadIsHoldingLock());
+    ASSERT(currentThreadIsHoldingAPILock());
     m_apiLock->willDestroyVM(this);
     heap.lastChanceToFinalize();
 
@@ -453,19 +462,8 @@ VM*& VM::sharedInstanceInternal()
 
 Watchdog& VM::ensureWatchdog()
 {
-    if (!m_watchdog) {
-        m_watchdog = adoptRef(new Watchdog());
-        
-        // The LLINT peeks into the Watchdog object directly. In order to do that,
-        // the LLINT assumes that the internal shape of a std::unique_ptr is the
-        // same as a plain C++ pointer, and loads the address of Watchdog from it.
-        RELEASE_ASSERT(*reinterpret_cast<Watchdog**>(&m_watchdog) == m_watchdog.get());
-
-        // And if we've previously compiled any functions, we need to revert
-        // them because they don't have the needed polling checks for the watchdog
-        // yet.
-        deleteAllCode(PreventCollectionAndDeleteAllCode);
-    }
+    if (!m_watchdog)
+        m_watchdog = adoptRef(new Watchdog(this));
     return *m_watchdog;
 }
 
@@ -544,8 +542,8 @@ NativeExecutable* VM::getHostFunction(NativeFunction function, Intrinsic intrins
     UNUSED_PARAM(intrinsic);
 #endif // ENABLE(JIT)
     return NativeExecutable::create(*this,
-        adoptRef(new NativeJITCode(MacroAssemblerCodeRef::createLLIntCodeRef(llint_native_call_trampoline), JITCode::HostCallThunk)), function,
-        adoptRef(new NativeJITCode(MacroAssemblerCodeRef::createLLIntCodeRef(llint_native_construct_trampoline), JITCode::HostCallThunk)), constructor,
+        adoptRef(*new NativeJITCode(MacroAssemblerCodeRef::createLLIntCodeRef(llint_native_call_trampoline), JITCode::HostCallThunk)), function,
+        adoptRef(*new NativeJITCode(MacroAssemblerCodeRef::createLLIntCodeRef(llint_native_construct_trampoline), JITCode::HostCallThunk)), constructor,
         NoIntrinsic, signature, name);
 }
 
@@ -623,7 +621,8 @@ void VM::throwException(ExecState* exec, Exception* exception)
 
 JSValue VM::throwException(ExecState* exec, JSValue thrownValue)
 {
-    Exception* exception = jsDynamicCast<Exception*>(thrownValue);
+    VM& vm = exec->vm();
+    Exception* exception = jsDynamicCast<Exception*>(vm, thrownValue);
     if (!exception)
         exception = Exception::create(*this, thrownValue);
 
@@ -862,9 +861,9 @@ void VM::dumpTypeProfilerData()
     typeProfiler()->dumpTypeProfilerData(*this);
 }
 
-void VM::queueMicrotask(JSGlobalObject* globalObject, PassRefPtr<Microtask> task)
+void VM::queueMicrotask(JSGlobalObject* globalObject, Ref<Microtask>&& task)
 {
-    m_microtaskQueue.append(std::make_unique<QueuedTask>(*this, globalObject, task));
+    m_microtaskQueue.append(std::make_unique<QueuedTask>(*this, globalObject, WTFMove(task)));
 }
 
 void VM::drainMicrotasks()

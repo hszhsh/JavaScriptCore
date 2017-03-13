@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- webkit-test-runner [ enableModernMediaControls=true ] -->
+<!DOCTYPE html>
 <script src="../../../resources/js-test-pre.js"></script>
 <body>
 <video src="../../content/test.mp4" style="width: 320px; height: 240px;" controls></video>
@@ -17,30 +17,32 @@ let mediaControlsElement, volumeSliderElement;
 media.addEventListener("webkitfullscreenchange", function() {
     if (media.webkitDisplayingFullscreen) {
         window.requestAnimationFrame(() => {
-            debug("Media entered fullscreen");
+            window.requestAnimationFrame(() => {
+                debug("Media entered fullscreen");
 
-            mediaControlsElement = shadowRoot.lastElementChild.lastElementChild;
-            volumeSliderElement = mediaControlsElement.querySelector(".volume.slider");
-        
-            shouldBeTrue("mediaControlsElement.classList.contains('uses-ltr-user-interface-layout-direction')");
-            shouldBeEqualToString("document.defaultView.getComputedStyle(volumeSliderElement).transform", "none");
+                mediaControlsElement = shadowRoot.lastElementChild.lastElementChild;
+                volumeSliderElement = mediaControlsElement.querySelector(".volume.slider");
 
-            debug("");
-            debug("Setting layout direction to RTL");
-            window.internals.setUserInterfaceLayoutDirection("RTL");
-            shouldBeFalse("mediaControlsElement.classList.contains('uses-ltr-user-interface-layout-direction')");
-            shouldBeEqualToString("document.defaultView.getComputedStyle(volumeSliderElement).transform", "matrix(-1, 0, 0, 1, 0, 0)");
+                shouldBeTrue("mediaControlsElement.classList.contains('uses-ltr-user-interface-layout-direction')");
+                shouldBeEqualToString("document.defaultView.getComputedStyle(volumeSliderElement).transform", "none");
 
-            debug("");
-            debug("Setting layout direction back to LTR");
-            window.internals.setUserInterfaceLayoutDirection("LTR");
-            shouldBeTrue("mediaControlsElement.classList.contains('uses-ltr-user-interface-layout-direction')");
-            shouldBeEqualToString("document.defaultView.getComputedStyle(volumeSliderElement).transform", "none");
+                debug("");
+                debug("Setting layout direction to RTL");
+                window.internals.setUserInterfaceLayoutDirection("RTL");
+                shouldBeFalse("mediaControlsElement.classList.contains('uses-ltr-user-interface-layout-direction')");
+                shouldBeEqualToString("document.defaultView.getComputedStyle(volumeSliderElement).transform", "matrix(-1, 0, 0, 1, 0, 0)");
 
-            debug("");
-            media.remove();
-            button.remove();
-            finishJSTest();
+                debug("");
+                debug("Setting layout direction back to LTR");
+                window.internals.setUserInterfaceLayoutDirection("LTR");
+                shouldBeTrue("mediaControlsElement.classList.contains('uses-ltr-user-interface-layout-direction')");
+                shouldBeEqualToString("document.defaultView.getComputedStyle(volumeSliderElement).transform", "none");
+
+                debug("");
+                media.remove();
+                button.remove();
+                finishJSTest();
+            });
         });
     }
 });

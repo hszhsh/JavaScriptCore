@@ -23,8 +23,7 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef PageClient_h
-#define PageClient_h
+#pragma once
 
 #include "ShareableBitmap.h"
 #include "WebColorPicker.h"
@@ -33,6 +32,7 @@
 #include <WebCore/AlternativeTextClient.h>
 #include <WebCore/EditorClient.h>
 #include <WebCore/UserInterfaceLayoutDirection.h>
+#include <WebCore/ValidationBubble.h>
 #include <wtf/Forward.h>
 
 #if PLATFORM(COCOA)
@@ -49,7 +49,6 @@ OBJC_CLASS NSTextAlternatives;
 namespace WebCore {
 class Cursor;
 class TextIndicator;
-class ValidationBubble;
 class WebMediaSessionManager;
 enum class TextIndicatorWindowLifetime : uint8_t;
 enum class TextIndicatorWindowDismissalAnimation : uint8_t;
@@ -101,6 +100,9 @@ public:
     // Tell the view to scroll to the given position, and whether this was a programmatic scroll.
     virtual void requestScroll(const WebCore::FloatPoint& scrollPosition, const WebCore::IntPoint& scrollOrigin, bool isProgrammaticScroll) = 0;
 
+    // Return the current scroll position (not necessarily the same as the WebCore scroll position, because of scaling, insets etc.)
+    virtual WebCore::FloatPoint viewScrollPosition() = 0;
+
     // Return the size of the view the page is associated with.
     virtual WebCore::IntSize viewSize() = 0;
 
@@ -138,6 +140,8 @@ public:
         return false;
     }
 
+    virtual void didStartProvisionalLoadForMainFrame() { };
+    virtual void didFailProvisionalLoadForMainFrame() { };
     virtual void didCommitLoadForMainFrame(const String& mimeType, bool useCustomContentProvider) = 0;
 
 #if USE(COORDINATED_GRAPHICS_MULTIPROCESS)
@@ -146,10 +150,6 @@ public:
     virtual void pageTransitionViewportReady() = 0;
     virtual void didFindZoomableArea(const WebCore::IntPoint&, const WebCore::IntRect&) = 0;
 #endif
-
-#if PLATFORM(EFL)
-    virtual void updateTextInputState() = 0;
-#endif // PLATFORM(EFL)
 
     virtual void handleDownloadRequest(DownloadProxy*) = 0;
 
@@ -173,7 +173,7 @@ public:
 #if PLATFORM(COCOA)
     virtual void accessibilityWebProcessTokenReceived(const IPC::DataReference&) = 0;
     virtual bool executeSavedCommandBySelector(const String& selector) = 0;
-    virtual void setDragImage(const WebCore::IntPoint& clientPosition, PassRefPtr<ShareableBitmap> dragImage, bool isLinkDrag) = 0;
+    virtual void setDragImage(const WebCore::IntPoint& clientPosition, PassRefPtr<ShareableBitmap> dragImage, WebCore::DragSourceAction) = 0;
     virtual void updateSecureInputState() = 0;
     virtual void resetSecureInputState() = 0;
     virtual void notifyInputContextAboutDiscardedComposition() = 0;
@@ -211,6 +211,7 @@ public:
     virtual WebCore::IntPoint accessibilityScreenToRootView(const WebCore::IntPoint&) = 0;
     virtual WebCore::IntRect rootViewToAccessibilityScreen(const WebCore::IntRect&) = 0;
     virtual void didNotHandleTapAsClick(const WebCore::IntPoint&) = 0;
+    virtual void didCompleteSyntheticClick() = 0;
 #endif
     
     virtual void doneWithKeyEvent(const NativeWebKeyboardEvent&, bool wasEventHandled) = 0;
@@ -228,7 +229,7 @@ public:
 #endif
 
 #if PLATFORM(COCOA)
-    virtual Ref<WebCore::ValidationBubble> createValidationBubble(const String& message) = 0;
+    virtual Ref<WebCore::ValidationBubble> createValidationBubble(const String& message, const WebCore::ValidationBubble::Settings&) = 0;
 #endif
 
 #if PLATFORM(COCOA)
@@ -253,7 +254,6 @@ public:
     virtual void recommendedScrollbarStyleDidChange(WebCore::ScrollbarStyle) = 0;
     virtual void removeNavigationGestureSnapshot() = 0;
     virtual void handleControlledElementIDResponse(const String&) = 0;
-    virtual void handleActiveNowPlayingSessionInfoResponse(bool hasActiveSession, const String& title, double duration, double elapsedTime) = 0;
 
     virtual CGRect boundsOfLayerInLayerBackedWindowCoordinates(CALayer *) const = 0;
 
@@ -284,6 +284,10 @@ public:
     virtual void setEditableElementIsFocused(bool) = 0;
 #endif // PLATFORM(MAC)
 
+#if PLATFORM(COCOA)
+    virtual void handleActiveNowPlayingSessionInfoResponse(bool hasActiveSession, const String& title, double duration, double elapsedTime) = 0;
+#endif
+
 #if PLATFORM(IOS)
     virtual void commitPotentialTapFailed() = 0;
     virtual void didGetTapHighlightGeometries(uint64_t requestID, const WebCore::Color&, const Vector<WebCore::FloatQuad>& highlightedQuads, const WebCore::IntSize& topLeftRadius, const WebCore::IntSize& topRightRadius, const WebCore::IntSize& bottomLeftRadius, const WebCore::IntSize& bottomRightRadius) = 0;
@@ -293,8 +297,8 @@ public:
 
     virtual void dynamicViewportUpdateChangedTarget(double newScale, const WebCore::FloatPoint& newScrollPosition, uint64_t transactionID) = 0;
     virtual void couldNotRestorePageState() = 0;
-    virtual void restorePageState(const WebCore::FloatPoint& scrollPosition, const WebCore::FloatPoint& scrollOrigin, const WebCore::FloatSize& obscuredInsetOnSave, double scale) = 0;
-    virtual void restorePageCenterAndScale(const WebCore::FloatPoint& center, double scale) = 0;
+    virtual void restorePageState(std::optional<WebCore::FloatPoint> scrollPosition, const WebCore::FloatPoint& scrollOrigin, const WebCore::FloatSize& obscuredInsetOnSave, double scale) = 0;
+    virtual void restorePageCenterAndScale(std::optional<WebCore::FloatPoint> center, double scale) = 0;
 
     virtual void startAssistingNode(const AssistedNodeInformation&, bool userIsInteracting, bool blurPreviousNode, API::Object* userData) = 0;
     virtual void stopAssistingNode() = 0;
@@ -304,7 +308,6 @@ public:
     virtual void saveImageToLibrary(PassRefPtr<WebCore::SharedBuffer>) = 0;
     virtual void didUpdateBlockSelectionWithTouch(uint32_t touch, uint32_t flags, float growThreshold, float shrinkThreshold) = 0;
     virtual void showPlaybackTargetPicker(bool hasVideo, const WebCore::IntRect& elementRect) = 0;
-    virtual void zoomToRect(WebCore::FloatRect, double minimumScale, double maximumScale) = 0;
     virtual void disableDoubleTapGesturesDuringTapIfNecessary(uint64_t requestID) = 0;
     virtual double minimumZoomScale() const = 0;
     virtual WebCore::FloatRect documentRect() const = 0;
@@ -372,8 +375,17 @@ public:
     virtual bool windowIsFrontWindowUnderMouse(const NativeWebMouseEvent&) { return false; }
 
     virtual WebCore::UserInterfaceLayoutDirection userInterfaceLayoutDirection() = 0;
+
+#if USE(QUICK_LOOK)
+    virtual void requestPasswordForQuickLookDocument(const String& fileName, std::function<void(const String&)>&&) = 0;
+#endif
+
+#if ENABLE(DATA_INTERACTION)
+    virtual void didPerformDataInteractionControllerOperation() = 0;
+    virtual void didHandleStartDataInteractionRequest(bool started) = 0;
+    virtual void startDataInteractionWithImage(const WebCore::IntPoint& clientPosition, const ShareableBitmap::Handle& image, std::optional<WebCore::TextIndicatorData>, const WebCore::FloatPoint& anchorPoint, uint64_t action) = 0;
+    virtual void didConcludeEditDataInteraction(std::optional<WebCore::TextIndicatorData>) = 0;
+#endif
 };
 
 } // namespace WebKit
-
-#endif // PageClient_h

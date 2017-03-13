@@ -52,12 +52,47 @@ bool WKWebsitePoliciesGetContentBlockersEnabled(WKWebsitePoliciesRef websitePoli
     return toImpl(websitePolicies)->contentBlockersEnabled();
 }
 
-bool WKWebsitePoliciesGetAutoplayEnabled(WKWebsitePoliciesRef websitePolicies)
+void WKWebsitePoliciesSetAllowsAutoplayQuirks(WKWebsitePoliciesRef websitePolicies, bool allowsQuirks)
 {
-    return toImpl(websitePolicies)->autoplayEnabled();
+    toImpl(websitePolicies)->setAllowsAutoplayQuirks(allowsQuirks);
 }
 
-void WKWebsitePoliciesSetAutoplayEnabled(WKWebsitePoliciesRef websitePolicies, bool enabled)
+bool WKWebsitePoliciesGetAllowsAutoplayQuirks(WKWebsitePoliciesRef websitePolicies)
 {
-    toImpl(websitePolicies)->setAutoplayEnabled(enabled);
+    return toImpl(websitePolicies)->allowsAutoplayQuirks();
+}
+
+WKWebsiteAutoplayPolicy WKWebsitePoliciesGetAutoplayPolicy(WKWebsitePoliciesRef websitePolicies)
+{
+    switch (toImpl(websitePolicies)->autoplayPolicy()) {
+    case WebKit::WebsiteAutoplayPolicy::Default:
+        return kWKWebsiteAutoplayPolicyDefault;
+    case WebsiteAutoplayPolicy::Allow:
+        return kWKWebsiteAutoplayPolicyAllow;
+    case WebsiteAutoplayPolicy::AllowWithoutSound:
+        return kWKWebsiteAutoplayPolicyAllowWithoutSound;
+    case WebsiteAutoplayPolicy::Deny:
+        return kWKWebsiteAutoplayPolicyDeny;
+    }
+    ASSERT_NOT_REACHED();
+    return kWKWebsiteAutoplayPolicyDefault;
+}
+
+void WKWebsitePoliciesSetAutoplayPolicy(WKWebsitePoliciesRef websitePolicies, WKWebsiteAutoplayPolicy policy)
+{
+    switch (policy) {
+    case kWKWebsiteAutoplayPolicyDefault:
+        toImpl(websitePolicies)->setAutoplayPolicy(WebsiteAutoplayPolicy::Default);
+        return;
+    case kWKWebsiteAutoplayPolicyAllow:
+        toImpl(websitePolicies)->setAutoplayPolicy(WebsiteAutoplayPolicy::Allow);
+        return;
+    case kWKWebsiteAutoplayPolicyAllowWithoutSound:
+        toImpl(websitePolicies)->setAutoplayPolicy(WebsiteAutoplayPolicy::AllowWithoutSound);
+        return;
+    case kWKWebsiteAutoplayPolicyDeny:
+        toImpl(websitePolicies)->setAutoplayPolicy(WebsiteAutoplayPolicy::Deny);
+        return;
+    }
+    ASSERT_NOT_REACHED();
 }

@@ -213,7 +213,7 @@ static bool isFileHidden(NSString *file)
         }
         
         // If we have removed every database file for this origin, delete the folder for this origin.
-        if (databaseFileCount == deletedDatabaseFileCount) {
+        if (databaseFileCount == deletedDatabaseFileCount || ![fileManager contentsOfDirectoryAtPath:path error:nullptr].count) {
             // Use rmdir - we don't want the deletion to happen if the folder is not empty.
             rmdir([path fileSystemRepresentation]);
         }
@@ -233,77 +233,6 @@ static bool isFileHidden(NSString *file)
 #endif // PLATFORM(IOS)
 
 @end
-
-#if PLATFORM(IOS)
-
-@implementation WebDatabaseManager (WebDatabaseManagerInternal)
-
-static Lock& transactionBackgroundTaskIdentifierLock()
-{
-    static NeverDestroyed<Lock> mutex;
-    return mutex;
-}
-
-static WebBackgroundTaskIdentifier transactionBackgroundTaskIdentifier;
-
-static void setTransactionBackgroundTaskIdentifier(WebBackgroundTaskIdentifier identifier)
-{
-    transactionBackgroundTaskIdentifier = identifier;
-}
-
-static WebBackgroundTaskIdentifier getTransactionBackgroundTaskIdentifier()
-{
-    static dispatch_once_t pred;
-    dispatch_once(&pred, ^{
-        setTransactionBackgroundTaskIdentifier(invalidWebBackgroundTaskIdentifier());
-    });
-    
-    return transactionBackgroundTaskIdentifier;
-}
-
-+ (void)willBeginFirstTransaction
-{
-    [self startBackgroundTask];
-}
-
-+ (void)didFinishLastTransaction
-{
-    [self endBackgroundTask];
-}
-
-+ (void)startBackgroundTask
-{
-    LockHolder lock(transactionBackgroundTaskIdentifierLock());
-
-    // If there's already an existing background task going on, there's no need to start a new one.
-    if (getTransactionBackgroundTaskIdentifier() != invalidWebBackgroundTaskIdentifier())
-        return;
-    
-    setTransactionBackgroundTaskIdentifier(startBackgroundTask(^ {
-        DatabaseTracker::singleton().closeAllDatabases(CurrentQueryBehavior::Interrupt);
-        [WebDatabaseManager endBackgroundTask];
-    }));
-}
-
-+ (void)endBackgroundTask
-{
-    LockHolder lock(transactionBackgroundTaskIdentifierLock());
-
-    // It is possible that we were unable to start the background task when the first transaction began.
-    // Don't try to end the task in that case.
-    // It is also possible we finally finish the last transaction right when the background task expires
-    // and this will end up being called twice for the same background task.  transactionBackgroundTaskIdentifier
-    // will be invalid for the second caller.
-    if (getTransactionBackgroundTaskIdentifier() == invalidWebBackgroundTaskIdentifier())
-        return;
-        
-    endBackgroundTask(getTransactionBackgroundTaskIdentifier());
-    setTransactionBackgroundTaskIdentifier(invalidWebBackgroundTaskIdentifier());
-}
-
-@end
-
-#endif // PLATFORM(IOS)
 
 static NSString *databasesDirectoryPath()
 {

@@ -54,6 +54,7 @@ public:
     void doAsyncTask(JSValueRef callback);
     void doAfterPresentationUpdate(JSValueRef callback);
     void doAfterNextStablePresentationUpdate(JSValueRef callback);
+    void doAfterVisibleContentRectUpdate(JSValueRef callback);
 
     void zoomToScale(double scale, JSValueRef callback);
 
@@ -87,6 +88,7 @@ public:
     void selectFormAccessoryPickerRow(long);
     
     JSObjectRef contentsOfUserInterfaceItem(JSStringRef) const;
+    void overridePreference(JSStringRef preference, JSStringRef value);
     
     void scrollToOffset(long x, long y);
 
@@ -138,7 +140,16 @@ public:
     
     JSRetainPtr<JSStringRef> scrollingTreeAsText() const;
 
+    JSObjectRef propertiesOfLayerWithID(uint64_t layerID) const;
+
     void uiScriptComplete(JSStringRef result);
+    
+    void retrieveSpeakSelectionContent(JSValueRef);
+    JSRetainPtr<JSStringRef> accessibilitySpeakSelectionContent() const;
+
+    // These use a callback to allow the client to know when view visibility state updates get to the web process.
+    void removeViewFromWindow(JSValueRef);
+    void addViewToWindow(JSValueRef);
 
 private:
     UIScriptController(UIScriptContext&);

@@ -31,6 +31,7 @@
 #import "APIPageConfiguration.h"
 #import "AccessibilityIOS.h"
 #import "ApplicationStateTracker.h"
+#import "InputViewUpdateDeferrer.h"
 #import "Logging.h"
 #import "PageClientImplIOS.h"
 #import "PrintInfo.h"
@@ -203,15 +204,14 @@ private:
     WebProcessPool::statistics().wkViewCount++;
 
     _rootContentView = adoptNS([[UIView alloc] init]);
+    [_rootContentView layer].name = @"RootContent";
     [_rootContentView layer].masksToBounds = NO;
     [_rootContentView setAutoresizingMask:UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight];
 
     _fixedClippingView = adoptNS([[UIView alloc] init]);
+    [_fixedClippingView layer].name = @"FixedClipping";
     [_fixedClippingView layer].masksToBounds = YES;
     [_fixedClippingView layer].anchorPoint = CGPointZero;
-#ifndef NDEBUG
-    [[_fixedClippingView layer] setName:@"Fixed clipping"];
-#endif
 
     [self addSubview:_fixedClippingView.get()];
     [_fixedClippingView addSubview:_rootContentView.get()];
@@ -574,7 +574,7 @@ static void storeAccessibilityRemoteConnectionInformation(id element, pid_t pid,
         [self updateFixedClippingView:fixedPositionRect];
 
         // We need to push the new content bounds to the webview to update fixed position rects.
-        [_webView _updateVisibleContentRects];
+        [_webView _scheduleVisibleContentRectUpdate];
     }
     
     // Updating the selection requires a full editor state. If the editor state is missing post layout
@@ -694,6 +694,12 @@ static void storeAccessibilityRemoteConnectionInformation(id element, pid_t pid,
 
     PrintInfo printInfo;
     printInfo.pageSetupScaleFactor = 1;
+    printInfo.snapshotFirstPage = printFormatter.snapshotFirstPage;
+    if (printInfo.snapshotFirstPage) {
+        static const CGFloat maximumPDFHeight = 200 * 72; // maximum PDF height for a single page is 200 inches
+        printingRect = (CGRect) { CGPointZero, { self.bounds.size.width, std::min(_webView.scrollView.contentSize.height, maximumPDFHeight) } };
+        [printFormatter _setSnapshotPaperRect:printingRect];
+    }
     printInfo.availablePaperWidth = CGRectGetWidth(printingRect);
     printInfo.availablePaperHeight = CGRectGetHeight(printingRect);
 

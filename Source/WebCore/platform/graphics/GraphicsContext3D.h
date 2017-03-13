@@ -60,7 +60,7 @@
 #include <wtf/RetainPtr.h>
 OBJC_CLASS CALayer;
 OBJC_CLASS WebGLLayer;
-#elif PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(WIN_CAIRO)
+#elif PLATFORM(GTK) || PLATFORM(WIN_CAIRO)
 typedef unsigned int GLuint;
 #endif
 
@@ -100,6 +100,9 @@ class IntSize;
 class WebGLRenderingContextBase;
 #if USE(CAIRO)
 class PlatformContextCairo;
+#endif
+#if USE(TEXTURE_MAPPER)
+class TextureMapperGC3DPlatformLayer;
 #endif
 
 typedef WTF::HashMap<CString, uint64_t> ShaderNameHash;
@@ -1117,7 +1120,7 @@ public:
     GC3Dboolean isVertexArray(Platform3DObject);
     void bindVertexArray(Platform3DObject);
 
-#if PLATFORM(GTK) || PLATFORM(EFL) || USE(CAIRO)
+#if PLATFORM(GTK) || USE(CAIRO)
     void paintToCanvas(const unsigned char* imagePixels, int imageWidth, int imageHeight,
                        int canvasWidth, int canvasHeight, PlatformContextCairo* context);
 #elif USE(CG)
@@ -1130,6 +1133,9 @@ public:
     void forceContextLost();
     void recycleContext();
 
+    void dispatchContextChangedNotification();
+    void simulateContextChanged();
+
     void paintRenderingResultsToCanvas(ImageBuffer*);
     RefPtr<ImageData> paintRenderingResultsToImageData();
     bool paintCompositedResultsToCanvas(ImageBuffer*);
@@ -1137,6 +1143,12 @@ public:
 #if PLATFORM(IOS)
     void endPaint();
 #endif
+#if PLATFORM(MAC)
+    void updateCGLContext();
+#endif
+    void setContextVisibility(bool);
+
+    GraphicsContext3DPowerPreference powerPreferenceUsedForCreation() const { return m_powerPreferenceUsedForCreation; }
 
     // Support for buffer creation and deletion
     Platform3DObject createBuffer();
@@ -1287,9 +1299,6 @@ private:
     bool reshapeFBOs(const IntSize&);
     void resolveMultisamplingIfNecessary(const IntRect& = IntRect());
     void attachDepthAndStencilBufferIfNeeded(GLuint internalDepthStencilFormat, int width, int height);
-#if PLATFORM(EFL) && USE(GRAPHICS_SURFACE)
-    void createGraphicsSurfaces(const IntSize&);
-#endif
 
     int m_currentWidth, m_currentHeight;
 
@@ -1364,7 +1373,7 @@ private:
 
     std::unique_ptr<ShaderNameHash> nameHashMapForShaders;
 
-#if ((PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(WIN)) && USE(OPENGL_ES_2))
+#if ((PLATFORM(GTK) || PLATFORM(WIN)) && USE(OPENGL_ES_2))
     friend class Extensions3DOpenGLES;
     std::unique_ptr<Extensions3DOpenGLES> m_extensions;
 #else
@@ -1374,6 +1383,7 @@ private:
     friend class Extensions3DOpenGLCommon;
 
     GraphicsContext3DAttributes m_attrs;
+    GraphicsContext3DPowerPreference m_powerPreferenceUsedForCreation { GraphicsContext3DPowerPreference::Default };
     RenderStyle m_renderStyle;
     Vector<Vector<float>> m_vertexArray;
 
@@ -1413,9 +1423,15 @@ private:
     // Errors raised by synthesizeGLError().
     ListHashSet<GC3Denum> m_syntheticErrors;
 
+#if USE(TEXTURE_MAPPER)
+    friend class TextureMapperGC3DPlatformLayer;
+    std::unique_ptr<TextureMapperGC3DPlatformLayer> m_texmapLayer;
+#else
     friend class GraphicsContext3DPrivate;
     std::unique_ptr<GraphicsContext3DPrivate> m_private;
-    
+#endif
+
+    // FIXME: Layering violation.
     WebGLRenderingContextBase* m_webglContext;
 
     bool m_isForWebGL2 { false };

@@ -122,6 +122,7 @@
 #include <WebCore/IntRect.h>
 #include <WebCore/JSElement.h>
 #include <WebCore/KeyboardEvent.h>
+#include <WebCore/LibWebRTCProvider.h>
 #include <WebCore/LogInitialization.h>
 #include <WebCore/Logging.h>
 #include <WebCore/MIMETypeRegistry.h>
@@ -408,7 +409,6 @@ bool WebView::s_allowSiteSpecificHacks = false;
 WebView::WebView()
 {
     JSC::initializeThreading();
-    WTF::initializeMainThread();
     RunLoop::initializeMainRunLoop();
 
     m_backingStoreSize.cx = m_backingStoreSize.cy = 0;
@@ -1658,7 +1658,7 @@ bool WebView::handleContextMenuEvent(WPARAM wParam, LPARAM lParam)
     Frame* targetFrame = result.innerNonSharedNode() ? result.innerNonSharedNode()->document().frame() : &m_page->focusController().focusedOrMainFrame();
 
     targetFrame->view()->setCursor(pointerCursor());
-    PlatformMouseEvent mouseEvent(m_viewWindow, WM_RBUTTONUP, wParam, lParam);
+    PlatformMouseEvent mouseEvent(m_viewWindow, WM_RBUTTONUP, wParam, makeScaledPoint(IntPoint(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)), deviceScaleFactor()));
     bool handledEvent = targetFrame->eventHandler().sendContextMenuEvent(mouseEvent);
     if (!handledEvent)
         return false;
@@ -1826,7 +1826,7 @@ bool WebView::handleMouseEvent(UINT message, WPARAM wParam, LPARAM lParam)
     // Create our event.
     // On WM_MOUSELEAVE we need to create a mouseout event, so we force the position
     // of the event to be at (MINSHORT, MINSHORT).
-    LPARAM position = (message == WM_MOUSELEAVE) ? ((MINSHORT << 16) | MINSHORT) : lParam;
+    LPARAM position = (message == WM_MOUSELEAVE) ? ((MINSHORT << 16) | MINSHORT) : makeScaledPoint(IntPoint(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)), deviceScaleFactor());
     PlatformMouseEvent mouseEvent(m_viewWindow, message, wParam, position, m_mouseActivated);
 
     setMouseActivated(false);
@@ -3099,7 +3099,11 @@ HRESULT WebView::initWithFrame(RECT frame, _In_ BSTR frameName, _In_ BSTR groupN
 
     m_inspectorClient = new WebInspectorClient(this);
 
-    PageConfiguration configuration(makeUniqueRef<WebEditorClient>(this), SocketProvider::create());
+    PageConfiguration configuration(
+        makeUniqueRef<WebEditorClient>(this),
+        SocketProvider::create(),
+        makeUniqueRef<LibWebRTCProvider>()
+    );
     configuration.backForwardClient = BackForwardList::create();
     configuration.chromeClient = new WebChromeClient(this);
     configuration.contextMenuClient = new WebContextMenuClient(this);
@@ -5181,7 +5185,7 @@ HRESULT WebView::notifyPreferencesChanged(IWebNotification* notification)
     settings.setShouldDisplayTextDescriptions(enabled);
 #endif
 
-    COMPtr<IWebPreferencesPrivate3> prefsPrivate(Query, preferences);
+    COMPtr<IWebPreferencesPrivate4> prefsPrivate(Query, preferences);
     if (prefsPrivate) {
         hr = prefsPrivate->localStorageDatabasePath(&str);
         if (FAILED(hr))
@@ -5228,10 +5232,6 @@ HRESULT WebView::notifyPreferencesChanged(IWebNotification* notification)
 
     // FIXME: Add preferences for the runtime enabled features.
 
-#if ENABLE(INDEXED_DATABASE)
-    RuntimeEnabledFeatures::sharedFeatures().setWebkitIndexedDBEnabled(true);
-#endif
-
 #if ENABLE(FETCH_API)
     hr = prefsPrivate->fetchAPIEnabled(&enabled);
     if (FAILED(hr))
@@ -5253,6 +5253,28 @@ HRESULT WebView::notifyPreferencesChanged(IWebNotification* notification)
     if (FAILED(hr))
         return hr;
     RuntimeEnabledFeatures::sharedFeatures().setModernMediaControlsEnabled(!!enabled);
+
+#if ENABLE(WEB_ANIMATIONS)
+    hr = prefsPrivate->webAnimationsEnabled(&enabled);
+    if (FAILED(hr))
+        return hr;
+    RuntimeEnabledFeatures::sharedFeatures().setWebAnimationsEnabled(!!enabled);
+#endif
+
+    hr = prefsPrivate->userTimingEnabled(&enabled);
+    if (FAILED(hr))
+        return hr;
+    RuntimeEnabledFeatures::sharedFeatures().setUserTimingEnabled(!!enabled);
+
+    hr = prefsPrivate->resourceTimingEnabled(&enabled);
+    if (FAILED(hr))
+        return hr;
+    RuntimeEnabledFeatures::sharedFeatures().setResourceTimingEnabled(!!enabled);
+
+    hr = prefsPrivate->linkPreloadEnabled(&enabled);
+    if (FAILED(hr))
+        return hr;
+    RuntimeEnabledFeatures::sharedFeatures().setLinkPreloadEnabled(!!enabled);
 
     hr = preferences->privateBrowsingEnabled(&enabled);
     if (FAILED(hr))
@@ -5850,7 +5872,7 @@ HRESULT WebView::standardUserAgentWithApplicationName(_In_ BSTR applicationName,
 HRESULT WebView::clearFocusNode()
 {
     if (m_page)
-        m_page->focusController().setFocusedElement(0, 0);
+        m_page->focusController().setFocusedElement(nullptr, m_page->focusController().focusedOrMainFrame());
     return S_OK;
 }
 
@@ -6484,7 +6506,7 @@ HRESULT WebView::reportException(_In_ JSContextRef context, _In_ JSValueRef exce
     JSC::JSLockHolder lock(execState);
 
     // Make sure the context has a DOMWindow global object, otherwise this context didn't originate from a WebView.
-    if (!toJSDOMWindow(execState->lexicalGlobalObject()))
+    if (!toJSDOMWindow(execState->vm(), execState->lexicalGlobalObject()))
         return E_FAIL;
 
     WebCore::reportException(execState, toJS(execState, exception));
@@ -6503,7 +6525,7 @@ HRESULT WebView::elementFromJS(_In_ JSContextRef context, _In_ JSValueRef nodeOb
 
     JSC::ExecState* exec = toJS(context);
     JSC::JSLockHolder lock(exec);
-    Element* elt = JSElement::toWrapped(toJS(exec, nodeObject));
+    Element* elt = JSElement::toWrapped(exec->vm(), toJS(exec, nodeObject));
     if (!elt)
         return E_FAIL;
 
@@ -7142,6 +7164,7 @@ void WebView::setAcceleratedCompositing(bool accelerated)
             ASSERT(m_viewWindow);
             m_layerTreeHost->setWindow(m_viewWindow);
             m_layerTreeHost->setPage(page());
+            m_layerTreeHost->setScaleFactor(deviceScaleFactor());
 
             // FIXME: We could perhaps get better performance by never allowing this layer to
             // become tiled (or choosing a higher-than-normal tiling threshold).
@@ -7155,10 +7178,12 @@ void WebView::setAcceleratedCompositing(bool accelerated)
             m_backingLayer->setNeedsDisplay();
             m_layerTreeHost->setRootChildLayer(PlatformCALayer::platformCALayer(m_backingLayer->platformLayer()));
 
+#if !HAVE(CACFLAYER_SETCONTENTSSCALE)
             TransformationMatrix m;
             m.scale(deviceScaleFactor());
             m_backingLayer->setAnchorPoint(FloatPoint3D());
             m_backingLayer->setTransform(m);
+#endif
 
             // We aren't going to be using our backing store while we're in accelerated compositing
             // mode. But don't delete it immediately, in case we switch out of accelerated
@@ -7442,7 +7467,7 @@ HRESULT WebView::defaultMinimumTimerInterval(_Out_ double* interval)
 {
     if (!interval)
         return E_POINTER;
-    *interval = DOMTimer::defaultMinimumInterval().count() / 1000.;
+    *interval = DOMTimer::defaultMinimumInterval().seconds();
     return S_OK;
 }
 
@@ -7451,8 +7476,7 @@ HRESULT WebView::setMinimumTimerInterval(double interval)
     if (!m_page)
         return E_FAIL;
 
-    auto intervalMS = std::chrono::milliseconds((std::chrono::milliseconds::rep)(interval * 1000));
-    page()->settings().setMinimumDOMTimerInterval(intervalMS);
+    page()->settings().setMinimumDOMTimerInterval(Seconds { interval });
     return S_OK;
 }
 
@@ -7749,7 +7773,7 @@ HRESULT WebView::setCustomBackingScaleFactor(double customScaleFactor)
 
     m_customDeviceScaleFactor = customScaleFactor;
 
-    if (oldScaleFactor != deviceScaleFactor())
+    if (m_page && oldScaleFactor != deviceScaleFactor())
         m_page->setDeviceScaleFactor(deviceScaleFactor());
 
     return S_OK;

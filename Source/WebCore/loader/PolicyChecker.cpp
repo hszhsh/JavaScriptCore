@@ -125,7 +125,7 @@ void PolicyChecker::checkNavigationPolicy(const ResourceRequest& request, bool d
 
 #if USE(QUICK_LOOK)
     // Always allow QuickLook-generated URLs based on the protocol scheme.
-    if (!request.isNull() && request.url().protocolIs(QLPreviewProtocol())) {
+    if (!request.isNull() && isQuickLookPreviewURL(request.url())) {
         continueAfterNavigationPolicy(PolicyUse);
         return;
     }
@@ -145,7 +145,7 @@ void PolicyChecker::checkNavigationPolicy(const ResourceRequest& request, bool d
 #endif
 
     m_delegateIsDecidingNavigationPolicy = true;
-    m_suggestedFilename = action.downloadAttribute();
+    m_suggestedFilename = action.downloadAttribute().isEmpty() ? nullAtom : action.downloadAttribute();
     m_frame.loader().client().dispatchDecidePolicyForNavigationAction(action, request, formState, [this](PolicyAction action) {
         continueAfterNavigationPolicy(action);
     });
@@ -157,7 +157,7 @@ void PolicyChecker::checkNewWindowPolicy(const NavigationAction& action, const R
     if (m_frame.document() && m_frame.document()->isSandboxed(SandboxPopups))
         return continueAfterNavigationPolicy(PolicyIgnore);
 
-    if (!DOMWindow::allowPopUp(&m_frame))
+    if (!DOMWindow::allowPopUp(m_frame))
         return continueAfterNavigationPolicy(PolicyIgnore);
 
     m_callback.set(request, formState, frameName, action, WTFMove(function));

@@ -63,9 +63,7 @@ const CSSParserContext& strictCSSParserContext()
 CSSParserContext::CSSParserContext(CSSParserMode mode, const URL& baseURL)
     : baseURL(baseURL)
     , mode(mode)
-#if ENABLE(CSS_GRID_LAYOUT)
     , cssGridLayoutEnabled(RuntimeEnabledFeatures::sharedFeatures().isCSSGridLayoutEnabled())
-#endif
 {
 #if PLATFORM(IOS)
     // FIXME: Force the site specific quirk below to work on iOS. Investigating other site specific quirks
@@ -80,20 +78,16 @@ CSSParserContext::CSSParserContext(Document& document, const URL& baseURL, const
     , charset(charset)
     , mode(document.inQuirksMode() ? HTMLQuirksMode : HTMLStandardMode)
     , isHTMLDocument(document.isHTMLDocument())
-#if ENABLE(CSS_GRID_LAYOUT)
     , cssGridLayoutEnabled(document.isCSSGridLayoutEnabled())
-#endif
 {
-    if (Settings* settings = document.settings()) {
-        needsSiteSpecificQuirks = settings->needsSiteSpecificQuirks();
-        enforcesCSSMIMETypeInNoQuirksMode = settings->enforceCSSMIMETypeInNoQuirksMode();
-        useLegacyBackgroundSizeShorthandBehavior = settings->useLegacyBackgroundSizeShorthandBehavior();
+    needsSiteSpecificQuirks = document.settings().needsSiteSpecificQuirks();
+    enforcesCSSMIMETypeInNoQuirksMode = document.settings().enforceCSSMIMETypeInNoQuirksMode();
+    useLegacyBackgroundSizeShorthandBehavior = document.settings().useLegacyBackgroundSizeShorthandBehavior();
 #if ENABLE(TEXT_AUTOSIZING)
-        textAutosizingEnabled = settings->textAutosizingEnabled();
+    textAutosizingEnabled = document.settings().textAutosizingEnabled();
 #endif
-        springTimingFunctionEnabled = settings->springTimingFunctionEnabled();
-        deferredCSSParserEnabled = settings->deferredCSSParserEnabled();
-    }
+    springTimingFunctionEnabled = document.settings().springTimingFunctionEnabled();
+    deferredCSSParserEnabled = document.settings().deferredCSSParserEnabled();
 
 #if PLATFORM(IOS)
     // FIXME: Force the site specific quirk below to work on iOS. Investigating other site specific quirks
@@ -109,9 +103,7 @@ bool operator==(const CSSParserContext& a, const CSSParserContext& b)
         && a.charset == b.charset
         && a.mode == b.mode
         && a.isHTMLDocument == b.isHTMLDocument
-#if ENABLE(CSS_GRID_LAYOUT)
         && a.cssGridLayoutEnabled == b.cssGridLayoutEnabled
-#endif
         && a.needsSiteSpecificQuirks == b.needsSiteSpecificQuirks
         && a.enforcesCSSMIMETypeInNoQuirksMode == b.enforcesCSSMIMETypeInNoQuirksMode
         && a.useLegacyBackgroundSizeShorthandBehavior == b.useLegacyBackgroundSizeShorthandBehavior

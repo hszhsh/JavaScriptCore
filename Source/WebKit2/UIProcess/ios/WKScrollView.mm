@@ -118,14 +118,20 @@ using namespace WebKit;
 
 - (id)initWithFrame:(CGRect)frame
 {
-    if (self = [super initWithFrame:frame]) {
-        ASSERT([self verticalScrollDecelerationFactor] == [self horizontalScrollDecelerationFactor]);
-        // FIXME: use UIWebPreferredScrollDecelerationFactor() from UIKit: rdar://problem/18931007.
-        _preferredScrollDecelerationFactor = [self verticalScrollDecelerationFactor];
-    }
+    self = [super initWithFrame:frame];
+
+    if (!self)
+        return nil;
+
+    self.alwaysBounceVertical = YES;
+    self.directionalLockEnabled = YES;
     
     return self;
 }
+
+#if USE(APPLE_INTERNAL_SDK) && __has_include(<WebKitAdditions/WKScrollViewAdditions.mm>)
+#import <WebKitAdditions/WKScrollViewAdditions.mm>
+#endif
 
 - (void)setInternalDelegate:(WKWebView <UIScrollViewDelegate> *)internalDelegate
 {
@@ -222,7 +228,7 @@ static inline bool valuesAreWithinOnePixel(CGFloat a, CGFloat b)
 {
     [super setContentInset:contentInset];
 
-    [_internalDelegate _updateVisibleContentRects];
+    [_internalDelegate _scheduleVisibleContentRectUpdate];
 }
 
 // Fetch top/left rubberband amounts (as negative values).
@@ -271,12 +277,6 @@ static inline bool valuesAreWithinOnePixel(CGFloat a, CGFloat b)
 
     if (!CGSizeEqualToSize(rubberbandAmount, CGSizeZero))
         [self _restoreContentOffsetWithRubberbandAmount:rubberbandAmount];
-}
-
-- (void)setDecelerationRate:(CGFloat)decelerationRate
-{
-    [super setDecelerationRate:decelerationRate];
-    _preferredScrollDecelerationFactor = decelerationRate;
 }
 
 @end

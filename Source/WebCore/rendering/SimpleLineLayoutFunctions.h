@@ -43,6 +43,7 @@ namespace SimpleLineLayout {
 LayoutUnit computeFlowHeight(const RenderBlockFlow&, const Layout&);
 LayoutUnit computeFlowFirstLineBaseline(const RenderBlockFlow&, const Layout&);
 LayoutUnit computeFlowLastLineBaseline(const RenderBlockFlow&, const Layout&);
+FloatRect computeOverflow(const RenderBlockFlow&, const FloatRect&);
 
 void paintFlow(const RenderBlockFlow&, const Layout&, PaintInfo&, const LayoutPoint& paintOffset);
 bool hitTestFlow(const RenderBlockFlow&, const Layout&, const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction);
@@ -57,6 +58,8 @@ IntPoint computeFirstRunLocation(const RenderObject&, const Layout&);
 
 Vector<IntRect> collectAbsoluteRects(const RenderObject&, const Layout&, const LayoutPoint& accumulatedOffset);
 Vector<FloatQuad> collectAbsoluteQuads(const RenderObject&, const Layout&, bool* wasFixed);
+unsigned textOffsetForPoint(const LayoutPoint&, const RenderText&, const Layout&);
+Vector<FloatQuad> collectAbsoluteQuadsForRange(const RenderObject&, unsigned start, unsigned end, const Layout&, bool* wasFixed);
 
 LayoutUnit lineHeightFromFlow(const RenderBlockFlow&);
 LayoutUnit baselineFromFlow(const RenderBlockFlow&);
@@ -71,7 +74,12 @@ namespace SimpleLineLayout {
 
 inline LayoutUnit computeFlowHeight(const RenderBlockFlow& flow, const Layout& layout)
 {
-    return lineHeightFromFlow(flow) * layout.lineCount();
+    auto flowHeight = lineHeightFromFlow(flow) * layout.lineCount();
+    if (!layout.hasLineStruts())
+        return flowHeight;
+    for (auto& strutEntry : layout.struts())
+        flowHeight += strutEntry.offset;
+    return flowHeight;
 }
 
 inline LayoutUnit computeFlowFirstLineBaseline(const RenderBlockFlow& flow, const Layout& layout)

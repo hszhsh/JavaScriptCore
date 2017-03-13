@@ -379,12 +379,7 @@ void WKContextRegisterURLSchemeAsBypassingContentSecurityPolicy(WKContextRef con
 
 void WKContextRegisterURLSchemeAsCachePartitioned(WKContextRef contextRef, WKStringRef urlScheme)
 {
-#if ENABLE(CACHE_PARTITIONING)
     toImpl(contextRef)->registerURLSchemeAsCachePartitioned(toImpl(urlScheme)->string());
-#else
-    UNUSED_PARAM(contextRef);
-    UNUSED_PARAM(urlScheme);
-#endif
 }
 
 void WKContextSetDomainRelaxationForbiddenForURLScheme(WKContextRef contextRef, WKStringRef urlScheme)
@@ -505,6 +500,16 @@ void WKContextGetStatistics(WKContextRef contextRef, void* context, WKContextGet
 void WKContextGetStatisticsWithOptions(WKContextRef contextRef, WKStatisticsOptions optionsMask, void* context, WKContextGetStatisticsFunction callback)
 {
     toImpl(contextRef)->getStatistics(optionsMask, toGenericCallbackFunction(context, callback));
+}
+
+bool WKContextJavaScriptConfigurationFileEnabled(WKContextRef contextRef)
+{
+    return toImpl(contextRef)->javaScriptConfigurationFileEnabled();
+}
+
+void WKContextSetJavaScriptConfigurationFileEnabled(WKContextRef contextRef, bool enable)
+{
+    toImpl(contextRef)->setJavaScriptConfigurationFileEnabled(enable);
 }
 
 void WKContextGarbageCollectJavaScriptObjects(WKContextRef contextRef)

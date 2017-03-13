@@ -51,13 +51,21 @@
 using namespace WebCore;
 using namespace WebKit;
 
+#if USE(APPLE_INTERNAL_SDK) && __has_include(<WebKitAdditions/WebDragClientAdditionsWebKit2.mm>)
+#import <WebKitAdditions/WebDragClientAdditionsWebKit2.mm>
+#endif
+
+#if PLATFORM(MAC)
+
 namespace WebKit {
 
 static PassRefPtr<ShareableBitmap> convertImageToBitmap(NSImage *image, const IntSize& size, Frame& frame)
 {
     ShareableBitmap::Flags flags = ShareableBitmap::SupportsAlpha;
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
     if (screenSupportsExtendedColor(frame.mainFrame().view()))
         flags |= ShareableBitmap::SupportsExtendedColor;
+#endif
     auto bitmap = ShareableBitmap::createShareable(size, flags);
     if (!bitmap)
         return nullptr;
@@ -74,10 +82,14 @@ static PassRefPtr<ShareableBitmap> convertImageToBitmap(NSImage *image, const In
     return WTFMove(bitmap);
 }
 
-void WebDragClient::startDrag(RetainPtr<NSImage> image, const IntPoint& point, const IntPoint&, DataTransfer&, Frame& frame, bool linkDrag)
+void WebDragClient::didConcludeEditDrag()
 {
-    IntSize bitmapSize([image size]);
-    RefPtr<ShareableBitmap> bitmap = convertImageToBitmap(image.get(), bitmapSize, frame);
+}
+
+void WebDragClient::startDrag(DragImage image, const IntPoint& point, const IntPoint&, const FloatPoint&, DataTransfer&, Frame& frame, DragSourceAction dragSourceAction)
+{
+    IntSize bitmapSize([image.get() size]);
+    RefPtr<ShareableBitmap> bitmap = convertImageToBitmap(image.get().get(), bitmapSize, frame);
     ShareableBitmap::Handle handle;
     if (!bitmap || !bitmap->createHandle(handle))
         return;
@@ -85,7 +97,7 @@ void WebDragClient::startDrag(RetainPtr<NSImage> image, const IntPoint& point, c
     m_page->willStartDrag();
 
     // FIXME: Seems this message should be named StartDrag, not SetDragImage.
-    m_page->send(Messages::WebPageProxy::SetDragImage(frame.view()->contentsToWindow(point), handle, linkDrag));
+    m_page->send(Messages::WebPageProxy::SetDragImage(frame.view()->contentsToWindow(point), handle, std::nullopt, { }, dragSourceAction));
 }
 
 static WebCore::CachedImage* cachedImage(Element& element)
@@ -102,7 +114,10 @@ static WebCore::CachedImage* cachedImage(Element& element)
 #if ENABLE(ATTACHMENT_ELEMENT)
 void WebDragClient::declareAndWriteAttachment(const String& pasteboardName, Element& element, const URL& url, const String& path, WebCore::Frame* frame)
 {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     ASSERT(pasteboardName == String(NSDragPboard));
+#pragma clang diagnostic pop
     
     NSURL* nsURL = (NSURL *)url;
     m_page->send(Messages::WebPageProxy::SetPromisedDataForAttachment(pasteboardName, String(nsURL.lastPathComponent), String(nsURL.pathExtension), path, String(nsURL.absoluteString), userVisibleString(nsURL)));
@@ -111,7 +126,10 @@ void WebDragClient::declareAndWriteAttachment(const String& pasteboardName, Elem
 
 void WebDragClient::declareAndWriteDragImage(const String& pasteboardName, Element& element, const URL& url, const String& label, Frame*)
 {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     ASSERT(pasteboardName == String(NSDragPboard));
+#pragma clang diagnostic pop
 
     WebCore::CachedImage* image = cachedImage(element);
 
@@ -159,5 +177,7 @@ void WebDragClient::declareAndWriteDragImage(const String& pasteboardName, Eleme
 }
 
 } // namespace WebKit
+
+#endif // PLATFORM(MAC)
 
 #endif // ENABLE(DRAG_SUPPORT)

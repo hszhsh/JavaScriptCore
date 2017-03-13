@@ -453,13 +453,13 @@ static void webkit_web_page_class_init(WebKitWebPageClass* klass)
      * @context_menu: the proposed #WebKitContextMenu
      * @hit_test_result: a #WebKitWebHitTestResult
      *
-     * Emmited before a context menu is displayed in the UI Process to
+     * Emitted before a context menu is displayed in the UI Process to
      * give the application a chance to customize the proposed menu,
      * build its own context menu or pass user data to the UI Process.
      * This signal is useful when the information available in the UI Process
      * is not enough to build or customize the context menu, for example, to
      * add menu entries depending on the #WebKitDOMNode at the coordinates of the
-     * @hit_test_result. Otherwise, it's recommened to use #WebKitWebView::context-menu
+     * @hit_test_result. Otherwise, it's recommended to use #WebKitWebView::context-menu
      * signal instead.
      *
      * Returns: %TRUE if the proposed @context_menu has been modified, or %FALSE otherwise.
@@ -482,8 +482,8 @@ static void webkit_web_page_class_init(WebKitWebPageClass* klass)
      * @web_page: the #WebKitWebPage on which the signal is emitted
      * @console_message: the #WebKitConsoleMessage
      *
-     * Emmited when a message is sent to the console. This can be a message
-     * produced by the use of JavaScript console API, a javascript exception,
+     * Emitted when a message is sent to the console. This can be a message
+     * produced by the use of JavaScript console API, a JavaScript exception,
      * a security error or other errors, warnings, debug or log messages.
      * The @console_message contains information of the message.
      *
@@ -505,14 +505,14 @@ static void webkit_web_page_class_init(WebKitWebPageClass* klass)
      *     #WebKitDOMElement with the list of forms in the page
      *
      * Emitted after form elements (or form associated elements) are associated to a particular web
-     * page. Useful to implement form autofilling with web pages where form fields are dynamically
-     * added (as many JS frameworks do). This might be emitted multiple times for the same web page.
+     * page. This is useful to implement form auto filling for web pages where form fields are added
+     * dynamically. This signal might be emitted multiple times for the same web page.
      *
      * Note that this signal could be also emitted when form controls are moved between forms. In
-     * those cases the @elements array carries the list of those elements which have moved.
+     * that case, the @elements array carries the list of those elements which have moved.
      *
-     * In any case the members of the @elements array will be alive during signal emission so
-     * clients should take a reference to keep them alive.
+     * Clients should take a reference to the members of the @elements array if it is desired to
+     * keep them alive after the signal handler returns.
      *
      * Since: 2.16
      */
