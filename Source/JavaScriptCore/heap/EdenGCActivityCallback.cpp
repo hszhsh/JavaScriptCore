@@ -83,7 +83,7 @@ void EdenGCActivityCallback::doCollection()
 
 double EdenGCActivityCallback::lastGCLength()
 {
-    return m_vm->heap.lastEdenGCLength();
+    return m_vm->heap.lastEdenGCLength().seconds();
 }
 
 double EdenGCActivityCallback::deathRate()

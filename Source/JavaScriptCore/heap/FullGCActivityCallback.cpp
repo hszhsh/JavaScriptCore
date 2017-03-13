@@ -100,7 +100,7 @@ void FullGCActivityCallback::doCollection()
 
 double FullGCActivityCallback::lastGCLength()
 {
-    return m_vm->heap.lastFullGCLength();
+    return m_vm->heap.lastFullGCLength().seconds();
 }
 
 double FullGCActivityCallback::deathRate()

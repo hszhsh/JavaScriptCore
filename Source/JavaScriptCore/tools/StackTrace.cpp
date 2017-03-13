@@ -32,6 +32,9 @@
 #include <cxxabi.h>
 #include <dlfcn.h>
 #include <execinfo.h>
+#elif OS(ANDROID)
+#include <cxxabi.h>
+#include <dlfcn.h>
 #endif
 
 #if OS(DARWIN) || OS(LINUX)
